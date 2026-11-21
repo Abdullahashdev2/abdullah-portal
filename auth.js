@@ -40,19 +40,23 @@ async function init() {
     async get(id) { const s = await F.getDoc(ref(id)); return s.exists() ? s.data() : null; },
     set(id, data) { return F.setDoc(ref(id), data); },
     async submitScore(id, score) {
-      const app = appById(id);
-      if (!app || !app.leaderboard || !auth.currentUser) return;
+      const board = boardById(id);
+      if (!board || !auth.currentUser) return;
       const u = auth.currentUser, r = F.doc(db, "leaderboards", id, "scores", u.uid);
       const cur = await F.getDoc(r);
-      if (cur.exists() && !isBetter(app, score, cur.data().score)) return;
+      if (cur.exists() && !isBetter(board, score, cur.data().score)) return;
       await F.setDoc(r, { name: firstName(u), photo: u.photoURL || "", score, updatedAt: Date.now() });
     },
   };
 
   // ---------- المتصدرين ----------
-  const appById = (id) => window.PORTAL.apps.find((a) => a.id === id);
-  const lbApps = () => window.PORTAL.apps.filter((a) => a.leaderboard);
-  const isBetter = (app, a, b) => (app.leaderboard.lowerIsBetter ? a < b : a > b);
+  // كل لعبة لها لوحة وحدة، أو أكثر عن طريق boards
+  const lbBoards = () => window.PORTAL.apps.filter((a) => a.leaderboard).flatMap((a) =>
+    a.leaderboard.boards
+      ? a.leaderboard.boards.map((b) => ({ ...b }))
+      : [{ id: a.id, name: a.name, unit: a.leaderboard.unit, lowerIsBetter: a.leaderboard.lowerIsBetter }]);
+  const boardById = (id) => lbBoards().find((b) => b.id === id);
+  const isBetter = (b, x, y) => (b.lowerIsBetter ? x < y : x > y);
   const firstName = (u) => (u.displayName || u.email.split("@")[0]).trim().split(/\s+/)[0].slice(0, 20);
   let lbCurrent = null;
 
@@ -66,7 +70,7 @@ async function init() {
 
   async function renderLeaderboard(id) {
     lbCurrent = id;
-    const app = appById(id), lb = app.leaderboard, user = auth.currentUser;
+    const lb = boardById(id), user = auth.currentUser;
     document.querySelectorAll("#lbTabs button").forEach((b) => b.classList.toggle("active", b.dataset.id === id));
     const list = $("#lbList"), mine = $("#lbMine");
     list.innerHTML = ""; mine.hidden = true;
@@ -108,15 +112,15 @@ async function init() {
     }
   }
 
-  if (lbApps().length) {
+  if (lbBoards().length) {
     $("#lbBtn").hidden = false;
-    lbApps().forEach((a) => {
+    lbBoards().forEach((a) => {
       const b = document.createElement("button");
       b.type = "button"; b.dataset.id = a.id; b.textContent = a.name;
       b.onclick = () => renderLeaderboard(a.id);
       $("#lbTabs").appendChild(b);
     });
-    P.onLeaderboardOpen = () => renderLeaderboard(lbCurrent || lbApps()[0].id);
+    P.onLeaderboardOpen = () => renderLeaderboard(lbCurrent || lbBoards()[0].id);
     $("#lbLogin").onclick = () => { P.renderProgress(); P.openSheet("#authSheet"); };
   }
 
@@ -129,7 +133,8 @@ async function init() {
         else if (c && (!l || (c.updatedAt || 0) >= (l.updatedAt || 0))) P.setLocalSave(id, c);
         else if (c && l) await cloud.set(id, l);
         const best = P.localSave(id);
-        if (best && typeof best.score === "number") await cloud.submitScore(id, best.score);
+        const sc = best && (best.scores || (typeof best.score === "number" ? { [id]: best.score } : {}));
+        for (const [bid, v] of Object.entries(sc || {})) if (typeof v === "number" && v > 0) await cloud.submitScore(bid, v);
       } catch (e) {}
     }));
     P.renderGrid();

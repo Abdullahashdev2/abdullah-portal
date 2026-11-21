@@ -39,8 +39,27 @@ window.PORTAL = {
      - leaderboard: يفعّل لوحة المتصدرين للعبة
          { unit: "نقطة" }                       ← الأعلى أفضل
          { unit: "محاولة", lowerIsBetter: true } ← الأقل أفضل
+         { boards: [{ id, name, unit }, ...] } ← أكثر من لوحة للعبة وحدة
+           (اللعبة ترسل Game.save(id, { scores: { boardId: رقم } }))
   */
   apps: [
+    {
+      id: "saeq-albatal",
+      name: "السائق البطل",
+      description: "قُد من داخل السيارة 3D، أو العب الكلاسيكية، أو روّق في وضع الروقان 🚗",
+      icon: "🚗",
+      color: "#fde68a",
+      category: "games",
+      url: "apps/saeq-albatal/",
+      open: "inside",
+      isNew: true,
+      leaderboard: {
+        boards: [
+          { id: "saeq-3d", name: "🎮 السائق 3D", unit: "نقطة" },
+          { id: "saeq-classic", name: "🚗 السائق الكلاسيكي", unit: "نقطة" },
+        ],
+      },
+    },
     {
       id: "memory-game",
       name: "لعبة الذاكرة",
@@ -50,7 +69,6 @@ window.PORTAL = {
       category: "games",
       url: "apps/memory-game/",
       open: "inside",
-      isNew: true,
       leaderboard: { unit: "محاولة", lowerIsBetter: true },
     },
     {

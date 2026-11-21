@@ -31,7 +31,10 @@
       renderGrid(); renderProgress();
       if (this.cloud) {
         try { await this.cloud.set(id, data); } catch (e) { console.warn("cloud save failed", e); }
-        if (typeof data.score === "number") { try { await this.cloud.submitScore(id, data.score); } catch (e) { console.warn("score failed", e); } }
+        const scores = data.scores || (typeof data.score === "number" ? { [id]: data.score } : {});
+        for (const [bid, v] of Object.entries(scores)) {
+          if (typeof v === "number" && v > 0) { try { await this.cloud.submitScore(bid, v); } catch (e) { console.warn("score failed", e); } }
+        }
       }
     },
   };
