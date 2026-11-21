@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>لعبة الذاكرة</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;800&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; font-family: Tajawal, sans-serif; background: linear-gradient(160deg, #fff1e8, #ffeaf3);
+    display: flex; flex-direction: column; align-items: center; padding: 20px 16px; color: #3d2c29; user-select: none; -webkit-user-select: none; }
+  h1 { margin: 0 0 6px; font-size: 1.8em; }
+  .stats { display: flex; gap: 12px; margin-bottom: 16px; }
+  .stats span { background: #fff; padding: 8px 16px; border-radius: 14px; font-weight: 800; box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: min(420px, 100%); }
+  .c { aspect-ratio: 1; perspective: 600px; cursor: pointer; }
+  .in { position: relative; width: 100%; height: 100%; transition: transform .4s; transform-style: preserve-3d; }
+  .c.flip .in, .c.done .in { transform: rotateY(180deg); }
+  .f { position: absolute; inset: 0; border-radius: 18px; display: grid; place-items: center; backface-visibility: hidden; font-size: clamp(28px, 9vw, 42px); }
+  .front { background: linear-gradient(135deg, #ff8a65, #ffb74d); box-shadow: 0 6px 14px rgba(255,138,101,.35); color: #fff; font-size: 28px; }
+  .back { background: #fff; transform: rotateY(180deg); box-shadow: 0 6px 14px rgba(0,0,0,.08); }
+  .c.done .back { background: #e4ffd6; }
+  button.again { margin-top: 18px; border: 0; padding: 14px 28px; border-radius: 18px; font: inherit; font-weight: 800;
+    background: linear-gradient(90deg, #ff8a65, #ffb74d); color: #fff; cursor: pointer; }
+  .best { margin-top: 6px; color: #8a7570; font-weight: 800; min-height: 1.2em; }
+  .win { font-size: 1.3em; font-weight: 800; margin-top: 14px; min-height: 1.5em; }
+</style>
+</head>
+<body>
+  <h1>🧠 لعبة الذاكرة</h1>
+  <div class="stats"><span id="moves">المحاولات: 0</span><span id="pairs">الأزواج: 0/8</span></div>
+  <div class="board" id="board"></div>
+  <div class="win" id="win"></div>
+  <div class="best" id="best"></div>
+  <button class="again" id="again">🔄 لعبة جديدة</button>
+<script src="../portal-sdk.js"></script>
+<script>
+  const EMOJI = ["🐱","🐶","🦊","🐼","🐸","🦁","🐵","🐰"];
+  let first = null, lock = false, moves = 0, pairs = 0;
+  const board = document.getElementById("board");
+  function start() {
+    board.innerHTML = ""; first = null; lock = false; moves = 0; pairs = 0; update();
+    document.getElementById("win").textContent = "";
+    [...EMOJI, ...EMOJI].sort(() => Math.random() - .5).forEach((e) => {
+      const c = document.createElement("div");
+      c.className = "c"; c.dataset.e = e;
+      c.innerHTML = `<div class="in"><div class="f front">?</div><div class="f back">${e}</div></div>`;
+      c.onclick = () => pick(c);
+      board.appendChild(c);
+    });
+  }
+  function update() {
+    document.getElementById("moves").textContent = "المحاولات: " + moves;
+    document.getElementById("pairs").textContent = "الأزواج: " + pairs + "/8";
+  }
+  function pick(c) {
+    if (lock || c === first || c.classList.contains("done")) return;
+    c.classList.add("flip");
+    if (!first) { first = c; return; }
+    moves++;
+    if (first.dataset.e === c.dataset.e) {
+      first.classList.add("done"); c.classList.add("done"); first = null; pairs++;
+      if (pairs === 8) finish();
+    } else {
+      lock = true; const a = first; first = null;
+      setTimeout(() => { a.classList.remove("flip"); c.classList.remove("flip"); lock = false; }, 800);
+    }
+    update();
+  }
+  // حفظ أفضل نتيجة
+  let record = null;
+  Game.load("memory-game").then((d) => { record = d; showBest(); });
+  function showBest() {
+    document.getElementById("best").textContent = record ? "🏆 أفضل نتيجة: " + record.best + " محاولة" : "";
+  }
+  function finish() {
+    const isBest = !record || moves < record.best;
+    const best = isBest ? moves : record.best;
+    const wins = ((record && record.wins) || 0) + 1;
+    record = { best, wins, score: best, summary: "أفضل: " + best + " محاولة · فاز " + wins };
+    Game.save("memory-game", record);
+    showBest();
+    document.getElementById("win").textContent = isBest
+      ? `🎉 رقم قياسي جديد! ${moves} محاولة`
+      : `👏 أحسنت! خلصتها في ${moves} محاولة`;
+  }
+  document.getElementById("again").onclick = start;
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  start();
+</script>
+</body>
+</html>

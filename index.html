@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>برامج وتطبيقات عبدالله</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="hero">
+    <div class="hero-top">
+      <div class="logo">🏡</div>
+      <div class="top-actions">
+        <button class="icon-btn" id="lbBtn" aria-label="المتصدرين" title="المتصدرين" hidden>🏆</button>
+        <button class="icon-btn account-btn" id="accountBtn" aria-label="حسابي" title="حسابي" hidden>👤</button>
+        <button class="icon-btn" id="settingsBtn" aria-label="تخصيص الواجهة" title="تخصيص الواجهة">🎨</button>
+      </div>
+    </div>
+    <p class="greeting" id="greeting"></p>
+    <h1 id="title"></h1>
+    <p class="subtitle" id="subtitle"></p>
+
+    <div class="search">
+      <span>🔍</span>
+      <input id="search" type="search" placeholder="ابحث عن لعبة أو برنامج..." autocomplete="off" />
+    </div>
+  </header>
+
+  <main>
+    <nav class="chips" id="chips"></nav>
+    <section class="grid" id="grid"></section>
+    <p class="empty" id="empty" hidden>ما لقينا شي 🤔 جرّب كلمة ثانية</p>
+  </main>
+
+  <footer id="footer"></footer>
+
+  <!-- عارض التطبيقات داخل البوابة -->
+  <div class="viewer" id="viewer" hidden>
+    <div class="viewer-bar">
+      <button class="icon-btn" id="closeViewer" aria-label="رجوع">→</button>
+      <strong id="viewerTitle"></strong>
+      <button class="icon-btn" id="fullViewer" aria-label="ملء الشاشة">⛶</button>
+    </div>
+    <iframe id="frame" title="التطبيق" allow="fullscreen; autoplay; gamepad" referrerpolicy="no-referrer"></iframe>
+  </div>
+
+  <!-- لوحة التخصيص -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <aside class="sheet" id="sheet" aria-hidden="true">
+    <h2>🎨 خصّص الواجهة</h2>
+    <label>لون الواجهة</label>
+    <div class="themes" id="themes"></div>
+
+    <label>الوضع</label>
+    <div class="seg" id="modeSeg">
+      <button data-mode="light">☀️ فاتح</button>
+      <button data-mode="dark">🌙 داكن</button>
+      <button data-mode="auto">⚙️ تلقائي</button>
+    </div>
+
+    <label>حجم الخط</label>
+    <div class="seg" id="sizeSeg">
+      <button data-size="sm">صغير</button>
+      <button data-size="md">متوسط</button>
+      <button data-size="lg">كبير</button>
+    </div>
+
+    <label>شكل العرض</label>
+    <div class="seg" id="layoutSeg">
+      <button data-layout="grid">▦ مربعات</button>
+      <button data-layout="list">☰ قائمة</button>
+    </div>
+
+    <div id="nameField">
+      <label for="nameInput">اسمك (للترحيب)</label>
+      <input id="nameInput" class="text-input" maxlength="20" placeholder="مثلاً: نورة" />
+    </div>
+
+    <button class="primary" id="closeSheet">تم ✓</button>
+  </aside>
+
+  <!-- لوحة الحساب -->
+  <aside class="sheet" id="authSheet" aria-hidden="true">
+    <div id="loginView">
+      <h2 id="authTitle">👋 تسجيل الدخول</h2>
+      <p class="muted center">سجّل دخول عشان يتحفظ تقدمك في كل الألعاب وعلى أي جهاز</p>
+      <button class="google-btn" id="googleBtn" type="button">
+        <svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        الدخول بحساب Google
+      </button>
+      <div class="or"><span>أو بالإيميل</span></div>
+      <form id="authForm" novalidate>
+        <div id="nameRow" hidden>
+          <input id="signupName" class="text-input" maxlength="20" placeholder="اسمك" autocomplete="name" />
+        </div>
+        <input id="email" class="text-input" type="email" placeholder="الإيميل" autocomplete="email" dir="ltr" />
+        <input id="password" class="text-input" type="password" placeholder="كلمة المرور (6 أحرف أو أكثر)" autocomplete="current-password" dir="ltr" />
+        <p class="auth-msg" id="authMsg" role="status"></p>
+        <button class="primary" id="authSubmit" type="submit">دخول</button>
+      </form>
+      <button class="link-btn" id="forgot" type="button">نسيت كلمة المرور؟</button>
+      <button class="link-btn strong" id="authSwitch" type="button">ما عندك حساب؟ سجّل الآن</button>
+    </div>
+
+    <div id="accountView" hidden>
+      <div class="profile">
+        <div class="avatar" id="avatar"></div>
+        <div><strong id="accountName"></strong><div class="muted" id="accountEmail" dir="ltr"></div></div>
+      </div>
+      <label>🏆 تقدّمي</label>
+      <div id="progressList"></div>
+      <button class="primary" data-close type="button">تم ✓</button>
+      <button class="link-btn danger" id="logoutBtn" type="button">تسجيل الخروج</button>
+    </div>
+  </aside>
+
+  <!-- لوحة المتصدرين -->
+  <aside class="sheet" id="lbSheet" aria-hidden="true">
+    <h2>🏆 المتصدرين</h2>
+    <div class="lb-tabs" id="lbTabs"></div>
+    <p class="muted center" id="lbHint"></p>
+    <ol class="lb-list" id="lbList"></ol>
+    <div class="lb-mine" id="lbMine" hidden></div>
+    <button class="primary" id="lbLogin" type="button" hidden>سجّل دخول وتنافس 🚀</button>
+    <button class="link-btn" data-close type="button">إغلاق</button>
+  </aside>
+
+  <script src="app.js"></script>
+  <script type="module" src="auth.js"></script>
+</body>
+</html>
