@@ -19,6 +19,7 @@
     <div class="hero-top">
       <div class="logo">🏡</div>
       <div class="top-actions">
+        <button class="icon-btn bell-btn" id="newsBtn" aria-label="الإشعارات" title="الإشعارات">🔔<span class="dot" id="newsDot" hidden></span></button>
         <button class="icon-btn" id="lbBtn" aria-label="المتصدرين" title="المتصدرين" hidden>🏆</button>
         <button class="icon-btn account-btn" id="accountBtn" aria-label="حسابي" title="حسابي" hidden>👤</button>
         <button class="icon-btn" id="settingsBtn" aria-label="تخصيص الواجهة" title="تخصيص الواجهة">🎨</button>
@@ -120,6 +121,20 @@
       <button class="primary" data-close type="button">تم ✓</button>
       <button class="link-btn danger" id="logoutBtn" type="button">تسجيل الخروج</button>
     </div>
+  </aside>
+
+  <!-- إشعار منبثق -->
+  <button class="toast" id="newsToast" type="button" hidden>
+    <span class="toast-icon">🎉</span>
+    <span class="toast-text"><b id="toastTitle"></b><small>اضغط وشوف الجديد</small></span>
+    <span class="toast-x" id="toastClose" aria-label="إغلاق">✕</span>
+  </button>
+
+  <!-- لوحة الإشعارات -->
+  <aside class="sheet" id="newsSheet" aria-hidden="true">
+    <h2>🔔 الإشعارات</h2>
+    <div id="newsList"></div>
+    <button class="link-btn" data-close type="button">إغلاق</button>
   </aside>
 
   <!-- لوحة المتصدرين -->

@@ -54,6 +54,11 @@
   };
   let accountName = null;
   let favs = new Set(store.get("favs2", []));
+  const NEWS = C.news || [];
+  let seenNews = new Set(store.get("seenNews", []));
+  const unseen = () => NEWS.filter((n) => !seenNews.has(n.id));
+  const appUpdated = (a) => NEWS.some((n) => n.app === a.id && !seenNews.has(n.id));
+  function markSeen(ids) { ids.forEach((i) => seenNews.add(i)); store.set("seenNews", [...seenNews]); }
   let filter = "all";
   let query = "";
 
@@ -133,7 +138,8 @@
         info.appendChild(pr);
       }
       card.appendChild(info);
-      if (a.isNew) { const s = document.createElement("span"); s.className = "badge"; s.textContent = "جديد"; card.appendChild(s); }
+      if (appUpdated(a)) { const s = document.createElement("span"); s.className = "badge upd"; s.textContent = "✨ محدّث"; card.appendChild(s); }
+      else if (a.isNew) { const s = document.createElement("span"); s.className = "badge"; s.textContent = "جديد"; card.appendChild(s); }
       const open = document.createElement("button");
       open.className = "open"; open.setAttribute("aria-label", "افتح " + a.name);
       open.onclick = () => launch(a);
@@ -171,6 +177,8 @@
 
   // ---------- فتح التطبيقات ----------
   function launch(a) {
+    const ids = NEWS.filter((n) => n.app === a.id).map((n) => n.id);
+    if (ids.some((i) => !seenNews.has(i))) { markSeen(ids); renderNewsState(); renderGrid(); }
     if (a.open === "tab") { window.open(a.url, "_blank", "noopener"); return; }
     $("#viewerTitle").textContent = a.name;
     $("#frame").src = a.url;
@@ -218,6 +226,60 @@
 
   $("#search").oninput = (e) => { query = e.target.value; renderGrid(); };
 
+  // ---------- الإشعارات ----------
+  function fmtDate(d) {
+    try { return new Date(d + "T12:00:00").toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "long" }); } catch { return d; }
+  }
+  function renderNewsState() {
+    const n = unseen().length;
+    $("#newsDot").hidden = n === 0;
+    $("#newsDot").textContent = n > 9 ? "9+" : n;
+    $("#newsBtn").hidden = NEWS.length === 0;
+  }
+  function renderNews() {
+    const box = $("#newsList");
+    box.innerHTML = "";
+    if (!NEWS.length) { box.innerHTML = '<p class="muted center">ما فيه إشعارات حالياً 😊</p>'; return; }
+    NEWS.forEach((n) => {
+      const card = document.createElement("article");
+      card.className = "news-card" + (seenNews.has(n.id) ? "" : " unread");
+      const h = document.createElement("div"); h.className = "news-head";
+      const t = document.createElement("b"); t.textContent = n.title;
+      const d = document.createElement("small"); d.textContent = fmtDate(n.date);
+      h.append(t, d); card.appendChild(h);
+      if (n.items && n.items.length) {
+        const ul = document.createElement("ul");
+        n.items.forEach((it) => { const li = document.createElement("li"); li.textContent = it; ul.appendChild(li); });
+        card.appendChild(ul);
+      }
+      const app = n.app && C.apps.find((a) => a.id === n.app);
+      if (app) {
+        const b = document.createElement("button"); b.className = "primary small"; b.type = "button";
+        b.textContent = "▶ افتح " + app.name;
+        b.onclick = () => { closeSheets(); launch(app); };
+        card.appendChild(b);
+      }
+      box.appendChild(card);
+    });
+  }
+  function openNews() {
+    $("#newsToast").hidden = true;
+    renderNews(); openSheet("#newsSheet");
+    markSeen(NEWS.map((n) => n.id)); renderNewsState(); renderGrid();
+  }
+  $("#newsBtn").onclick = openNews;
+  $("#newsToast").onclick = (e) => {
+    if (e.target.id === "toastClose") { $("#newsToast").hidden = true; return; }
+    openNews();
+  };
+  function showToast() {
+    const u = unseen();
+    if (!u.length) return;
+    $("#toastTitle").textContent = u[0].title + (u.length > 1 ? ` (+${u.length - 1})` : "");
+    setTimeout(() => { $("#newsToast").hidden = false; }, 700);
+    setTimeout(() => { $("#newsToast").hidden = true; }, 9000);
+  }
+
   // ---------- واجهة لـ auth.js ----------
   window.Portal = {
     appIds: () => C.apps.map((a) => a.id),
@@ -237,5 +299,5 @@
     if (e.key === "F12" || ((e.ctrlKey || e.metaKey) && e.shiftKey && ["i", "j", "c"].includes(k))) e.preventDefault();
   });
 
-  renderChips(); renderGrid(); applyPrefs();
+  renderChips(); renderGrid(); applyPrefs(); renderNewsState(); showToast();
 })();
