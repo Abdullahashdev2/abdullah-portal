@@ -389,7 +389,7 @@ const saveC=()=>store.set('sb3_chill',C);
 
 /* ================= AUDIO ================= */
 let AC=null,master=null,recDest=null,noiseBuf=null;
-function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.connect(AC.destination);try{recDest=AC.createMediaStreamDestination();master.connect(recDest);}catch(e){recDest=null;}
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.connect(AC.destination);window.__gameMaster=master;window.__gameAC=AC;try{recDest=AC.createMediaStreamDestination();master.connect(recDest);}catch(e){recDest=null;}
  const len=AC.sampleRate*2;noiseBuf=AC.createBuffer(1,len,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;}catch(e){AC=null;}}
  if(AC&&AC.state==='suspended'){try{AC.resume();}catch(e){}}return AC;}
 function beep(f,d,type,vol,slide){if(!S.sound)return;const a=ac();if(!a)return;try{const o=a.createOscillator(),g=a.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,a.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(40,f+slide),a.currentTime+d);g.gain.setValueAtTime(vol||.12,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+d);o.connect(g);g.connect(master);o.start();o.stop(a.currentTime+d);}catch(e){}}
@@ -1270,13 +1270,13 @@ vPos=w+uOff;vN=n;vCol=aCol;vUv=aUv;vMat=aMat;vL=p;vLN=aN;gl_Position=uVP*vec4(vP
 precision highp float;
 in vec3 vPos;in vec3 vN;in vec3 vCol;in vec2 vUv;in float vMat;in vec3 vL;in vec3 vLN;
 uniform vec3 uTint,uSunDir,uSunCol,uAmbSky,uAmbGnd,uFogCol,uSkyTop,uSkyHor,uLampCol,uHeadDir,uEmisCol,uHeadPos,uCamPos;uniform float uCaus;
-uniform float uFogD,uNight,uWet,uTime,uEmis,uEmisHead,uEmisTail,uHead,uWinLit,uAlpha;
+uniform float uFogD,uNight,uWet,uTime,uEmis,uEmisHead,uEmisTail,uHead,uWinLit,uAlpha;uniform vec2 uWOff;
 uniform vec4 uLamps[8];uniform vec4 uUvRect;uniform sampler2D uTex;
 out vec4 o;
 ${NOISE}
 void main(){
  int m=int(vMat+.5);vec3 V=normalize(-vPos);vec3 N=normalize(vN);if(dot(N,V)<0.)N=-N;
- vec3 base=vCol;float spec=0.,rough=.8;vec3 emis=vec3(0);float alpha=1.;float caus=0.;
+ vec3 base=vCol;float spec=0.,rough=.8;vec3 emis=vec3(0);float alpha=1.;float caus=0.;float glit=0.;
  if(m==0){base=uTint;spec=.9;rough=.2;}
  else if(m==2){vec2 g=abs(vLN.x)>.5?vec2(vL.z,vL.y):vec2(vL.x,vL.y);vec2 cs=vec2(3.2,3.5);vec2 id=floor(g/cs),f=fract(g/cs);
   base=vCol*uTint*(.82+.18*vn(g*.7));
@@ -1289,8 +1289,14 @@ void main(){
  else if(m==3){float x=vUv.x,a=vUv.y;base=vCol*.72*(.8+.3*vn(vPos.xz*2.5+vec2(a*3.))+.12*vn(vec2(x*2.,a*.5)));
   float dash=step(fract(a/12.),.45);float ln=dash*(1.-smoothstep(.06,.09,abs(abs(x)-1.8)));ln+=1.-smoothstep(.07,.1,abs(abs(x)-5.1));
   base=mix(base,vec3(.93),clamp(ln,0.,1.)*.9);spec=mix(.12,.7,uWet);rough=mix(.65,.18,uWet);}
- else if(m==4){vec2 w=vPos.xz+vec2(uTime*.4,0.);float t=uTime;N=normalize(vec3(.14*cos(vUv.y*.35+t*1.3)+.08*(vn(w*1.1+t*.3)-.5),1.,.1*cos(vUv.x*.27-t*1.1)+.08*(vn(w*1.7-t*.2)-.5)));
-  base=vCol;spec=1.;rough=.05;float foam=smoothstep(2.2,0.,vUv.x+sin(t*1.3+vUv.y*.3)*.7);base=mix(base,vec3(.93),foam*.85);}
+ else if(m==4){float t=uTime;vec2 g=vPos.xz+uWOff;float dist=length(vPos);float df=1.-smoothstep(35.,240.,dist);
+  float n1=vn(g*.33+vec2(t*.22,t*.09)),n2=vn(g*.85-vec2(t*.37,-t*.18)),n3=vn(g*2.2+vec2(t*.62,t*.27)),n4=vn(g*5.3-vec2(t*.9,t*.4));
+  vec2 dn=vec2(.13*cos(vUv.y*.35+t*1.3),.09*cos(vUv.x*.27-t*1.1))+(vec2(n1,n2)-.5)*.22+(vec2(n2,n3)-.5)*.13*df+(vec2(n3,n4)-.5)*.09*df*df;
+  N=normalize(vec3(dn.x,1.,dn.y));
+  float deep=smoothstep(1.5,42.,vUv.x);vec3 shallow=vCol*vec3(.72,1.22,1.12)+vec3(.02,.075,.065);
+  base=mix(shallow,vCol*.82,deep);spec=1.;rough=.035;
+  float foam=smoothstep(2.2,0.,vUv.x+sin(t*1.3+vUv.y*.3)*.7)*(.75+.5*vn(g*3.1+t));base=mix(base,vec3(.95),clamp(foam,0.,1.)*.85);
+  float crest=smoothstep(.74,.92,n1*.55+n2*.5)*df*.22;base=mix(base,vec3(.92),crest);glit=1.;}
  else if(m==6){emis=vCol*uEmis;base=vCol*.3;}
  else if(m==12){emis=vCol*uEmisHead;base=vCol*.4;}
  else if(m==14){emis=vCol*uEmisTail;base=vCol*.4;}
@@ -1311,22 +1317,38 @@ void main(){
  for(int i=0;i<8;i++){vec4 lp=uLamps[i];if(lp.w<=0.)continue;vec3 Lv=lp.xyz-vPos;float d2=dot(Lv,Lv);vec3 L=Lv*inversesqrt(d2);float at=lp.w*55./(d2+3.);c+=base*uLampCol*at*max(dot(N,L),0.);
   if(spec>0.){vec3 H=normalize(L+V);c+=uLampCol*at*spec*pow(max(dot(N,H),0.),mix(8.,220.,1.-rough))*.8;}}
  if(spec>0.){vec3 H=normalize(uSunDir+V);c+=uSunCol*spec*pow(max(dot(N,H),0.),mix(8.,300.,1.-rough))*.6;vec3 R=reflect(-V,N);float fr=.04+.96*pow(1.-max(dot(N,V),0.),5.);vec3 sk=mix(uSkyHor,uSkyTop,clamp(R.y*2.5,0.,1.));c=mix(c,sk,clamp(fr*spec*(1.-rough*.7)*(m==3?.45:m==4?.55:1.),0.,1.));}
+ if(glit>0.){vec3 R=reflect(-V,N);float rs=max(dot(R,uSunDir),0.);float sp=step(.86,h21(floor((vPos.xz+uWOff)*5.)+floor(uTime*7.)));
+  c+=uSunCol*(pow(rs,160.)*1.6+pow(rs,900.)*sp*22.)*(1.-uNight);}
  c+=emis+base*caus*1.6*(uSunCol+.25);
  float dist=length(vPos);float fg=1.-exp(-pow(dist*uFogD,2.));c=mix(c,uFogCol,fg);
  o=vec4(c,alpha*(m==9?1.-fg:1.)*uAlpha);}`;
  const VS_Q=`#version 300 es
 out vec2 vUv;void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));vUv=p;gl_Position=vec4(p*2.-1.,0.,1.);}`;
  const FS_SKY=`#version 300 es
-precision highp float;in vec2 vUv;uniform mat4 uInv;uniform vec3 uSkyTop,uSkyHor,uSunDir,uSunCol,uCloudCol,uMoonDir;uniform float uCloud,uTime,uStars,uSunVis,uMoonVis;out vec4 o;
+precision highp float;in vec2 vUv;uniform mat4 uInv;uniform vec3 uSkyTop,uSkyHor,uSunDir,uSunCol,uCloudCol,uMoonDir;uniform float uCloud,uTime,uStars,uSunVis,uMoonVis,uQ;out vec4 o;
 ${NOISE}
 float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*vn(p);p*=2.03;a*=.5;}return s;}
 void main(){vec4 q=uInv*vec4(vUv*2.-1.,1.,1.);vec3 d=normalize(q.xyz/q.w);float y=d.y;
- vec3 c=mix(uSkyHor,uSkyTop,pow(clamp(y,0.,1.),.5));if(y<0.)c=uSkyHor*(.8+.2*exp(y*8.));
- float sd=max(dot(d,uSunDir),0.);c+=uSunCol*(pow(sd,900.)*8.+pow(sd,14.)*.3)*uSunVis;
+ float sd=max(dot(d,uSunDir),0.);float sunH=clamp(uSunDir.y,0.,1.);
+ vec3 c=mix(uSkyHor,uSkyTop,pow(clamp(y,0.,1.),.5));
+ float hz=exp(-abs(y)*9.);c=mix(c,uSkyHor*1.1+uSunCol*.06*uSunVis,hz*.5*uQ);
+ vec3 warm=mix(vec3(1.,.5,.25),vec3(1.,.9,.78),smoothstep(.04,.45,sunH));
+ c+=warm*uSunVis*uQ*(pow(sd,5.)*.2+pow(sd,40.)*.35)*(.55+.9*hz);
+ c+=uSunCol*(pow(sd,900.)*8.+pow(sd,14.)*.3)*uSunVis;
+ if(y<0.)c=mix(c,uSkyHor*(.8+.2*exp(y*8.)),smoothstep(0.,-.03,y));
  float md=max(dot(d,uMoonDir),0.);c+=vec3(.95,.93,.85)*(smoothstep(.99955,.9997,md)*1.4+pow(md,90.)*.12)*uMoonVis;
  if(uStars>0.&&y>0.){vec2 sp=d.xz/(y+.35)*200.;float hs=h21(floor(sp));c+=step(.9965,hs)*uStars*(.55+.45*sin(uTime*2.+hs*40.));}
- if(y>.005&&uCloud>0.){vec2 cp=d.xz/(y+.04)*1.1+vec2(uTime*.012,uTime*.005);float n=fbm(cp);float cov=smoothstep(1.-uCloud,1.-uCloud+.38,n);float sh=fbm(cp*1.3+vec2(.2,.1));
-  vec3 cc=uCloudCol*(1.05-.45*sh)+uSunCol*.25*uSunVis*pow(sd,3.);c=mix(c,cc,cov*smoothstep(0.,.12,y)*.96);}
+ if(y>.005&&uCloud>0.){vec2 cp=d.xz/(y+.04)*1.1+vec2(uTime*.012,uTime*.005);float fh=smoothstep(0.,.12,y);
+  if(uQ>.5){vec2 wq=vec2(fbm(cp*.55+uTime*.004),fbm(cp*.55+vec2(5.2,1.3)-uTime*.003));vec2 cw=cp+wq*.6;
+   float n=fbm(cw);float cov=smoothstep(1.-uCloud,1.-uCloud+.36,n);
+   vec2 sv=uSunDir.xz;float sl=length(sv);sv=sl>1e-3?sv/sl:vec2(0.,1.);float ns=fbm(cw+sv*.14);float lit=clamp((n-ns)*5.+.55,0.,1.);
+   float sh=fbm(cw*1.35+vec2(.2,.1));float edge=1.-smoothstep(0.,.25,cov);
+   vec3 cc=uCloudCol*(.7+.45*lit-.28*sh)+uSunCol*uSunVis*mix(warm,vec3(1.),.4)*(.22*pow(sd,3.)+.3*lit*pow(sd,1.5)+.9*edge*pow(sd,8.));
+   c=mix(c,cc,cov*fh*.96);
+   vec2 cp2=d.xz/(y+.09)*.42+vec2(uTime*.018,0.);float n2=fbm(cp2*vec2(1.,3.2));float c2=smoothstep(.56,.86,n2)*.32*(1.-cov)*fh*min(1.,uCloud+.35);
+   c=mix(c,uCloudCol*1.08+warm*.12*uSunVis,c2);}
+  else{float n=fbm(cp);float cov=smoothstep(1.-uCloud,1.-uCloud+.38,n);float sh=fbm(cp*1.3+vec2(.2,.1));
+   vec3 cc=uCloudCol*(1.05-.45*sh)+uSunCol*.25*uSunVis*pow(sd,3.);c=mix(c,cc,cov*fh*.96);}}
  o=vec4(c,1.);}`;
  const FS_BRIGHT=`#version 300 es
 precision highp float;in vec2 vUv;uniform sampler2D uT;uniform float uThr;out vec4 o;
@@ -1335,11 +1357,13 @@ void main(){vec3 c=texture(uT,vUv).rgb;float l=max(c.r,max(c.g,c.b));o=vec4(c*ma
 precision highp float;in vec2 vUv;uniform sampler2D uT;uniform vec2 uDir;out vec4 o;
 void main(){vec3 c=texture(uT,vUv).rgb*.227;c+=(texture(uT,vUv+uDir*1.385).rgb+texture(uT,vUv-uDir*1.385).rgb)*.316;c+=(texture(uT,vUv+uDir*3.23).rgb+texture(uT,vUv-uDir*3.23).rgb)*.07;o=vec4(c,1.);}`;
  const FS_COMP=`#version 300 es
-precision highp float;in vec2 vUv;uniform sampler2D uScene,uBloom;uniform float uBloomK,uTime,uGrain,uVig,uFloat,uCA,uSat,uCon,uExp;uniform vec3 uLift,uGain;out vec4 o;
+precision highp float;in vec2 vUv;uniform sampler2D uScene,uBloom;uniform float uBloomK,uTime,uGrain,uVig,uFloat,uCA,uSat,uCon,uExp,uRays;uniform vec3 uLift,uGain;uniform vec2 uSunP;out vec4 o;
 float hh(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uScene,vUv).g;c.b=texture(uScene,vUv-d*uCA).b;
- c+=texture(uBloom,vUv).rgb*uBloomK;c*=uExp;if(uFloat>.5)c=aces(c);c=clamp(c,0.,1.);
+ c+=texture(uBloom,vUv).rgb*uBloomK;
+ if(uRays>0.){vec2 dv=(vUv-uSunP)/28.;vec2 uv=vUv;float dec=1.;vec3 r=vec3(0);for(int i=0;i<28;i++){uv-=dv;r+=max(texture(uBloom,uv).rgb-.3,0.)*dec;dec*=.92;}c+=r*uRays*.028*exp(-length((vUv-uSunP)*vec2(1.,.65))*2.4);}
+ c*=uExp;if(uFloat>.5)c=aces(c);c=clamp(c,0.,1.);
  float l=dot(c,vec3(.299,.587,.114));c=mix(vec3(l),c,uSat);c=(c-.5)*uCon+.5;c=c*uGain+uLift*(1.-c);
  c*=1.-uVig*dot(d,d)*1.9;c+=(hh(vUv*vec2(1731.,977.)+fract(uTime)*91.)-.5)*uGrain;o=vec4(clamp(c,0.,1.),1.);}`;
  function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
@@ -1539,7 +1563,7 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
  function setU(p,n,v){const l=U(p,n);if(l==null)return;if(typeof v==='number')gl.uniform1f(l,v);else if(v.length===2)gl.uniform2fv(l,v);else if(v.length===3)gl.uniform3fv(l,v);else if(v.length===4)gl.uniform4fv(l,v);else gl.uniformMatrix4fv(l,false,v);}
  function frame(V,W_,T,cam,o){
   if(!init())return false;
-  const s=Math.min(V.dpr||1,S.quality==='eco'?1:1.6);S3=s;const w=Math.max(2,Math.round(V.W*s)),h=Math.max(2,Math.round(V.H*s));
+  const s=Math.min(V.dpr||1,S.quality==='eco'?1:S.quality==='ultra'?2:1.6);S3=s;const w=Math.max(2,Math.round(V.W*s)),h=Math.max(2,Math.round(V.H*s));
   if(w!==Wp||h!==Hp){Wp=w;Hp=h;cv.width=w;cv.height=h;setupFB(w,h);}
   usePath(W_.liveR||(W_.useMap?MAP.route:null));if(namesDirty&&gl){namesDirty=false;buildAtlas();}
   if(T!==lastT){chunks.forEach(free);chunks.clear();lastT=T;if(M.back)free(M.back);M.back=buildBack(T);}
@@ -1584,14 +1608,14 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
   const p=P.main;
   const common=(vp,mirror)=>{gl.useProgram(p);setU(p,'uVP',vp);setU(p,'uSunDir',sunDir);setU(p,'uSunCol',sunCol);setU(p,'uAmbSky',ambSky);setU(p,'uAmbGnd',ambGnd);setU(p,'uFogCol',fogCol);setU(p,'uFogD',fogD);
    setU(p,'uSkyTop',skyTop);setU(p,'uSkyHor',skyHor);setU(p,'uNight',night?1:dk);setU(p,'uWet',wet);setU(p,'uTime',t);setU(p,'uLampCol',T.flicker?[.75,.85,1]:[1,.82,.58]);
-   setU(p,'uHead',mirror?0:(lightsOn(W_,lit)?(W_.row?.35:1):0));setU(p,'uHeadDir',fwd(B.h).map((v,i)=>i===1?-.1:v));{const hp=cam==='inside'?[eye[0],eye[1]-.4,eye[2]]:wpos(at(W_.z+700),right(at(W_.z+700).h),lane,.7);setU(p,'uHeadPos',[hp[0]-eye[0],hp[1]-eye[1],hp[2]-eye[2]]);}setU(p,'uWinLit',night?.45:.06);setU(p,'uAlpha',1);setU(p,'uCaus',0);setU(p,'uCamPos',[0,0,0]);
+   setU(p,'uHead',mirror?0:(lightsOn(W_,lit)?(W_.row?.35:1):0));setU(p,'uHeadDir',fwd(B.h).map((v,i)=>i===1?-.1:v));{const hp=cam==='inside'?[eye[0],eye[1]-.4,eye[2]]:wpos(at(W_.z+700),right(at(W_.z+700).h),lane,.7);setU(p,'uHeadPos',[hp[0]-eye[0],hp[1]-eye[1],hp[2]-eye[2]]);}setU(p,'uWinLit',night?.45:.06);setU(p,'uAlpha',1);setU(p,'uCaus',0);setU(p,'uCamPos',[0,0,0]);setU(p,'uWOff',[eye[0]%2000,eye[2]%2000]);
    gl.uniform4fv(U(p,'uLamps'),lampArr);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,atlas);gl.uniform1i(U(p,'uTex'),0);};
   const draw=(m,pos,yaw,scl,tint,ex)=>{if(!m)return;setU(p,'uOff',[pos[0]-eye[0],pos[1]-eye[1],pos[2]-eye[2]]);setU(p,'uYaw',yaw);setU(p,'uScl',scl||[1,1,1]);setU(p,'uTint',tint||[1,1,1]);
    if(ex){if(ex.emis!=null)setU(p,'uEmis',ex.emis);if(ex.ec)setU(p,'uEmisCol',ex.ec);if(ex.uv)setU(p,'uUvRect',ex.uv);if(ex.head!=null)setU(p,'uEmisHead',ex.head);if(ex.tail!=null)setU(p,'uEmisTail',ex.tail);}
    gl.bindVertexArray(m.vao);gl.drawArrays(gl.TRIANGLES,0,m.count);};
   const sky=(invVP)=>{gl.useProgram(P.sky);gl.disable(gl.DEPTH_TEST);gl.depthMask(false);const q=P.sky;setU(q,'uInv',invVP);setU(q,'uSkyTop',skyTop);setU(q,'uSkyHor',skyHor);setU(q,'uSunDir',sunDir);setU(q,'uSunCol',T.sun?[1.7,.9,.5]:[1.2,1.1,.95]);
    const cl=col3(T.cloud);const cov=/,\s*0\)$/.test(String(T.cloud))?0:T.heavy?.95:T.rain?.82:T.fog?.9:night?.35:T.snow?.75:.5;setU(q,'uCloudCol',night?cl.map(v=>v*.6):cl);setU(q,'uCloud',cov);setU(q,'uTime',t);
-   setU(q,'uStars',T.stars?1:0);setU(q,'uSunVis',night?0:sunVis);setU(q,'uMoonVis',T.moon?1:0);const md=[.45,.35,.82],ml=Math.hypot(...md);setU(q,'uMoonDir',md.map(v=>v/ml));
+   setU(q,'uStars',T.stars?1:0);setU(q,'uQ',S.quality==='eco'?0:1);setU(q,'uSunVis',night?0:sunVis);setU(q,'uMoonVis',T.moon?1:0);const md=[.45,.35,.82],ml=Math.hypot(...md);setU(q,'uMoonDir',md.map(v=>v/ml));
    gl.bindVertexArray(P.vao);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);};
   const scene=(mirror)=>{
    gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);
@@ -1655,10 +1679,12 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
   // ---- bloom
   gl.disable(gl.DEPTH_TEST);gl.bindVertexArray(P.vao);
   gl.bindFramebuffer(gl.FRAMEBUFFER,F.b1);gl.viewport(0,0,F.bw,F.bh);gl.useProgram(P.bright);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,F.sceneT);gl.uniform1i(U(P.bright,'uT'),0);setU(P.bright,'uThr',isFloat?1:.82);gl.drawArrays(gl.TRIANGLES,0,3);
-  gl.useProgram(P.blur);gl.uniform1i(U(P.blur,'uT'),0);for(let k=0;k<2;k++){gl.bindFramebuffer(gl.FRAMEBUFFER,F.b2);gl.bindTexture(gl.TEXTURE_2D,F.b1T);setU(P.blur,'uDir',[(1+k)/F.bw,0]);gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,F.b1);gl.bindTexture(gl.TEXTURE_2D,F.b2T);setU(P.blur,'uDir',[0,(1+k)/F.bh]);gl.drawArrays(gl.TRIANGLES,0,3);}
+  gl.useProgram(P.blur);gl.uniform1i(U(P.blur,'uT'),0);for(let k=0;k<(S.quality==='ultra'?3:2);k++){gl.bindFramebuffer(gl.FRAMEBUFFER,F.b2);gl.bindTexture(gl.TEXTURE_2D,F.b1T);setU(P.blur,'uDir',[(1+k)/F.bw,0]);gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,F.b1);gl.bindTexture(gl.TEXTURE_2D,F.b2T);setU(P.blur,'uDir',[0,(1+k)/F.bh]);gl.drawArrays(gl.TRIANGLES,0,3);}
   // ---- composite
+  let sunP=[.5,.5],rays=0;{const m=VP,x=m[0]*sunDir[0]+m[4]*sunDir[1]+m[8]*sunDir[2],y=m[1]*sunDir[0]+m[5]*sunDir[1]+m[9]*sunDir[2],w=m[3]*sunDir[0]+m[7]*sunDir[1]+m[11]*sunDir[2];
+   if(w>.01&&S.quality!=='eco'){sunP=[x/w*.5+.5,y/w*.5+.5];const e=Math.max(Math.abs(sunP[0]-.5),Math.abs(sunP[1]-.5));rays=(night?0:sunVis)*(T.sun?1.35:.85)*Math.max(0,1-Math.max(0,e-.5)/.45);}}
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,Wp,Hp);const q=P.comp;gl.useProgram(q);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,F.sceneT);gl.uniform1i(U(q,'uScene'),0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,F.b1T);gl.uniform1i(U(q,'uBloom'),1);gl.activeTexture(gl.TEXTURE0);
-  const G=GRADES[S.grade]||GRADES.cinema;setU(q,'uBloomK',(lit?1.1:.55)*G.bloom);setU(q,'uTime',t);setU(q,'uGrain',G.grain);setU(q,'uVig',G.vig);setU(q,'uFloat',isFloat?1:0);setU(q,'uCA',G.ca);setU(q,'uSat',G.sat);setU(q,'uCon',G.con);setU(q,'uExp',G.exp*(isFloat?1.15:1)*(+S.bright||1)*(lit?1.12:1));setU(q,'uLift',G.lift);setU(q,'uGain',G.gain);
+  const G=GRADES[S.grade]||GRADES.cinema;setU(q,'uBloomK',(lit?1.1:.55)*G.bloom);setU(q,'uTime',t);setU(q,'uRays',rays);setU(q,'uSunP',sunP);setU(q,'uGrain',G.grain);setU(q,'uVig',G.vig);setU(q,'uFloat',isFloat?1:0);setU(q,'uCA',G.ca);setU(q,'uSat',G.sat);setU(q,'uCon',G.con);setU(q,'uExp',G.exp*(isFloat?1.15:1)*(+S.bright||1)*(lit?1.12:1));setU(q,'uLift',G.lift);setU(q,'uGain',G.gain);
   gl.drawArrays(gl.TRIANGLES,0,3);
   // ---- rear-view mirror (inside cam)
   if(cam==='inside'&&V.mw){const mx=Math.round(V.mx*s),my=Math.round(Hp-(V.my+V.mh)*s),mw=Math.round(V.mw*s),mh=Math.round(V.mh*s);
@@ -1762,7 +1788,7 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
  function k0(c){return c%6===1;}
  const FISHC={anthias:[1,.42,.3],tang:[.15,.35,.95],yellow:[1,.85,.1],silver:[.78,.82,.88],parrot:[.2,.78,.62],butter:[1,.93,.55],clown:[1,.45,.08]};
  function frameDive(V,D,cam){if(!init())return false;buildDiveModels();
-  const s=Math.min(V.dpr||1,S.quality==='eco'?1:1.6);S3=s;const w=Math.max(2,Math.round(V.W*s)),h=Math.max(2,Math.round(V.H*s));if(w!==Wp||h!==Hp){Wp=w;Hp=h;cv.width=w;cv.height=h;setupFB(w,h);}
+  const s=Math.min(V.dpr||1,S.quality==='eco'?1:S.quality==='ultra'?2:1.6);S3=s;const w=Math.max(2,Math.round(V.W*s)),h=Math.max(2,Math.round(V.H*s));if(w!==Wp||h!==Hp){Wp=w;Hp=h;cv.width=w;cv.height=h;setupFB(w,h);}
   const trip=D.trip,night=!!D.night;if(DV.trip!==trip||DV.night!==night){DV.chunks.forEach(free);DV.chunks.clear();DV.trip=trip;DV.night=night;}
   const t=D.t,depth=Math.max(0,D.depth),shallow=Math.exp(-depth/65);const nf=night?.22:1;
   const lerp=(a,b,u)=>a.map((v,i)=>v+(b[i]-v)*clamp(u,0,1));
@@ -1822,7 +1848,7 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
   gl.bindVertexArray(P.vao);gl.bindFramebuffer(gl.FRAMEBUFFER,F.b1);gl.viewport(0,0,F.bw,F.bh);gl.useProgram(P.bright);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,F.sceneT);gl.uniform1i(U(P.bright,'uT'),0);setU(P.bright,'uThr',isFloat?.9:.75);gl.drawArrays(gl.TRIANGLES,0,3);
   gl.useProgram(P.blur);gl.uniform1i(U(P.blur,'uT'),0);for(let k=0;k<2;k++){gl.bindFramebuffer(gl.FRAMEBUFFER,F.b2);gl.bindTexture(gl.TEXTURE_2D,F.b1T);setU(P.blur,'uDir',[(1+k)/F.bw,0]);gl.drawArrays(gl.TRIANGLES,0,3);gl.bindFramebuffer(gl.FRAMEBUFFER,F.b1);gl.bindTexture(gl.TEXTURE_2D,F.b2T);setU(P.blur,'uDir',[0,(1+k)/F.bh]);gl.drawArrays(gl.TRIANGLES,0,3);}
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,Wp,Hp);const q=P.comp;gl.useProgram(q);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,F.sceneT);gl.uniform1i(U(q,'uScene'),0);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,F.b1T);gl.uniform1i(U(q,'uBloom'),1);gl.activeTexture(gl.TEXTURE0);
-  const G=GRADES[S.grade]||GRADES.cinema;setU(q,'uBloomK',(lit?1.3:.7)*G.bloom);setU(q,'uTime',performance.now()/1000);setU(q,'uGrain',G.grain);setU(q,'uVig',G.vig+(dive?.2:0));setU(q,'uFloat',isFloat?1:0);setU(q,'uCA',G.ca+(dive?.002:0));setU(q,'uSat',G.sat*(dive?1.08:1));setU(q,'uCon',G.con);setU(q,'uExp',G.exp*(isFloat?1.15:1)*(+S.bright||1)*(dive?1.15:1));setU(q,'uLift',G.lift);setU(q,'uGain',G.gain);gl.drawArrays(gl.TRIANGLES,0,3);}
+  const G=GRADES[S.grade]||GRADES.cinema;setU(q,'uBloomK',(lit?1.3:.7)*G.bloom);setU(q,'uTime',performance.now()/1000);setU(q,'uRays',0);setU(q,'uGrain',G.grain);setU(q,'uVig',G.vig+(dive?.2:0));setU(q,'uFloat',isFloat?1:0);setU(q,'uCA',G.ca+(dive?.002:0));setU(q,'uSat',G.sat*(dive?1.08:1));setU(q,'uCon',G.con);setU(q,'uExp',G.exp*(isFloat?1.15:1)*(+S.bright||1)*(dive?1.15:1));setU(q,'uLift',G.lift);setU(q,'uGain',G.gain);gl.drawArrays(gl.TRIANGLES,0,3);}
 
  return{frameDive,groundY,depthAt,setNames(a){extraNames=a.slice(0,15);namesDirty=true;},frame,canvas:cv,get horizon(){return horizon;},get scale(){return S3;},supported(){return init();},invalidate(){lastT=null;},rebuild(){resetPath();chunks.forEach(free);chunks.clear();},project,get lastOk(){return !!lastVP;}};
 })();
@@ -2140,7 +2166,7 @@ function buildGfxOpts(box){const ok=R3.supported();
  const d=addChips(box,S,'gfx','🎮 مستوى الجرافيكس',[['real','واقعي 3D ✨'],['classic','كلاسيكي 🎨']],()=>{save();if(cur==='chill')sizeView(VC);});
  if(!ok){const h=document.createElement('div');h.className='hint';h.textContent='⚠️ جهازك أو المتصفح ما يدعم الوضع الواقعي 3D، فبيشتغل الكلاسيكي تلقائياً.';d.appendChild(h);}
  addChips(box,S,'grade','🎞️ ألوان التصوير (في الواقعي)',Object.keys(GRADES).map(k=>[k,GRADES[k].label]),save);
- addChips(box,S,'quality','⚙️ الجودة',[['high','عالية'],['eco','موفّرة للبطارية 🔋']],save);
+ addChips(box,S,'quality','⚙️ الجودة',[['ultra','فائقة ✨'],['high','عالية'],['eco','موفّرة للبطارية 🔋']],save);
  addChips(box,S,'vehicle','🚙 نوع سيارتك',[['small','صغيرة 🚗'],['sedan','سيدان 🚘'],['suv','جيب 🚙'],['truck','شاحنة 🚚'],['cyber','سايبر ⚡ (المضلّعة)']],()=>{if(S.vehicle==='cyber'&&!S.cyberSet){S.cyberSet=true;S.carColor='#c5c9ce';}save();try{changed();}catch(e){}});
  addRange(box,S,'camH','⬆️ ارتفاع الكاميرا (رفع السيارة)',-0.4,3,0.1,v=>(v>0?'+':'')+fmt(Math.round(v*10)/10)+' م',save);
  addRange(box,S,'bright','☀️ سطوع الصورة (يفيد في الليل)',.8,1.8,.05,v=>fmt(Math.round(v*100))+'٪',save);}
@@ -2668,6 +2694,202 @@ ghostLoadMine();buildOpts();applyLook();$('#sceneTag').textContent=THEMES[homeG.
       if(a)a.textContent=ar(best3d()); if(b)b.textContent=ar(get("sb_best"));}
     else if(best3d()>(d.best3d||0)||get("sb_best")>(d.bestClassic||0)) push();
   });
+})();
+</script>
+<!-- ================= SLEEP MODE (وضع النوم) ================= -->
+<style>
+#slpLayer{position:fixed;inset:0;z-index:9000;display:none;background:#000;color:#e2e8f0;font-family:inherit;transition:background-color 1.2s}
+#slpLayer.on{display:block}
+#slpClock{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:.55;transition:opacity 1s}
+#slpClock b{display:block;font-size:64px;font-weight:200;letter-spacing:2px;color:#cbd5e1}
+#slpClock small{font-size:15px;color:#94a3b8}
+#slpDot{width:10px;height:10px;border-radius:50%;background:#818cf8;margin:18px auto 0;animation:slpBreath 7s ease-in-out infinite}
+@keyframes slpBreath{0%,100%{transform:scale(.6);opacity:.25}50%{transform:scale(1.5);opacity:.8}}
+#slpHint{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 18px);left:0;right:0;text-align:center;font-size:13px;color:#64748b;pointer-events:none}
+#slpPanel{position:fixed;z-index:9001;left:50%;bottom:0;transform:translate(-50%,110%);width:min(520px,100%);max-height:88vh;overflow-y:auto;
+ background:#0f172a;color:#e2e8f0;border-radius:26px 26px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 18px);box-shadow:0 -12px 40px rgba(0,0,0,.6);transition:transform .35s cubic-bezier(.2,.9,.3,1.1);direction:rtl}
+#slpPanel.on{transform:translate(-50%,0)}
+#slpPanel h3{margin:0 0 4px;font-size:21px;text-align:center}
+#slpPanel .sub{margin:0 0 12px;text-align:center;color:#94a3b8;font-size:13px;line-height:1.7}
+#slpPanel .lbl{font-weight:800;margin:16px 0 8px;font-size:15px;color:#c7d2fe}
+.slpChips{display:flex;flex-wrap:wrap;gap:8px}
+.slpChips button{border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:999px;padding:9px 13px;font-size:14px;font-weight:700}
+.slpChips button.on{background:linear-gradient(90deg,#6366f1,#8b5cf6);border-color:transparent;color:#fff}
+.slpRow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:#111c33;margin-bottom:6px}
+.slpRow.act{background:#1e1b4b;box-shadow:inset 0 0 0 1px #4f46e5}
+.slpRow span{flex:0 0 132px;font-size:14px;font-weight:700}
+.slpRow input{flex:1;accent-color:#818cf8}
+.slpRow em{flex:0 0 34px;font-style:normal;font-size:12px;color:#94a3b8;text-align:left}
+#slpPlay{display:block;width:100%;margin-top:16px;border:0;border-radius:18px;padding:15px;font-size:18px;font-weight:800;color:#fff;background:linear-gradient(90deg,#4f46e5,#7c3aed)}
+#slpStatus{text-align:center;font-size:13px;color:#a5b4fc;min-height:20px;margin-top:8px}
+.slpBtm{display:flex;gap:8px;margin-top:10px}
+.slpBtm button{flex:1;border:0;border-radius:14px;padding:12px;font-weight:800;font-size:14px;background:#1e293b;color:#e2e8f0}
+.slpBtm button.x{background:#3f1d2e;color:#fecdd3}
+.slpNote{font-size:12px;color:#64748b;line-height:1.8;margin-top:12px}
+#slpHomeBtn{display:block;width:min(100%,420px);border:0;border-radius:16px;padding:13px;font-size:17px;font-weight:800;color:#fff;background:linear-gradient(90deg,#312e81,#6d28d9);box-shadow:0 6px 20px rgba(76,29,149,.45)}
+#slpDriveBtn{font-size:18px}
+</style>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const KEY='sb_sleep';
+const SR=32000, LOOP=60, XF=4; // loop length (s) and crossfade (s)
+const SOUNDS=[
+ ['rain','🌧️ مطر'],['carrain','🚗 مطر على السيارة'],['storm','⛈️ رعد بعيد'],['waves','🌊 أمواج البحر'],
+ ['ac','❄️ مكيّف'],['fan','🌀 مروحة'],['wind','🌬️ رياح'],['fire','🔥 نار ومدفأة'],['night','🦗 ليل وصراصير'],
+ ['river','🏞️ نهر'],['drive','🛣️ قيادة ليلية'],['music','🎹 موسيقى هادئة'],['brown','🤎 ضوضاء بنية'],['pink','🩷 ضوضاء وردية'],['white','🤍 ضوضاء بيضاء']];
+const PRESETS=[
+ ['🌧️ مطر هادئ',{rain:70,night:12}],['🚗 مطر على السيارة',{carrain:75,drive:35}],['❄️ مكيّف ونوم',{ac:80}],
+ ['🌊 بحر الليل',{waves:75,wind:12}],['⛈️ عاصفة بعيدة',{rain:60,storm:50}],['🔥 كوخ دافئ',{fire:70,rain:30}],
+ ['🎹 موسيقى ومطر',{music:65,rain:30}],['🏞️ طبيعة',{river:55,night:35,wind:10}],['🤎 تركيز عميق',{brown:70}]];
+const TIMERS=[[0,'بدون'],[15,'١٥ د'],[30,'٣٠ د'],[60,'ساعة'],[90,'ساعة ونص'],[120,'ساعتين'],[240,'٤ ساعات'],[480,'طول الليل']];
+const SCREENS=[['dim','🌙 تعتيم'],['black','⚫ سوداء'],['clear','🎬 بدون']];
+const st=(()=>{let d={mix:{rain:70,night:12},timer:60,screen:'dim',dimLvl:75,game:0};try{Object.assign(d,JSON.parse(localStorage.getItem(KEY))||{});}catch(e){}return d;})();
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}};
+
+/* ---------- deterministic noise ---------- */
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function noiseBufs(ctx,len){const r=rng(7),w=ctx.createBuffer(2,len,SR),p=ctx.createBuffer(2,len,SR),b=ctx.createBuffer(2,len,SR);
+ for(let ch=0;ch<2;ch++){const W=w.getChannelData(ch),P=p.getChannelData(ch),B=b.getChannelData(ch);let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0,br=0;
+  for(let i=0;i<len;i++){const x=r()*2-1;W[i]=x;b0=.99886*b0+x*.0555179;b1=.99332*b1+x*.0750759;b2=.969*b2+x*.153852;b3=.8665*b3+x*.3104856;b4=.55*b4+x*.5329522;b5=-.7616*b5-x*.016898;
+   P[i]=(b0+b1+b2+b3+b4+b5+b6+x*.5362)*.11;b6=x*.115926;br=(br+.02*x)/1.02;B[i]=br*3.5;}}
+ return{w,p,b};}
+function bufFrom(ctx,len,fill){const b=ctx.createBuffer(2,len,SR);for(let ch=0;ch<2;ch++)fill(b.getChannelData(ch),ch);return b;}
+
+/* ---------- sound recipes (render into gain node `out`) ---------- */
+function build(ctx,id,out,N,len){
+ const src=(buf,off)=>{const s=ctx.createBufferSource();s.buffer=buf;s.connect(out===null?ctx.destination:out);return s;};
+ const chain=(buf,nodes,g)=>{const s=ctx.createBufferSource();s.buffer=buf;let n=s;for(const f of nodes){n.connect(f);n=f;}const gg=ctx.createGain();gg.gain.value=g;n.connect(gg);gg.connect(out);s.start(0);return gg;};
+ const F=(type,freq,q)=>{const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;if(q!=null)f.Q.value=q;return f;};
+ const T=len/SR, r=rng(id.length*977+13);
+ const drops=(dens,f0,f1,amp,dec)=>bufFrom(ctx,len,(d,ch)=>{const rr=rng(ch*31+dens);const n=Math.floor(T*dens);for(let k=0;k<n;k++){const t0=Math.floor(rr()*(len-SR*.05));const f=f0+(f1-f0)*rr(),a=amp*(.3+.7*rr()*rr());const L=Math.floor(SR*dec*(.5+rr()));
+   for(let i=0;i<L&&t0+i<len;i++){d[t0+i]+=Math.sin(2*Math.PI*f*i/SR)*a*Math.exp(-i/(L*.25));}}});
+ switch(id){
+  case 'white':chain(N.w,[F('lowpass',9000)],.22);break;
+  case 'pink':chain(N.p,[],.55);break;
+  case 'brown':chain(N.b,[F('lowpass',700)],.6);break;
+  case 'rain':chain(N.w,[F('bandpass',1900,.45)],.32);chain(N.w,[F('highpass',5200,.5)],.1);chain(N.b,[F('lowpass',380)],.25);chain(drops(70,2600,5200,.10,.006),[F('highpass',1800)],1);break;
+  case 'carrain':chain(N.w,[F('bandpass',1100,.5),F('lowpass',3200)],.28);chain(N.b,[F('lowpass',250)],.35);chain(drops(55,700,1900,.22,.012),[F('lowpass',2600)],1);chain(drops(25,250,600,.25,.02),[],1);break;
+  case 'storm':{chain(N.w,[F('bandpass',1500,.5)],.12);const th=bufFrom(ctx,len,(d,ch)=>{const rr=rng(99+ch);const B=N.b.getChannelData(ch);
+    [[.06,9],[.43,11],[.74,8]].forEach(([at,dur])=>{const t0=Math.floor(at*len),L=Math.floor(dur*SR);let e=0;for(let i=0;i<L&&t0+i<len;i++){const tt=i/SR;e=tt<.4?tt/.4:Math.exp(-(tt-.4)/2.6)*(1+.35*Math.sin(tt*3.1)*Math.exp(-tt/3));d[t0+i]+=B[(t0+i)%len]*e*2.2;}});});
+   chain(th,[F('lowpass',190),F('lowpass',260)],.4);break;}
+  case 'waves':{const g=chain(N.p,[F('lowpass',900,.4)],.0);const g2=chain(N.w,[F('bandpass',2400,.4)],.0);
+   const P=60/8,curve=new Float32Array(1024),c2=new Float32Array(1024);for(let i=0;i<1024;i++){const ph=(i/1023*T/P)%1;const e=Math.pow(Math.sin(Math.PI*Math.min(1,ph*1.25)),2);curve[i]=.15+.85*e;c2[i]=.02+.3*Math.pow(e,3);}
+   g.gain.setValueCurveAtTime(curve,0,T);g2.gain.setValueCurveAtTime(c2,0,T);chain(N.b,[F('lowpass',160)],.25);break;}
+  case 'ac':chain(N.b,[F('lowpass',520,.3)],.55);chain(N.p,[F('bandpass',2400,.7)],.05);
+   {const o=ctx.createOscillator();o.frequency.value=100;const g=ctx.createGain();g.gain.value=.006;o.connect(g);g.connect(out);o.start(0);const o2=ctx.createOscillator();o2.frequency.value=50;const g2=ctx.createGain();g2.gain.value=.01;o2.connect(g2);g2.connect(out);o2.start(0);}break;
+  case 'fan':{const g=chain(N.p,[F('lowpass',1300,.3)],.5);const l=ctx.createOscillator();l.frequency.value=6;const lg=ctx.createGain();lg.gain.value=.05;l.connect(lg);lg.connect(g.gain);l.start(0);chain(N.b,[F('lowpass',200)],.2);break;}
+  case 'wind':{const f=F('bandpass',420,.6);const g=chain(N.p,[f],.9);const l=ctx.createOscillator();l.frequency.value=1/20;const lg=ctx.createGain();lg.gain.value=230;l.connect(lg);lg.connect(f.frequency);l.start(0);
+   const l2=ctx.createOscillator();l2.frequency.value=1/12;const lg2=ctx.createGain();lg2.gain.value=.45;l2.connect(lg2);lg2.connect(g.gain);l2.start(0);break;}
+  case 'fire':chain(N.b,[F('lowpass',320)],.45);chain(bufFrom(ctx,len,(d,ch)=>{const rr=rng(5+ch);const n=Math.floor(T*7);for(let k=0;k<n;k++){const t0=Math.floor(rr()*(len-2000)),L=Math.floor(SR*(.002+rr()*.02)),a=.15+.6*rr()*rr();for(let i=0;i<L;i++)d[t0+i]+=(rr()*2-1)*a*Math.exp(-i/(L*.3));}}),[F('highpass',1200)],.8);break;
+  case 'night':chain(N.p,[F('lowpass',600)],.12);chain(bufFrom(ctx,len,(d,ch)=>{[[4650,.75,.2,0],[5180,1.2,.15,.33]].forEach(([f,per,a,off])=>{const cyc=Math.round(T/per);for(let k=0;k<cyc;k++){const t0=Math.floor((k*per+off*per)*SR);for(let p=0;p<3;p++){const s0=t0+Math.floor(p*.045*SR),L=Math.floor(.028*SR);
+     for(let i=0;i<L&&s0+i<len;i++){d[s0+i]+=Math.sin(2*Math.PI*f*i/SR)*a*Math.sin(Math.PI*i/L)*(ch?.85:1);}}}});}),[],1);break;
+  case 'river':{const g=chain(N.p,[F('bandpass',900,.35)],.65);chain(N.w,[F('bandpass',2600,.6)],.08);[3.1,4.7,7.3].forEach((fq,i)=>{const l=ctx.createOscillator();l.frequency.value=fq;const lg=ctx.createGain();lg.gain.value=.07;l.connect(lg);lg.connect(g.gain);l.start(0);});chain(N.b,[F('lowpass',300)],.2);break;}
+  case 'drive':{chain(N.b,[F('lowpass',130)],.6);chain(N.p,[F('bandpass',650,.4)],.06);const o=ctx.createOscillator();o.frequency.value=44;const g=ctx.createGain();g.gain.value=.018;o.connect(g);g.connect(out);o.start(0);
+   chain(bufFrom(ctx,len,(d,ch)=>{const B=N.b.getChannelData(ch);for(let k=0;k<20;k++)for(let j=0;j<2;j++){const t0=Math.floor((k*3+j*.12)*SR),L=Math.floor(.09*SR);for(let i=0;i<L;i++)d[t0+i]+=B[t0+i]*1.6*Math.exp(-i/(L*.25));}}),[F('lowpass',180)],1);break;}
+  case 'music':{const pad=ctx.createGain();pad.gain.value=1;const lp=F('lowpass',1700,.4);pad.connect(lp);
+   const conv=ctx.createConvolver();conv.buffer=bufFrom(ctx,Math.floor(SR*4.5),(d,ch)=>{const rr=rng(3+ch);for(let i=0;i<d.length;i++)d[i]=(rr()*2-1)*Math.pow(1-i/d.length,3.2)*.5;});
+   const dry=ctx.createGain();dry.gain.value=1.3;const wet=ctx.createGain();wet.gain.value=1.15;lp.connect(dry);lp.connect(conv);conv.connect(wet);dry.connect(out);wet.connect(out);
+   const hz=m=>440*Math.pow(2,(m-69)/12);const CH=[[48,55,64,71],[45,52,60,67,74],[41,48,57,64],[43,50,59,62,69]];const sec=15;
+   for(let k=0;k*sec<T;k++){const ch=CH[k%4],t0=k*sec;ch.forEach((m,j)=>{['sine','triangle'].forEach((ty,q)=>{const o=ctx.createOscillator();o.type=ty;o.frequency.value=hz(m)*(q?1.003:1);const g=ctx.createGain();const v=(q?.012:.03)*(m>60?.7:1);
+      g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(v,t0+4.5);g.gain.setValueAtTime(v,t0+sec-1);g.gain.linearRampToValueAtTime(0,t0+sec+5);o.connect(g);g.connect(pad);o.start(t0);o.stop(t0+sec+5.2);});});}
+   const pent=[72,74,76,79,81,84,86,88];const rb=rng(42);for(let t=1.2;t<T;t+=2.4+rb()*1.6){if(rb()<.25)continue;const m=pent[Math.floor(rb()*pent.length)],o=ctx.createOscillator();o.type='sine';o.frequency.value=hz(m);const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+.02);g.gain.exponentialRampToValueAtTime(.0005,t+3.2);o.connect(g);g.connect(lp);o.start(t);o.stop(t+3.3);}
+   break;}
+ }}
+
+/* ---------- render the whole mix to one seamless loop ---------- */
+async function renderMix(mix){
+ const len=(LOOP+XF)*SR;const ctx=new OfflineAudioContext(2,len,SR);const N=noiseBufs(ctx,len);
+ const master=ctx.createGain();master.gain.value=.9;const comp=ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;master.connect(comp);comp.connect(ctx.destination);
+ let any=false;for(const [id] of SOUNDS){const v=+mix[id]||0;if(v<=0)continue;any=true;const g=ctx.createGain();g.gain.value=Math.pow(v/100,1.6)*1.4;g.connect(master);build(ctx,id,g,N,len);}
+ if(!any)return null;
+ const buf=await ctx.startRendering();const L=LOOP*SR,X=XF*SR,out=[];
+ for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch),o=new Float32Array(L);o.set(d.subarray(0,L));for(let i=0;i<X;i++){const a=i/X;o[i]=d[i]*Math.sqrt(a)+d[L+i]*Math.sqrt(1-a);}out.push(o);}
+ return wav(out);}
+function wav(chs){const n=chs[0].length,b=new ArrayBuffer(44+n*4),v=new DataView(b);const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+ W(0,'RIFF');v.setUint32(4,36+n*4,true);W(8,'WAVE');W(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,SR,true);v.setUint32(28,SR*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);W(36,'data');v.setUint32(40,n*4,true);
+ let o=44;for(let i=0;i<n;i++)for(let c=0;c<2;c++){const x=Math.max(-1,Math.min(1,chs[c][i]));v.setInt16(o,x<0?x*32768:x*32767,true);o+=2;}
+ return URL.createObjectURL(new Blob([b],{type:'audio/wav'}));}
+
+/* ---------- playback (one <audio> element = keeps playing with the screen off) ---------- */
+let audio=null,url=null,playing=false,endAt=0,timerIv=null,renderTok=0,artURL='',baseVol=1;
+function art(){if(artURL)return artURL;const c=document.createElement('canvas');c.width=c.height=512;const g=c.getContext('2d');const gr=g.createLinearGradient(0,0,0,512);gr.addColorStop(0,'#1e1b4b');gr.addColorStop(1,'#0b1020');g.fillStyle=gr;g.fillRect(0,0,512,512);
+ g.fillStyle='#fde68a';g.beginPath();g.arc(300,210,110,0,Math.PI*2);g.fill();g.fillStyle='#1e1b4b';g.beginPath();g.arc(350,175,100,0,Math.PI*2);g.fill();g.fillStyle='rgba(255,255,255,.8)';[[90,90,3],[150,330,2],[420,380,3],[380,90,2],[70,420,2]].forEach(([x,y,r])=>{g.beginPath();g.arc(x,y,r,0,7);g.fill();});
+ g.fillStyle='#e0e7ff';g.font='bold 54px system-ui';g.textAlign='center';g.fillText('وضع النوم',256,450);artURL=c.toDataURL('image/png');return artURL;}
+function mixName(){const p=PRESETS.find(([n,m])=>JSON.stringify(m)===JSON.stringify(clean(st.mix)));if(p)return p[0];return SOUNDS.filter(([id])=>st.mix[id]>0).map(([,l])=>l).slice(0,3).join(' + ')||'—';}
+function clean(m){const o={};for(const k in m)if(m[k]>0)o[k]=m[k];return o;}
+function setMedia(){if(!('mediaSession' in navigator))return;try{navigator.mediaSession.metadata=new MediaMetadata({title:'😴 وضع النوم',artist:'السائق البطل',album:mixName(),artwork:[{src:art(),sizes:'512x512',type:'image/png'}]});
+ navigator.mediaSession.setActionHandler('play',()=>play());navigator.mediaSession.setActionHandler('pause',()=>pause());navigator.mediaSession.setActionHandler('stop',()=>pause());}catch(e){}}
+function status(t){$('#slpStatus').textContent=t;}
+async function prepare(){const tok=++renderTok;status('⏳ أجهّز الأصوات… (ثواني)');let u;try{u=await renderMix(st.mix);}catch(e){status('ما قدرت أجهّز الصوت 😕');console.error(e);return;}
+ if(tok!==renderTok){if(u)URL.revokeObjectURL(u);return;}
+ if(!u){status('اختر صوت واحد على الأقل 🎧');if(audio){audio.pause();}return;}
+ const old=audio,oldUrl=url;const a=new Audio(u);a.loop=true;a.preload='auto';a.setAttribute('playsinline','');a.volume=0;audio=a;url=u;
+ if(playing){try{await a.play();}catch(e){}fadeTo(a,targetVol(),1500);if(old){fadeTo(old,0,1500,()=>{old.pause();if(oldUrl)URL.revokeObjectURL(oldUrl);});}}
+ else if(old){old.pause();if(oldUrl)URL.revokeObjectURL(oldUrl);}
+ status(playing?'🎧 شغّال — '+mixName():'✅ جاهز — اضغط تشغيل');setMedia();}
+function fadeTo(a,v,ms,done){const s=a.volume,t0=performance.now();const step=()=>{const k=Math.min(1,(performance.now()-t0)/ms);try{a.volume=s+(v-s)*k;}catch(e){}if(k<1)setTimeout(step,60);else if(done)done();};step();}
+function targetVol(){if(!endAt)return baseVol;const left=(endAt-Date.now())/60000,fade=Math.min(5,(st.timer||0)/3);return left>=fade?baseVol:Math.max(0,baseVol*left/fade);}
+async function play(){if(!audio){await prepare();if(!audio)return;}playing=true;try{await audio.play();}catch(e){status('اضغط تشغيل مرة ثانية ▶');playing=false;return;}
+ fadeTo(audio,targetVol(),1800);if(st.timer>0&&!endAt)endAt=Date.now()+st.timer*60000;tick();clearInterval(timerIv);timerIv=setInterval(tick,15000);
+ if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';status('🎧 شغّال — '+mixName());updPlay();gameVol();}
+function pause(){playing=false;if(audio)fadeTo(audio,0,900,()=>audio&&audio.pause());clearInterval(timerIv);endAt=0;if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';status('⏸ موقوف');updPlay();updClock();}
+function tick(){if(!playing||!audio)return;if(endAt){if(Date.now()>=endAt){pause();status('🌙 انتهى المؤقت — تصبح على خير');return;}try{audio.volume=targetVol();}catch(e){}}updClock();}
+function updPlay(){$('#slpPlay').textContent=playing?'⏸ إيقاف':'▶ تشغيل';}
+function gameVol(){const m=window.__gameMaster,a=window.__gameAC;if(!m||!a)return;try{m.gain.setTargetAtTime(layerOn?(st.game/100):1,a.currentTime,.4);}catch(e){}}
+
+/* ---------- screen layer ---------- */
+let layerOn=false,clockIv=null;
+function updClock(){const n=new Date();let h=n.getHours(),m=n.getMinutes();$('#slpTime').textContent=(h%12||12)+':'+String(m).padStart(2,'0');
+ $('#slpLeft').textContent=endAt&&playing?('⏳ يطفي بعد '+Math.max(1,Math.round((endAt-Date.now())/60000))+' دقيقة'):(playing?'🎧 '+mixName():'');}
+function applyScreen(){const L=$('#slpLayer');const a=st.screen==='black'?1:st.screen==='dim'?st.dimLvl/100:0;L.style.backgroundColor='rgba(0,0,0,'+a+')';$('#slpClock').style.display=st.screen==='clear'?'none':'';L.style.pointerEvents=st.screen==='clear'?'none':'auto';}
+function openLayer(){layerOn=true;$('#slpLayer').classList.add('on');applyScreen();updClock();clearInterval(clockIv);clockIv=setInterval(updClock,20000);gameVol();}
+function closeAll(){pause();layerOn=false;$('#slpLayer').classList.remove('on');panel(false);clearInterval(clockIv);gameVol();}
+function panel(v){$('#slpPanel').classList.toggle('on',v);if(v)renderPanel();}
+
+/* ---------- panel UI ---------- */
+let reTimer=null;function changed(){save();clearTimeout(reTimer);reTimer=setTimeout(prepare,700);}
+function chips(box,items,cur,on){box.innerHTML='';items.forEach(([v,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if(cur(v))b.className='on';b.onclick=()=>{on(v);renderPanel();};box.appendChild(b);});}
+function renderPanel(){
+ chips($('#slpPresets'),PRESETS.map(([n,m])=>[n,n]),n=>{const p=PRESETS.find(x=>x[0]===n);return JSON.stringify(p[1])===JSON.stringify(clean(st.mix));},n=>{st.mix=Object.assign({},PRESETS.find(x=>x[0]===n)[1]);changed();});
+ const box=$('#slpMix');box.innerHTML='';SOUNDS.forEach(([id,l])=>{const v=+st.mix[id]||0;const r=document.createElement('label');r.className='slpRow'+(v>0?' act':'');r.innerHTML='<span></span><input type="range" min="0" max="100" step="5"><em></em>';
+  r.querySelector('span').textContent=l;const inp=r.querySelector('input');inp.value=v;r.querySelector('em').textContent=v?v+'%':'';
+  inp.oninput=()=>{st.mix[id]=+inp.value;r.querySelector('em').textContent=inp.value>0?inp.value+'%':'';r.classList.toggle('act',inp.value>0);};inp.onchange=changed;box.appendChild(r);});
+ chips($('#slpTimers'),TIMERS,v=>st.timer===v,v=>{st.timer=v;save();endAt=playing&&v>0?Date.now()+v*60000:0;tick();});
+ chips($('#slpScreens'),SCREENS,v=>st.screen===v,v=>{st.screen=v;save();applyScreen();});
+ $('#slpDim').value=st.dimLvl;$('#slpGame').value=st.game;updPlay();}
+
+function mount(){
+ const L=document.createElement('div');L.id='slpLayer';L.innerHTML='<div id="slpClock"><b id="slpTime"></b><small id="slpLeft"></small><div id="slpDot"></div></div><div id="slpHint">المس الشاشة للتحكم • تقدر تطفي الشاشة والصوت يكمّل</div>';document.body.appendChild(L);
+ L.addEventListener('click',()=>panel(!$('#slpPanel').classList.contains('on')));
+ const P=document.createElement('div');P.id='slpPanel';P.innerHTML=`
+  <h3>😴 وضع النوم</h3><p class="sub">أصوات هادئة تتولّد داخل جوالك وتشتغل بدون نت.<br>شغّلها وطفّ الشاشة — الصوت يكمّل لين يخلص المؤقت.</p>
+  <div class="lbl">✨ جاهزة</div><div class="slpChips" id="slpPresets"></div>
+  <div class="lbl">🎚️ امزج على كيفك</div><div id="slpMix"></div>
+  <div class="lbl">⏰ يطفي بعد</div><div class="slpChips" id="slpTimers"></div>
+  <div class="lbl">📱 الشاشة</div><div class="slpChips" id="slpScreens"></div>
+  <div class="slpRow" style="margin-top:8px"><span>🌗 درجة التعتيم</span><input type="range" id="slpDim" min="30" max="98" step="2"></div>
+  <div class="slpRow"><span>🚗 أصوات اللعبة</span><input type="range" id="slpGame" min="0" max="100" step="5"></div>
+  <button id="slpPlay" type="button">▶ تشغيل</button><div id="slpStatus"></div>
+  <div class="slpBtm"><button type="button" id="slpHide">🙈 إخفاء اللوحة</button><button type="button" class="x" id="slpExit">✕ إنهاء وضع النوم</button></div>
+  <p class="slpNote">💡 إذا طفّيت الشاشة بزر الجوال، الصوت يكمّل والمؤقت يخفّض الصوت بهدوء آخر دقائق.<br>🔋 الشاشة السوداء توفّر البطارية. وللنوم الطويل خلّ الجوال على الشاحن.</p>`;
+ document.body.appendChild(P);
+ $('#slpPlay').onclick=()=>playing?pause():play();
+ $('#slpHide').onclick=()=>panel(false);$('#slpExit').onclick=closeAll;
+ $('#slpDim').oninput=e=>{st.dimLvl=+e.target.value;st.screen='dim';applyScreen();};$('#slpDim').onchange=()=>{save();renderPanel();};
+ $('#slpGame').oninput=e=>{st.game=+e.target.value;gameVol();};$('#slpGame').onchange=save;
+ // entry: home card
+ const m3=document.querySelector('.mode.m3');if(m3){const b=document.createElement('button');b.id='slpHomeBtn';b.type='button';b.textContent='😴 وضع النوم — أصوات واسترخاء';b.style.marginTop='10px';m3.appendChild(b);b.onclick=e=>{e.stopPropagation();start(true);};}
+ // entry: inside the relax drive
+ const grp=document.querySelector('#dAudio');if(grp){const b=document.createElement('button');b.className='icon';b.id='slpDriveBtn';b.type='button';b.setAttribute('aria-label','وضع النوم');b.textContent='😴';grp.after(b);b.onclick=e=>{e.stopPropagation();start(false);};}
+}
+function start(fromHome){
+ if(fromHome){const t=document.createElement('button');t.dataset.go='drive';t.style.display='none';document.body.appendChild(t);t.click();t.remove();}
+ openLayer();panel(true);if(!audio)prepare();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){tick();updClock();}});
+mount();
 })();
 </script>
 </body>
