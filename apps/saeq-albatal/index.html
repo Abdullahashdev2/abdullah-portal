@@ -2736,22 +2736,49 @@ ghostLoadMine();buildOpts();applyLook();$('#sceneTag').textContent=THEMES[homeG.
 'use strict';
 const $=s=>document.querySelector(s);
 const KEY='sb_sleep';
-const SR=24000, LOOP=60, XF=4, REPS=4; // 60s seamless loop, written 4x into a 4-minute file
+const SR=24000, XF=4; // short mixes: 60 s loop written 4x (4-min file); long music: 180 s cycle (3-min file)
 const SOUNDS=[
- ['rain','🌧️ مطر','nat'],['carrain','🚗 مطر على السيارة','nat'],['tent','⛺ مطر على خيمة','nat'],['storm','⛈️ رعد بعيد','nat'],
- ['waves','🌊 أمواج البحر','nat'],['river','🏞️ نهر','nat'],['wind','🌬️ رياح','nat'],['leaves','🍃 حفيف الشجر','nat'],['night','🦗 ليل وصراصير','nat'],['fire','🔥 نار ومدفأة','nat'],
- ['ac','❄️ مكيّف','home'],['fan','🌀 مروحة','home'],['drive','🛣️ قيادة ليلية','home'],['train','🚂 قطار الليل','home'],['plane','✈️ داخل الطائرة','home'],['womb','👶 صوت الرحم (للأطفال)','home'],
- ['music','🎹 موسيقى هادئة','calm'],['lullaby','🎵 تهويدة صندوق الموسيقى','calm'],['bowls','🔔 أوعية تأمّل','calm'],['breath','😮‍💨 موجة تنفّس ٦/دقيقة','calm'],
- ['pink','🩷 ضوضاء وردية','sci'],['brown','🤎 ضوضاء بنية','sci'],['white','🤍 ضوضاء بيضاء','sci'],['binaural','🎧 نبضات دلتا (سماعات)','sci']];
-const GROUPS={nat:'🌿 طبيعة',home:'🏠 البيت والسفر',calm:'🎵 موسيقى وتأمّل',sci:'🧠 ضوضاء علمية'};
+ ['m_drone','🕯️ همهمة عميقة','long'],
+ ['m_night','🌌 سماء الليل','long'],
+ ['m_strings','🎻 وتريات دافئة','long'],
+ ['m_ocean','🌊 مدّ هادئ','long'],
+ ['m_piano','🎹 بيانو بعيد','long'],
+ ['rain','🌧️ مطر','nat'],
+ ['carrain','🚗 مطر على السيارة','nat'],
+ ['tent','⛺ مطر على خيمة','nat'],
+ ['storm','⛈️ رعد بعيد','nat'],
+ ['waves','🌊 أمواج البحر','nat'],
+ ['river','🏞️ نهر','nat'],
+ ['wind','🌬️ رياح','nat'],
+ ['leaves','🍃 حفيف الشجر','nat'],
+ ['night','🦗 ليل وصراصير','nat'],
+ ['fire','🔥 نار ومدفأة','nat'],
+ ['ac','❄️ مكيّف','home'],
+ ['fan','🌀 مروحة','home'],
+ ['drive','🛣️ قيادة ليلية','home'],
+ ['train','🚂 قطار الليل','home'],
+ ['plane','✈️ داخل الطائرة','home'],
+ ['womb','👶 صوت الرحم (للأطفال)','home'],
+ ['music','🎹 موسيقى هادئة','calm'],
+ ['lullaby','🎵 تهويدة صندوق الموسيقى','calm'],
+ ['bowls','🔔 أوعية تأمّل','calm'],
+ ['breath','😮‍💨 موجة تنفّس ٦/دقيقة','calm'],
+ ['mask','🛡️ حاجب الأصوات','sci'],
+ ['pink','🩷 ضوضاء وردية','sci'],
+ ['brown','🤎 ضوضاء بنية','sci'],
+ ['white','🤍 ضوضاء بيضاء','sci'],
+ ['binaural','🎧 نبضات دلتا (سماعات)','sci']];
+const EVENTFUL=new Set(['storm','fire','bowls','lullaby','train','night','drive','music','m_piano']); // sudden notes/clicks: not ideal for light sleepers
+const GROUPS={long:'🌙 موسيقى طويلة للنوم (دورة ٣ دقايق)',nat:'🌿 طبيعة',home:'🏠 البيت والسفر',calm:'🎵 موسيقى وتأمّل',sci:'🧠 ضوضاء علمية'};
 const PRESETS=[
+ ['🛡️ للنوم الخفيف',{mask:60,m_drone:30}],['🌌 موسيقى طويلة',{m_night:65,mask:20}],['🎻 وتريات ومطر',{m_strings:55,rain:30}],['🌊 مدّ هادئ',{m_ocean:65}],['🎹 بيانو بعيد',{m_piano:55,pink:20}],
  ['🧠 نوم عميق',{pink:65,rain:20}],['🌧️ مطر هادئ',{rain:70,night:12}],['🚗 مطر على السيارة',{carrain:75,drive:35}],['❄️ مكيّف ونوم',{ac:80}],
  ['😮‍💨 تنفّس وهدوء',{breath:70,waves:20}],['🌊 بحر الليل',{waves:75,wind:12}],['🎧 دلتا ومطر',{binaural:40,rain:45}],['👶 للأطفال',{womb:75}],
  ['🎵 تهويدة',{lullaby:60,rain:20}],['🔔 تأمّل',{bowls:55,wind:15}],['🚂 قطار الليل',{train:70,rain:25}],['✈️ رحلة طيران',{plane:75}],
  ['⛈️ عاصفة بعيدة',{rain:60,storm:50}],['🔥 كوخ دافئ',{fire:70,rain:30}],['🎹 موسيقى ومطر',{music:65,rain:30}],['🏞️ طبيعة',{river:55,night:35,leaves:20}],['🤎 تركيز',{brown:70}]];
 const TIMERS=[[0,'بدون'],[15,'١٥ د'],[30,'٣٠ د'],[60,'ساعة'],[90,'ساعة ونص'],[120,'ساعتين'],[240,'٤ ساعات'],[480,'طول الليل']];
-const SCREENS=[['dim','🌙 تعتيم'],['black','⚫ سوداء'],['clear','🎬 بدون']];
-const st=(()=>{let d={mix:{rain:70,night:12},timer:60,screen:'dim',dimLvl:75,game:0};try{Object.assign(d,JSON.parse(localStorage.getItem(KEY))||{});}catch(e){}return d;})();
+const SCREENS=[['void','🌑 ظلام تام'],['black','⚫ سوداء بساعة'],['dim','🌙 تعتيم'],['clear','🎬 بدون']];
+const st=(()=>{let d={mix:{rain:70,night:12},timer:60,screen:'dim',dimLvl:75,game:0,light:false};try{Object.assign(d,JSON.parse(localStorage.getItem(KEY))||{});}catch(e){}return d;})();
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}};
 
 /* ---------- deterministic noise ---------- */
@@ -2803,6 +2830,8 @@ function build(ctx,id,out,N,len){
    const pent=[72,74,76,79,81,84,86,88];const rb=rng(42);for(let t=1.2;t<T;t+=2.4+rb()*1.6){if(rb()<.25)continue;const m=pent[Math.floor(rb()*pent.length)],o=ctx.createOscillator();o.type='sine';o.frequency.value=hz(m);const g=ctx.createGain();
     g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+.02);g.gain.exponentialRampToValueAtTime(.0005,t+3.2);o.connect(g);g.connect(lp);o.start(t);o.stop(t+3.3);}
    break;}
+  case 'mask':chain(N.p,[F('lowpass',3800,.3)],.42);chain(N.b,[F('lowpass',900,.3)],.42);break;
+  case 'm_drone':case 'm_night':case 'm_strings':case 'm_ocean':case 'm_piano':longMusic(ctx,id,out,N,len,F,chain,bufFrom);break;
   case 'tent':chain(N.p,[F('bandpass',1400,.5)],.35);chain(drops(110,300,950,.3,.018),[F('lowpass',1800)],1);chain(N.b,[F('lowpass',300)],.2);break;
   case 'leaves':{const g=chain(N.p,[F('highpass',1600),F('lowpass',6000)],.65);const l=ctx.createOscillator();l.frequency.value=1/15;const lg=ctx.createGain();lg.gain.value=.3;l.connect(lg);lg.connect(g.gain);l.start(0);
    const l2=ctx.createOscillator();l2.frequency.value=.4;const lg2=ctx.createGain();lg2.gain.value=.08;l2.connect(lg2);lg2.connect(g.gain);l2.start(0);break;}
@@ -2827,16 +2856,45 @@ function build(ctx,id,out,N,len){
      t+=d*beat;}t+=beat*2;}break;}
  }}
 
+/* ---------- long, transient-free sleep music (180 s harmonic cycle) ----------
+   built to the traits linked to better sleep: slow, no lyrics, no beat, soft attacks,
+   low register, small dynamic range, very slow harmonic change */
+const EP_IN=new Float32Array(256).map((_,i)=>Math.sin(Math.PI/2*i/255)),EP_OUT=new Float32Array(256).map((_,i)=>Math.cos(Math.PI/2*i/255));
+function longMusic(ctx,id,out,N,len,F,chain,bufFrom){
+ const T=len/SR,hz=m=>440*Math.pow(2,(m-69)/12);
+ const rev=(sec,mix)=>{const c=ctx.createConvolver();c.buffer=bufFrom(ctx,Math.floor(SR*sec),(d,ch)=>{const r=rng(61+ch);for(let i=0;i<d.length;i++)d[i]=(r()*2-1)*Math.pow(1-i/d.length,2.6)*.5;});const w=ctx.createGain();w.gain.value=mix;c.connect(w);w.connect(out);return c;};
+ const bus=(lp,wet,dry)=>{const g=ctx.createGain();const f=F('lowpass',lp,.3);g.connect(f);const d=ctx.createGain();d.gain.value=dry;f.connect(d);d.connect(out);f.connect(rev(6,wet));return g;};
+ // voice: slow swell in/out over one chord span, several detuned layers -> no audible attack at all
+ const voice=(dst,f,t0,dur,amp,types,det)=>{types.forEach((ty,k)=>{const o=ctx.createOscillator();o.type=ty;o.frequency.value=f;o.detune.value=(k-(types.length-1)/2)*det;const g=ctx.createGain();
+   const a=Math.min(10,dur*.4),v=amp/types.length;g.gain.setValueAtTime(0,0);g.gain.setValueCurveAtTime(EP_IN.map(x=>x*v),t0,a);g.gain.setValueCurveAtTime(EP_OUT.map(x=>x*v),t0+dur,a);
+   o.connect(g);g.connect(dst);o.start(t0);o.stop(t0+dur+a+.1);});};
+ const prog=(chords,span,dst,amp,types,det)=>{for(let k=0;k*span<T;k++)chords[k%chords.length].forEach((m,j)=>voice(dst,hz(m),k*span,span,amp*(m<48?1.15:m>67?.55:.85),types,det));};
+ switch(id){
+  case 'm_drone':{ // one warm root + fifth that never changes: the most event-free option
+   const g=bus(700,.55,.9);
+   [[38,.095],[45,.065],[50,.042],[57,.02]].forEach(([m,a])=>['sine','triangle'].forEach((ty,k)=>{const o=ctx.createOscillator();o.type=ty;o.frequency.value=hz(m);o.detune.value=k?1.5:-1.5;const gg=ctx.createGain();gg.gain.value=a*(k?.45:1);o.connect(gg);gg.connect(g);o.start(0);}));break;}
+  case 'm_night':{const g=bus(1150,.7,.75);prog([[38,50,57,62,66,69],[35,47,54,62,66,69],[31,43,50,59,62,66],[33,45,52,57,61,64],[28,40,47,55,59,62],[31,43,50,57,62,66]],30,g,.075,['sine','triangle'],7);break;}
+  case 'm_strings':{const g=bus(950,.75,.7);prog([[36,48,55,64,67],[33,45,52,60,64],[29,41,48,57,64],[31,43,50,59,62],[33,45,52,60,67],[29,41,53,57,64]],30,g,.12,['sawtooth','sawtooth','sawtooth'],11);break;}
+  case 'm_ocean':{const g=bus(1000,.65,.8);prog([[40,52,59,64,68],[37,49,56,64,68],[33,45,52,61,64],[35,47,54,59,63],[40,52,57,64,66],[33,45,52,59,64]],30,g,.06,['sine','triangle'],6);
+   const w=chain(N.p,[F('lowpass',650,.3)],0);const n=2048,c=new Float32Array(n);for(let i=0;i<n;i++){const ph=(i/(n-1)*T/10)%1;const e=ph<.4?Math.sin(Math.PI/2*ph/.4):Math.cos(Math.PI/2*(ph-.4)/.6);c[i]=.04+.32*e*e;}w.gain.setValueCurveAtTime(c,0,T);break;}
+  case 'm_piano':{const g=bus(900,.6,.8);prog([[36,43,52],[33,40,48],[29,36,45],[31,38,47],[33,40,48],[29,36,45]],30,g,.085,['sine','triangle'],5);
+   const pb=bus(1500,.85,.55),scale=[60,62,64,67,69,72,74,76],r=rng(77);
+   for(let t=2;t<T-6;t+=4.2+r()*2.6){if(r()<.3)continue;const m=scale[Math.floor(r()*scale.length)];[[1,.06],[2,.014],[3,.006]].forEach(([k,a])=>{const o=ctx.createOscillator();o.frequency.value=hz(m)*k;const gg=ctx.createGain();
+     gg.gain.setValueAtTime(0,t);gg.gain.linearRampToValueAtTime(a,t+.09);gg.gain.exponentialRampToValueAtTime(.0002,t+5.5);o.connect(gg);gg.connect(pb);o.start(t);o.stop(t+5.6);});}break;}
+ }}
+
 /* ---------- render the whole mix to one seamless loop ---------- */
+const LONG=new Set(['m_night','m_strings','m_ocean','m_piano','m_drone']);
 async function renderMix(mix){
+ const LOOP=Object.keys(mix).some(k=>LONG.has(k)&&mix[k]>0)?180:60,REPS=LOOP===180?1:4;
  const len=(LOOP+XF)*SR;const ctx=new OfflineAudioContext(2,len,SR);const N=noiseBufs(ctx,len);
  const master=ctx.createGain();master.gain.value=.9;const comp=ctx.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;master.connect(comp);comp.connect(ctx.destination);
  let any=false;for(const [id] of SOUNDS){const v=+mix[id]||0;if(v<=0)continue;any=true;const g=ctx.createGain();g.gain.value=Math.pow(v/100,1.6)*1.4;g.connect(master);build(ctx,id,g,N,len);}
  if(!any)return null;
  const buf=await ctx.startRendering();const L=LOOP*SR,X=XF*SR,out=[];
  for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch),o=new Float32Array(L);o.set(d.subarray(0,L));for(let i=0;i<X;i++){const a=i/X;o[i]=d[i]*Math.sqrt(a)+d[L+i]*Math.sqrt(1-a);}out.push(o);}
- return wav(out);}
-function wav(chs){const n1=chs[0].length,n=n1*REPS,b=new ArrayBuffer(44+n*4),v=new DataView(b);const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+ return wav(out,REPS);}
+function wav(chs,REPS){const n1=chs[0].length,n=n1*REPS,b=new ArrayBuffer(44+n*4),v=new DataView(b);const W=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
  W(0,'RIFF');v.setUint32(4,36+n*4,true);W(8,'WAVE');W(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,2,true);v.setUint32(24,SR,true);v.setUint32(28,SR*4,true);v.setUint16(32,4,true);v.setUint16(34,16,true);W(36,'data');v.setUint32(40,n*4,true);
  const one=new Int16Array(n1*2);for(let i=0;i<n1;i++)for(let c=0;c<2;c++){const x=Math.max(-1,Math.min(1,chs[c][i]));one[i*2+c]=x<0?x*32768:x*32767;}
  const dst=new Int16Array(b,44,n*2);for(let r=0;r<REPS;r++)dst.set(one,r*n1*2);
@@ -2852,7 +2910,7 @@ function clean(m){const o={};for(const k in m)if(m[k]>0)o[k]=m[k];return o;}
 function setMedia(){if(!('mediaSession' in navigator))return;try{navigator.mediaSession.metadata=new MediaMetadata({title:'😴 وضع النوم',artist:'السائق البطل',album:mixName(),artwork:[{src:art(),sizes:'512x512',type:'image/png'}]});
  navigator.mediaSession.setActionHandler('play',()=>play());navigator.mediaSession.setActionHandler('pause',()=>pause());navigator.mediaSession.setActionHandler('stop',()=>pause());}catch(e){}}
 function status(t){$('#slpStatus').textContent=t;}
-async function prepare(){const tok=++renderTok;status('⏳ أجهّز الأصوات… (ثواني)');let u;try{u=await renderMix(st.mix);}catch(e){status('ما قدرت أجهّز الصوت 😕');console.error(e);return;}
+async function prepare(){const tok=++renderTok;status(Object.keys(st.mix).some(k=>LONG.has(k)&&st.mix[k]>0)?'⏳ أجهّز الموسيقى الطويلة… (حوالي ١٥ ثانية)':'⏳ أجهّز الأصوات… (ثواني)');let u;try{u=await renderMix(st.mix);}catch(e){status('ما قدرت أجهّز الصوت 😕');console.error(e);return;}
  if(tok!==renderTok){if(u)URL.revokeObjectURL(u);return;}
  if(!u){status('اختر صوت واحد على الأقل 🎧');if(audio){audio.pause();}return;}
  const old=audio,oldUrl=url;const a=new Audio(u);a.loop=false;a.preload='auto';a.setAttribute('playsinline','');a.volume=0;guard(a);audio=a;url=u;
@@ -2868,7 +2926,7 @@ function guard(a){
 function fadeTo(a,v,ms,done){const s=a.volume,t0=performance.now();const step=()=>{const k=Math.min(1,(performance.now()-t0)/ms);try{a.volume=s+(v-s)*k;}catch(e){}if(k<1)setTimeout(step,60);else if(done)done();};step();}
 function targetVol(){if(!endAt)return baseVol;const left=(endAt-Date.now())/60000,fade=Math.min(10,(st.timer||0)/3);return left>=fade?baseVol:Math.max(0,baseVol*left/fade);}
 async function play(){if(!audio){await prepare();if(!audio)return;}playing=true;try{await audio.play();}catch(e){status('اضغط تشغيل مرة ثانية ▶');playing=false;return;}
- fadeTo(audio,targetVol(),1800);if(st.timer>0&&!endAt)endAt=Date.now()+st.timer*60000;tick();clearInterval(timerIv);timerIv=setInterval(tick,15000);
+ fadeTo(audio,targetVol(),st.light?30000:1800);if(st.timer>0&&!endAt)endAt=Date.now()+st.timer*60000;tick();clearInterval(timerIv);timerIv=setInterval(tick,15000);
  if('mediaSession' in navigator)navigator.mediaSession.playbackState='playing';status('🎧 شغّال — '+mixName());updPlay();gameVol();}
 function pause(){playing=false;retries=[];if(audio)fadeTo(audio,0,900,()=>audio&&audio.pause());clearInterval(timerIv);endAt=0;if('mediaSession' in navigator)navigator.mediaSession.playbackState='paused';status('⏸ موقوف');updPlay();updClock();}
 function tick(){if(!playing||!audio)return;if(endAt){if(Date.now()>=endAt){pause();status('🌙 انتهى المؤقت — تصبح على خير');return;}try{audio.volume=targetVol();}catch(e){}}updClock();}
@@ -2879,7 +2937,7 @@ function gameVol(){const m=window.__gameMaster,a=window.__gameAC;if(!m||!a)retur
 let layerOn=false,clockIv=null;
 function updClock(){const n=new Date();let h=n.getHours(),m=n.getMinutes();$('#slpTime').textContent=(h%12||12)+':'+String(m).padStart(2,'0');
  $('#slpLeft').textContent=endAt&&playing?('⏳ يطفي بعد '+Math.max(1,Math.round((endAt-Date.now())/60000))+' دقيقة'):(playing?'🎧 '+mixName():'');}
-function applyScreen(){const L=$('#slpLayer');const a=st.screen==='black'?1:st.screen==='dim'?st.dimLvl/100:0;L.style.backgroundColor='rgba(0,0,0,'+a+')';$('#slpClock').style.display=st.screen==='clear'?'none':'';L.style.pointerEvents=st.screen==='clear'?'none':'auto';}
+function applyScreen(){const L=$('#slpLayer');const a=st.screen==='black'||st.screen==='void'?1:st.screen==='dim'?st.dimLvl/100:0;L.style.backgroundColor='rgba(0,0,0,'+a+')';$('#slpClock').style.display=st.screen==='clear'||st.screen==='void'?'none':'';$('#slpHint').style.display=st.screen==='void'?'none':'';L.style.pointerEvents=st.screen==='clear'?'none':'auto';}
 function openLayer(){layerOn=true;$('#slpLayer').classList.add('on');applyScreen();updClock();clearInterval(clockIv);clockIv=setInterval(updClock,20000);gameVol();}
 function closeAll(){pause();layerOn=false;$('#slpLayer').classList.remove('on');panel(false);clearInterval(clockIv);gameVol();}
 function panel(v){$('#slpPanel').classList.toggle('on',v);if(v)renderPanel();}
@@ -2887,10 +2945,13 @@ function panel(v){$('#slpPanel').classList.toggle('on',v);if(v)renderPanel();}
 /* ---------- panel UI ---------- */
 let reTimer=null;function changed(){save();clearTimeout(reTimer);reTimer=setTimeout(prepare,700);}
 function chips(box,items,cur,on){box.innerHTML='';items.forEach(([v,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if(cur(v))b.className='on';b.onclick=()=>{on(v);renderPanel();};box.appendChild(b);});}
+function setLight(on){st.light=on;if(on){st.screen='void';st.game=0;st.timer=0;const bad=Object.keys(st.mix).filter(k=>EVENTFUL.has(k)&&st.mix[k]>0);if(bad.length||!Object.values(st.mix).some(v=>v>0))st.mix={mask:60,m_drone:30};}
+ save();applyScreen();gameVol();changed();}
 function renderPanel(){
+ $('#slpLightBtn').className=st.light?'on':'';$('#slpLightBtn').textContent=st.light?'🛡️ نومي خفيف — مفعّل ✓':'🛡️ نومي خفيف وأصحى من أي شي';$('#slpLightInfo').style.display=st.light?'':'none';
  chips($('#slpPresets'),PRESETS.map(([n,m])=>[n,n]),n=>{const p=PRESETS.find(x=>x[0]===n);return JSON.stringify(p[1])===JSON.stringify(clean(st.mix));},n=>{st.mix=Object.assign({},PRESETS.find(x=>x[0]===n)[1]);changed();});
  const box=$('#slpMix');box.innerHTML='';let lastG='';SOUNDS.forEach(([id,l,gr])=>{if(gr!==lastG){lastG=gr;const h=document.createElement('div');h.className='slpGrp';h.textContent=GROUPS[gr];box.appendChild(h);}const v=+st.mix[id]||0;const r=document.createElement('label');r.className='slpRow'+(v>0?' act':'');r.innerHTML='<span></span><input type="range" min="0" max="100" step="5"><em></em>';
-  r.querySelector('span').textContent=l;const inp=r.querySelector('input');inp.value=v;r.querySelector('em').textContent=v?v+'%':'';
+  r.querySelector('span').textContent=l+(st.light&&EVENTFUL.has(id)?' ⚠️':'');if(st.light&&EVENTFUL.has(id))r.style.opacity=.55;const inp=r.querySelector('input');inp.value=v;r.querySelector('em').textContent=v?v+'%':'';
   inp.oninput=()=>{st.mix[id]=+inp.value;r.querySelector('em').textContent=inp.value>0?inp.value+'%':'';r.classList.toggle('act',inp.value>0);};inp.onchange=changed;box.appendChild(r);});
  chips($('#slpTimers'),TIMERS,v=>st.timer===v,v=>{st.timer=v;save();endAt=playing&&v>0?Date.now()+v*60000:0;tick();});
  chips($('#slpScreens'),SCREENS,v=>st.screen===v,v=>{st.screen=v;save();applyScreen();});
@@ -2901,6 +2962,8 @@ function mount(){
  L.addEventListener('click',()=>panel(!$('#slpPanel').classList.contains('on')));
  const P=document.createElement('div');P.id='slpPanel';P.innerHTML=`
   <h3>😴 وضع النوم</h3><p class="sub">أصوات هادئة تتولّد داخل جوالك وتشتغل بدون نت.<br>شغّلها وطفّ الشاشة — الصوت يكمّل لين يخلص المؤقت.</p>
+  <div class="slpChips"><button type="button" id="slpLightBtn"></button></div>
+  <div class="slpSci" id="slpLightInfo">🛡️ <b>للنوم الخفيف والأرق:</b> الأبحاث تقول إن <b>الصوت الثابت المتواصل</b> (مثل «حاجب الأصوات») يرفع الحد اللي يصحّيك من الأصوات المفاجئة — يغطّي الباب والسيارات والحركة. الأهم: <b>ثابت طول الليل</b> بدون انقطاع (عشان كذا المؤقت صار «بدون»)، وبصوت <b>أوطى من الكلام العادي</b>. الشاشة صارت ظلام تام، والصوت يبدأ بالتدريج خلال ٣٠ ثانية. الأصوات اللي عليها ⚠️ فيها نغمات أو طقطقة مفاجئة.<br>💡 للأرق المزمن: أقوى علاج معتمد عالمياً هو <b>العلاج السلوكي المعرفي للأرق (CBT-I)</b> مع مختص — الصوت يساعد لكنه مو بديل.</div>
   <div class="lbl">✨ جاهزة</div><div class="slpChips" id="slpPresets"></div>
   <p class="slpSci">🔬 <b>وش تقول الدراسات؟</b> الضوضاء الوردية ارتبطت بنوم أعمق، وأصوات الطبيعة تهدّي الجهاز العصبي، والتنفّس البطيء (٦ مرات بالدقيقة) يخفّض التوتر، والموسيقى البطيئة بدون كلام تساعد على النوم. نبضات دلتا نتائجها متفاوتة وتحتاج سماعات. وصوت الرحم يهدّي الرضّع.</p>
   <div class="lbl">🎚️ امزج على كيفك</div><div id="slpMix"></div>
@@ -2912,7 +2975,7 @@ function mount(){
   <div class="slpBtm"><button type="button" id="slpHide">🙈 إخفاء اللوحة</button><button type="button" class="x" id="slpExit">✕ إنهاء وضع النوم</button></div>
   <p class="slpNote">💡 إذا طفّيت الشاشة بزر الجوال، الصوت يكمّل والمؤقت يخفّض الصوت بهدوء آخر دقائق.<br>🔋 الشاشة السوداء توفّر البطارية. وللنوم الطويل خلّ الجوال على الشاحن.</p>`;
  document.body.appendChild(P);
- $('#slpPlay').onclick=()=>playing?pause():play();
+ $('#slpPlay').onclick=()=>playing?pause():play();$('#slpLightBtn').onclick=()=>{setLight(!st.light);renderPanel();};
  $('#slpHide').onclick=()=>panel(false);$('#slpExit').onclick=closeAll;
  $('#slpDim').oninput=e=>{st.dimLvl=+e.target.value;st.screen='dim';applyScreen();};$('#slpDim').onchange=()=>{save();renderPanel();};
  $('#slpGame').oninput=e=>{st.game=+e.target.value;gameVol();};$('#slpGame').onchange=save;
