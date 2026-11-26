@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0b1020">
-<title>السائق البطل</title>
+<title>رحّال</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:#0b1020;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif;color:#1f2937;touch-action:manipulation;user-select:none;-webkit-user-select:none}
@@ -30,6 +30,17 @@ h1{font-size:40px;margin:6px 0 0;background:linear-gradient(90deg,#fde68a,#fb923
 .m1{background:linear-gradient(135deg,#16a34a,#0f766e)}
 .m2{background:linear-gradient(135deg,#f97316,#db2777)}
 .m3{background:linear-gradient(135deg,#4c1d95,#1e3a8a 60%,#0f172a)}
+.m4{background:linear-gradient(160deg,#0ea5e9,#2563eb 55%,#f59e0b 130%);flex-shrink:0;width:min(100%,420px)}
+.m4::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 80% 15%,rgba(255,255,255,.35),transparent 45%);pointer-events:none}
+.verBtn{margin-top:8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#e2e8f0;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700}
+#verSheet{position:fixed;inset:0;z-index:50;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)}
+#verSheet.on{display:flex}
+#verSheet .in{width:min(520px,100%);max-height:85vh;overflow-y:auto;background:#0f172a;color:#e2e8f0;border-radius:24px 24px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 18px)}
+#verSheet h3{margin:0 0 10px;text-align:center}
+#verSheet .v{background:#111c33;border-radius:16px;padding:12px 14px;margin-bottom:10px}
+#verSheet .v b{color:#fde68a}#verSheet .v small{color:#94a3b8;margin-inline-start:6px}
+#verSheet ul{margin:8px 0 0;padding:0 18px 0 0;line-height:1.9;font-size:14px}
+#verSheet button{display:block;width:100%;border:0;border-radius:14px;padding:13px;font-size:16px;font-weight:800;background:#1e293b;color:#fff;margin-top:6px}
 .m3::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 20%,rgba(255,255,255,.18),transparent 40%);pointer-events:none}
 .mode .best{position:absolute;left:12px;top:12px;font-size:12px;background:rgba(0,0,0,.25);border-radius:999px;padding:3px 10px}
 .galleryBtn{width:min(100%,420px);border:0;border-radius:16px;padding:12px;font-size:17px;font-weight:800;color:#fff;background:rgba(255,255,255,.1)}
@@ -213,8 +224,9 @@ h1{font-size:40px;margin:6px 0 0;background:linear-gradient(90deg,#fde68a,#fb923
 <section id="home" class="screen on">
   <div class="title-wrap">
     <div class="badge">✏️ فكرة ورسم: <span id="creditName">بطلنا</span></div>
-    <h1>السائق البطل</h1>
-    <p>ثلاث تجارب في مكان واحد</p>
+    <h1>رحّال</h1>
+    <p>قيادة، طيران، وروقان — في عالم واحد</p>
+    <button class="verBtn" id="verBtn" type="button">الإصدار ٣٫٠ • ما الجديد؟ ✨</button>
   </div>
   <canvas id="homeCanvas"></canvas>
   <div class="sceneTag" id="sceneTag">🌧️ ممطر</div>
@@ -229,6 +241,9 @@ h1{font-size:40px;margin:6px 0 0;background:linear-gradient(90deg,#fde68a,#fb923
       <h3>🌙 وضع الروقان <span class="newTag">جديد: واقعي 3D</span></h3><p>قيادة، وتجديف 🚣، وغوص في أعماق البحار 🤿 — بلا نهاية وبدون اصطدام. ١٥ عالماً: مطر ورعد، مخيف، السبع، كوارث، صواريخ، نهاية العالم… البحر، أضف كلامك وصوتك ويوتيوب، وسجّل مقطعك بجرافيكس واقعي.</p>
       <div class="row"><button data-go="chill">✨ ادخل وضع الروقان</button></div></div>
   </div>
+    <div class="mode m4"><span class="best">✨ جديد</span>
+      <h3>✈️ عالم السماء <span class="newTag">طيران 3D</span></h3><p>اقلع بطائرة من المدرج، أو خلّ سيارتك تتحوّل وتطير — بين طرق جوية وإشارات معلّقة في السماء.</p>
+      <div class="row"><button type="button" onclick="location.href='flight.html?mode=game&auto=1'">🎮 مغامرة</button><button type="button" class="alt" onclick="location.href='flight.html'">⚙️ خيارات</button></div></div>
   <button class="galleryBtn" data-go="gallery">🖼️ المعرض</button>
 </section>
 
@@ -538,10 +553,22 @@ function fxText(W_,txt,col){W_.fx.push({txt,col:col||'#fff',t:0});}
 function hit(W_,msg){W_.lives--;W_.inv=1.8;W_.shake=.45;sfx.crash();toast(msg);if(navigator.vibrate){try{navigator.vibrate(150);}catch(e){}}if(W_.lives<=0)gameOver();}
 function steer(d){if(!G||(G.state!=='play'&&G.state!=='count')||G.paused)return;const n=clamp(G.lane+d,0,2);if(n!==G.lane){G.lane=n;sfx.lane();}}
 function horn(){sfx.horn();if(!G||G.state!=='play')return;fxText(G,'بيب بيب! 📯','#fde047');let best=null;G.cars.forEach(c=>{if(c.lane===G.lane&&c.z>G.z&&(!best||c.z<best.z))best=c;});if(best&&!best.fast)best.cruise+=1500;}
-function autopilot(W_,dt){const L=W_.light;const g=L?L.z-(W_.z+FRONT):1e9;W_.braking=!!(L&&L.red&&!L.done&&g>-100&&g<9000);
- W_.apT-=dt;const blocked=W_.cars.some(c=>c.lane===W_.lane&&c.z>W_.z&&c.z-W_.z<7000);
- if(W_.apT<=0||blocked){W_.apT=rand(2.5,5);const sc=l=>{let d=40000;for(const c of W_.cars)if(c.lane===l&&c.z>W_.z-2500)d=Math.min(d,c.z-W_.z);return d;};let best=W_.lane,bs=sc(W_.lane);for(const l of [W_.lane-1,W_.lane+1])if(l>=0&&l<=2){const s=sc(l)+Math.random()*3000;if(s>bs+2000){bs=s;best=l;}}W_.lane=best;}
- if(W_.cars.some(c=>c.lane===W_.lane&&c.z>W_.z&&c.z-W_.z<2600))W_.braking=true;
+// traffic mix loosely following what is common on Saudi roads (family sedans, big SUVs, pickups...)
+const TRAFFIC=[['family',22],['luxsuv',14],['car',10],['pickup',12],['suv',8],['crossover',10],['hatch',8],['ev',6],['truck',8],['sport',2]];
+function pickTraffic(){let r=Math.random()*100;for(const [k,w] of TRAFFIC){if((r-=w)<=0)return k;}return 'car';}
+function autopilot(W_,dt){
+ // calm, human-like driving: decide lanes rarely and only when clearly better & safe, follow traffic smoothly, ease into red lights
+ const L=W_.light;const g=L?L.z-(W_.z+FRONT):1e9;const red=!!(L&&L.red&&!L.done&&g>-100&&g<14000);
+ const ahead=l=>{let d=1e9,car=null;for(const c of W_.cars)if(c.lane===l&&c.z>W_.z-150){const dd=c.z-W_.z;if(dd<d){d=dd;car=c;}}return{d,car};};
+ W_.apT-=dt;W_.apCool=(W_.apCool||0)-dt;const busy=Math.abs(LANEX[W_.lane]-W_.x)>250;const cur=ahead(W_.lane);
+ if(W_.apCool<=0&&!busy&&!red&&(W_.apT<=0||cur.d<9000)){W_.apT=rand(7,13);
+  const safe=l=>!W_.cars.some(c=>c.lane===l&&c.z>W_.z-3800&&c.z<W_.z+5000);let best=W_.lane,bs=cur.d;
+  for(const l of[W_.lane-1,W_.lane+1])if(l>=0&&l<=2&&safe(l)){const s=ahead(l).d;if(s>bs+6500){bs=s;best=l;}}
+  if(best!==W_.lane){W_.lane=best;W_.apCool=5.5;}}
+ let cap=1e9,dec=2000;const c2=ahead(W_.lane);
+ if(c2.car&&c2.d<16000){const cv=Math.max(0,c2.car.v||c2.car.cruise||0);cap=Math.max(0,cv+(c2.d-3200)*.55);if(c2.d<1800)dec=6500;}
+ if(red){const room=Math.max(0,g-250);cap=Math.min(cap,Math.sqrt(2*1700*room));if(room<600)dec=4500;}
+ W_.apCap=cap;W_.apDec=dec;W_.braking=false;
  if(W_.useMap&&W_.nav&&W_.nav.dir&&W_.nav.dist<320)W_.lane=W_.nav.dir>0?2:0;}
 
 const isReal=()=>S.gfx==='real'&&R3.supported();
@@ -552,10 +579,10 @@ function update(W_,dt){ROUTE_CTX=W_.liveR||((W_.useMap&&MAP.route)?MAP.route:nul
   else if(n!==p){ce.textContent=fmt(n);sfx.tick();}}
  if(W_.live)liveStep(W_,dt);else if(W_.manual)manualStep(W_,dt);else if(W_.demo)autopilot(W_,dt);
  const playing=W_.state==='play';
- if(playing&&(W_.live||W_.manual)){}else if(playing){if(ROUTE_CTX&&W_.demo&&W_.nav&&W_.nav.dir){const d=W_.nav.dist;W_.turnLim=d<45?2600:d<140?2600+(d-45)/95*4400:1e9;}else W_.turnLim=1e9;{const st=(+S.gameSpeed||85)*100*.82*(W_.diff?W_.diff.spd*(1+.07*((W_.level||1)-1)):1);W_.max=W_.demo?Math.min(W_.cruise||8000,W_.turnLim):Math.min(st+W_.dist*0.0035,st*1.75);}const tgt=W_.braking?0:W_.max;if(W_.speed<tgt)W_.speed=Math.min(tgt,W_.speed+2600*dt);else W_.speed=Math.max(tgt,W_.speed-(W_.braking?9000:3000)*dt);}
+ if(playing&&(W_.live||W_.manual)){}else if(playing){if(ROUTE_CTX&&W_.demo&&W_.nav&&W_.nav.dir){const d=W_.nav.dist;W_.turnLim=d<45?2600:d<140?2600+(d-45)/95*4400:1e9;}else W_.turnLim=1e9;{const st=(+S.gameSpeed||85)*100*.82*(W_.diff?W_.diff.spd*(1+.07*((W_.level||1)-1)):1);W_.max=W_.demo?Math.min(W_.cruise||8000,W_.turnLim,W_.apCap==null?1e9:W_.apCap):Math.min(st+W_.dist*0.0035,st*1.75);}const tgt=W_.braking?0:W_.max;if(W_.demo&&!W_.braking){const dv=tgt-W_.speed;W_.speed=Math.max(0,W_.speed+clamp(dv,-(W_.apDec||2000)*dt,Math.min(1500,400+Math.abs(dv)*.5)*dt));}else if(W_.speed<tgt)W_.speed=Math.min(tgt,W_.speed+2600*dt);else W_.speed=Math.max(tgt,W_.speed-(W_.braking?9000:3000)*dt);}
  else if(W_.state==='over')W_.speed=Math.max(0,W_.speed-8000*dt);else W_.speed=0;
  const dz=W_.speed*dt;W_.z+=dz;if(playing)W_.dist+=dz;
- const ddx=LANEX[W_.lane]-W_.x;W_.x+=ddx*Math.min(1,dt*(W_.demo?3.5:7));if(W_.row)rowStep(W_,dt);
+ const ddx=LANEX[W_.lane]-W_.x;if(W_.demo){const h=Math.min(dt,.05);W_.vx=(W_.vx||0)+(ddx*2.1-(W_.vx||0)*2.9)*h;W_.x+=W_.vx*h;}else W_.x+=ddx*Math.min(1,dt*7);if(W_.row)rowStep(W_,dt);
  const base=Math.floor(W_.z/SEG);
  W_.steer=clamp(ddx/1333,-1,1)*0.85+curveAt(base)*0.05;
  W_.bgX-=curveAt(base)*dz*0.0012;
@@ -577,11 +604,11 @@ function update(W_,dt){ROUTE_CTX=W_.liveR||((W_.useMap&&MAP.route)?MAP.route:nul
  const redZ=(L&&L.red)?L.z:null;
  // cars
  const cap=W_.diff?Math.min(12,W_.diff.cap+Math.floor(((W_.level||1)-1)*.7)):W_.traffic===0?0:W_.traffic===2?8:W_.traffic===1&&W_.demo?4:5;
- if(playing&&!W_.prefilled&&cap>0){W_.prefilled=true;for(let q=0;q<cap;q++){const zS=W_.z+(real?rand(12000,120000):rand(6000,26000));const occ=new Set(W_.cars.filter(c=>Math.abs(c.z-zS)<6000).map(c=>c.lane));const free=[0,1,2].filter(l=>!occ.has(l)&&!(l===W_.lane&&zS-W_.z<20000));if(free.length){const lane=pick(free);W_.cars.push({lane,x:LANEX[lane],z:zS,cruise:W_.demo?rand(.25,.5)*(W_.cruise||8000):rand(2500,5000)*(W_.diff?W_.diff.carK:1),v:0,color:pick(CAR_COLORS),type:Math.random()<.15?'truck':(Math.random()<.3?'suv':'car'),plate:String(1000+Math.floor(Math.random()*9000)),fast:false});}}}
+ if(playing&&!W_.prefilled&&cap>0){W_.prefilled=true;for(let q=0;q<cap;q++){const zS=W_.z+(real?rand(12000,120000):rand(6000,26000));const occ=new Set(W_.cars.filter(c=>Math.abs(c.z-zS)<6000).map(c=>c.lane));const free=[0,1,2].filter(l=>!occ.has(l)&&!(l===W_.lane&&zS-W_.z<20000));if(free.length){const lane=pick(free);W_.cars.push({lane,x:LANEX[lane],z:zS,cruise:W_.demo?rand(.25,.5)*(W_.cruise||8000):rand(2500,5000)*(W_.diff?W_.diff.carK:1),v:0,color:pick(CAR_COLORS),type:pickTraffic(),plate:String(1000+Math.floor(Math.random()*9000)),fast:false});}}}
  W_.carT-=dt*(W_.speed/9000)*(W_.traffic===2?2:1);
  if(playing&&W_.carT<=0){W_.carT=rand(.8,1.6);
   if(W_.cars.filter(c=>c.z>W_.z+6000).length<cap){const zS=W_.z+(real?rand(90000,150000):24000+rand(0,4000));const occ=new Set(W_.cars.filter(c=>Math.abs(c.z-zS)<7000).map(c=>c.lane));const free=[0,1,2].filter(l=>!occ.has(l));
-   if(free.length>=2){const lane=pick(free);W_.cars.push({lane,x:LANEX[lane],z:zS,cruise:W_.demo?rand(.25,.5)*(W_.cruise||8000):rand(2500,5000)*(W_.diff?W_.diff.carK:1),v:0,color:pick(CAR_COLORS),type:Math.random()<.15?'truck':(Math.random()<.3?'suv':'car'),plate:String(1000+Math.floor(Math.random()*9000)),fast:false});}}}
+   if(free.length>=2){const lane=pick(free);W_.cars.push({lane,x:LANEX[lane],z:zS,cruise:W_.demo?rand(.25,.5)*(W_.cruise||8000):rand(2500,5000)*(W_.diff?W_.diff.carK:1),v:0,color:pick(CAR_COLORS),type:pickTraffic(),plate:String(1000+Math.floor(Math.random()*9000)),fast:false});}}}
  if(live&&playing){W_.fastT-=dt;if(W_.fastT<=0){W_.fastT=W_.diff&&W_.diff.fast?rand(W_.diff.fast[0],W_.diff.fast[1]):(W_.diff?1e9:rand(10,17));const lightSoon=!!L||(W_.nextLight-W_.dist<60000);
   if(!lightSoon&&W_.speed>5000){const lane=W_.lane,z=W_.z-15000;if(!W_.cars.some(c=>c.lane===lane&&c.z<W_.z+2000&&c.z>z-3000))W_.cars.push({lane,x:LANEX[lane],z,cruise:W_.max+3800,v:0,color:pick(['#111827','#f8fafc','#dc2626','#2563eb']),type:'car',plate:'1'+Math.floor(Math.random()*900+100),fast:true,warned:false});}}}
  if(W_.live||W_.manual)liveCars(W_,dt,redZ);
@@ -986,13 +1013,21 @@ function drawCaptions(c,V,t,inside){
   c.restore();}
  if(C.mark){c.save();c.globalAlpha=.75;const fs=Math.min(W,H)*.032;c.font=`800 ${fs}px system-ui,sans-serif`;c.textAlign='left';c.textBaseline='bottom';c.direction='ltr';c.lineWidth=3;c.strokeStyle='rgba(0,0,0,.6)';c.strokeText(C.mark,fs*.6,H-fs*.6);c.fillStyle='#fff';c.fillText(C.mark,fs*.6,H-fs*.6);c.restore();}}
 
+let FXC=null;
 function render3D(V,W_,o,T){const cam=o.cam||'inside',inside=cam==='inside';
  if(!R3.frame(V,W_,T,cam))return false;
  const c=V.ctx,W=V.W,H=V.H,bottom=inside?V.dashTop:H;V.hy=H*R3.horizon;const s=R3.scale;
  V.mirSrc=inside?{img:R3.canvas,sx:V.mx*s,sy:V.my*s,sw:V.mw*s,sh:V.mh*s}:null;
  c.save();if(W_.roll&&inside){c.fillStyle='#000';c.fillRect(0,0,W,H);c.translate(W/2,H/2);c.rotate(W_.roll);c.scale(1.25,1.25);c.translate(-W/2,-H/2);}if(W_.shake>0)c.translate(rand(-5,5)*W_.shake*2,rand(-5,5)*W_.shake*2);
  c.drawImage(R3.canvas,0,0,W,H);
- if(T.missiles||T.meteors||T.lightning||T.bats||T.searchlights||T.tornado||T.smoke||T.planet||T.planet2||T.aurora||T.nebula){c.save();c.beginPath();c.rect(0,0,W,Math.max(0,V.hy+1));c.clip();const k=V.F/195;skyFantasy(c,W_,T,W,V.hy,k);skyExtras(c,W_,T,W,V.hy,k,true);drawSkyFx(c,V,W_,T);c.restore();}
+ if(T.missiles||T.meteors||T.lightning||T.bats||T.searchlights||T.tornado||T.smoke||T.planet||T.planet2||T.aurora||T.nebula){
+  const cv0=c.canvas,o=FXC||(FXC=document.createElement('canvas'));if(o.width!==cv0.width||o.height!==cv0.height){o.width=cv0.width;o.height=cv0.height;}
+  const x=o.getContext('2d');x.setTransform(1,0,0,1,0,0);x.globalCompositeOperation='source-over';x.clearRect(0,0,o.width,o.height);x.setTransform(c.getTransform());
+  const hy=Math.max(0,V.hy),k=V.F/195;x.save();x.beginPath();x.rect(0,0,W,hy+H*.03);x.clip();skyFantasy(x,W_,T,W,hy,k);skyExtras(x,W_,T,W,hy,k,true);drawSkyFx(x,V,W_,T);x.restore();
+  // fade the painted sky out well above the horizon, so it melts into the real 3D sky and fog
+  x.globalCompositeOperation='destination-in';const fm=x.createLinearGradient(0,0,0,hy);fm.addColorStop(0,'rgba(0,0,0,.92)');fm.addColorStop(.62,'rgba(0,0,0,.78)');fm.addColorStop(.9,'rgba(0,0,0,.18)');fm.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=fm;x.fillRect(-W,-H,W*3,hy+H);x.clearRect(-W,hy,W*3,H*2);x.globalCompositeOperation='source-over';
+  c.save();c.setTransform(1,0,0,1,0,0);c.drawImage(o,0,0);c.restore();}
  drawGhosts(c,V,W_,bottom);
  if(W_.flash>0){c.fillStyle=`rgba(225,232,255,${W_.flash*.45})`;c.fillRect(0,0,W,bottom);}
  if(W_.pp.length){const pk=T.snow?'snow':T.embers?'ember':'ash';for(const p of W_.pp){const x=p.x*W,y=p.y*bottom;c.fillStyle=pk==='snow'?'rgba(255,255,255,.9)':pk==='ember'?`rgba(255,${120+Math.floor(80*Math.sin(W_.t*5+p.ph))},40,.9)`:'rgba(180,170,165,.7)';c.beginPath();c.arc(x,y,p.r,0,TAU);c.fill();}}
@@ -1418,6 +1453,34 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
    b.box(-Wd-.12,H1-.05,bz1-.15,-Wd,H1+.12,bz1,W,0);b.box(Wd,H1-.05,bz1-.15,Wd+.12,H1+.12,bz1,W,0);
    for(const sx of[-1,1])for(const zz of[-Lh*.64,Lh*.64])b.wheelX(sx*(Wd-.08),.34,zz,.34,.13,12);return b;};
   ['car','suv','truck','small'].forEach(k=>M[k]=upload(car(k)));
+  // Saudi-favourite body styles (generic shapes, no brands): family sedan, big SUV, pickup, hatchback, modern EV, crossover, sports coupe
+  const CARX={
+   family:{Wd:.93,Lh:2.42,H1:.82,H2:1.45,bz0:-.62,bz1:.47,tz0:-.4,tz1:.08,tw:.8,grille:[.62,.64,.68],gw:.55,bar:false},
+   luxsuv:{Wd:1.03,Lh:2.55,H1:1.15,H2:2.0,bz0:-.68,bz1:.42,tz0:-.64,tz1:.27,tw:.86,grille:[.75,.77,.8],gw:.7,rails:true,rideH:.42},
+   pickup:{Wd:.98,Lh:2.65,H1:1.02,H2:1.86,bz0:-.12,bz1:.42,tz0:-.1,tz1:.25,tw:.84,grille:[.2,.21,.23],gw:.62,bed:true,rideH:.4},
+   hatch:{Wd:.84,Lh:1.95,H1:.8,H2:1.52,bz0:-.93,bz1:.42,tz0:-.8,tz1:.1,tw:.8,grille:[.08,.08,.09],gw:.45},
+   ev:{Wd:.95,Lh:2.45,H1:.8,H2:1.44,bz0:-.86,bz1:.48,tz0:-.34,tz1:.06,tw:.78,grille:null,bar:true,roof:[.06,.07,.09]},
+   crossover:{Wd:.95,Lh:2.25,H1:.98,H2:1.72,bz0:-.7,bz1:.44,tz0:-.5,tz1:.2,tw:.8,grille:[.12,.12,.14],gw:.62,roof:[.07,.07,.08],rideH:.38},
+   sport:{Wd:.97,Lh:2.3,H1:.66,H2:1.14,bz0:-.78,bz1:.5,tz0:-.28,tz1:.02,tw:.72,grille:[.06,.06,.07],gw:.6,spoiler:true,rideH:.26,bar:true}};
+  const carX=k=>{const o=CARX[k],b=MB(),p=(x,y,z)=>[x,y,z],{Wd,Lh,H1,H2}=o,y0=o.rideH||.32,dk=[.07,.07,.08];
+   b.box(-Wd,y0,-Lh,Wd,H1,Lh,W,0);
+   const bz0=Lh*o.bz0,bz1=Lh*o.bz1,tz0=Lh*o.tz0,tz1=Lh*o.tz1,bw=Wd*.94,tw=Wd*o.tw;
+   b.quad(p(-bw,H1,bz1),p(bw,H1,bz1),p(tw,H2,tz1),p(-tw,H2,tz1),W,7);b.quad(p(bw,H1,bz0),p(-bw,H1,bz0),p(-tw,H2,tz0),p(tw,H2,tz0),W,7);
+   b.quad(p(bw,H1,bz1),p(bw,H1,bz0),p(tw,H2,tz0),p(tw,H2,tz1),W,7);b.quad(p(-bw,H1,bz0),p(-bw,H1,bz1),p(-tw,H2,tz1),p(-tw,H2,tz0),W,7);
+   if(o.roof)b.quad(p(-tw,H2+.005,tz1),p(tw,H2+.005,tz1),p(tw,H2+.005,tz0),p(-tw,H2+.005,tz0),o.roof,1);else b.quad(p(-tw,H2,tz1),p(tw,H2,tz1),p(tw,H2,tz0),p(-tw,H2,tz0),W,0);
+   if(o.bed){b.box(-Wd,H1,-Lh,-Wd+.08,H1+.32,bz0-.05,W,0);b.box(Wd-.08,H1,-Lh,Wd,H1+.32,bz0-.05,W,0);b.box(-Wd,H1,-Lh,Wd,H1+.32,-Lh+.08,W,0);b.box(-Wd+.08,H1-.02,-Lh+.08,Wd-.08,H1+.01,bz0-.05,dk,1);}
+   if(o.rails)for(const sx of[-1,1])b.box(sx*tw*.86-.04,H2,tz0+.1,sx*tw*.86+.04,H2+.07,tz1-.1,[.55,.57,.6],1);
+   if(o.spoiler){b.box(-Wd*.85,H1+.18,-Lh+.05,Wd*.85,H1+.23,-Lh+.38,dk,1);for(const sx of[-1,1])b.box(sx*Wd*.6-.03,H1,-Lh+.15,sx*Wd*.6+.03,H1+.19,-Lh+.25,dk,1);}
+   b.box(-Wd*1.01,y0-.04,-Lh-.07,Wd*1.01,y0+.2,-Lh+.25,dk,1);b.box(-Wd*1.01,y0-.04,Lh-.25,Wd*1.01,y0+.18,Lh+.07,dk,1);
+   if(o.bar){b.quad(p(-Wd*.92,H1-.13,-Lh-.012),p(Wd*.92,H1-.13,-Lh-.012),p(Wd*.92,H1-.07,-Lh-.012),p(-Wd*.92,H1-.07,-Lh-.012),[1,.07,.04],14);
+    b.quad(p(-Wd*.9,H1-.11,Lh+.012),p(Wd*.9,H1-.11,Lh+.012),p(Wd*.9,H1-.07,Lh+.012),p(-Wd*.9,H1-.07,Lh+.012),[1,.97,.9],12);}
+   else{for(const [a1,a2] of[[-.95,-.45],[.45,.95]])b.quad(p(Wd*a1,H1-.24,-Lh-.012),p(Wd*a2,H1-.24,-Lh-.012),p(Wd*a2,H1-.06,-Lh-.012),p(Wd*a1,H1-.06,-Lh-.012),[1,.07,.04],14);
+    for(const [a1,a2] of[[-.92,-.55],[.55,.92]])b.quad(p(Wd*a1,H1-.2,Lh+.012),p(Wd*a2,H1-.2,Lh+.012),p(Wd*a2,H1-.07,Lh+.012),p(Wd*a1,H1-.07,Lh+.012),[1,.97,.88],12);}
+   if(o.grille){const gh=o.rideH>.35?.32:.18;b.quad(p(-Wd*o.gw,H1-.08-gh,Lh+.01),p(Wd*o.gw,H1-.08-gh,Lh+.01),p(Wd*o.gw,H1-.08,Lh+.01),p(-Wd*o.gw,H1-.08,Lh+.01),o.grille,1);}
+   b.box(-.27,y0+.24,-Lh-.09,.27,y0+.38,-Lh-.07,[.95,.95,.95],1);
+   b.box(-Wd-.12,H1-.05,bz1-.15,-Wd,H1+.12,bz1,W,0);b.box(Wd,H1-.05,bz1-.15,Wd+.12,H1+.12,bz1,W,0);
+   const wr=o.rideH>.35?.4:o.rideH<.3?.33:.35;for(const sx of[-1,1])for(const zz of[-Lh*.64,Lh*.64])b.wheelX(sx*(Wd-.08),wr,zz,wr,.14,12);return b;};
+  Object.keys(CARX).forEach(k=>M[k]=upload(carX(k)));
   const gr=[[.2,.42,.18],[.25,.5,.2],[.17,.36,.15],[.3,.55,.22]];
   for(let v=0;v<3;v++){const b=MB();const H=7.5+v*1.6,lean=(v-1)*.9;let pv=[0,0,0];
    for(let k=1;k<=7;k++){const t=k/7;const np=[lean*t*t,H*t,0];b.tube(pv,np,.26-.1*(t-1/7),.26-.1*t,6,[.42,.31,.21],1);pv=np;}
@@ -1583,7 +1646,7 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
   const lane=W_.x*K;const B=at(W_.z),Rv=right(B.h),Fv=fwd(B.h);const ahead=at(W_.z+(cam==='drone'?14000:9000)),Ra=right(ahead.h);
   let eye,tgt,fovy,asp=V.W/V.H;const sway=Math.sin(t*.07);
   const wpos=(Q,R,l,y)=>[Q.x+R[0]*l,y,Q.z+R[2]*l];
-  if(cam==='inside'){eye=wpos(B,Rv,lane-.38,({small:1.1,sedan:1.22,suv:1.62,truck:2.45,cyber:1.5}[S.vehicle]||1.22)+(+S.camH||0)+(W_.jy||0)+Math.sin(t*8)*.004*Math.min(1,W_.speed/8000));tgt=wpos(ahead,Ra,lane-.2,1.0);fovy=clamp(2*Math.atan(Math.tan(37*Math.PI/180)/asp),.9,1.35);}
+  if(cam==='inside'){eye=wpos(B,Rv,lane-.38,({small:1.1,sedan:1.22,suv:1.62,truck:2.45,cyber:1.5,family:1.22,luxsuv:1.75,pickup:1.68,hatch:1.12,ev:1.2,crossover:1.45,sport:.98}[S.vehicle]||1.22)+(+S.camH||0)+(W_.jy||0)+Math.sin(t*8)*.004*Math.min(1,W_.speed/8000));tgt=wpos(ahead,Ra,lane-.2,1.0);fovy=clamp(2*Math.atan(Math.tan(37*Math.PI/180)/asp),.9,1.35);}
   else if(cam==='behind'){const bk=at(W_.z-(S.vehicle==='truck'?3200:S.vehicle==='cyber'?3100:2400));eye=wpos(bk,right(bk.h),lane,(S.vehicle==='truck'?3.6:S.vehicle==='suv'||S.vehicle==='cyber'?2.7:2.35)+(+S.camH||0)+(W_.jy||0)*.55);tgt=wpos(at(W_.z+4500),right(at(W_.z+4500).h),lane,1.1);fovy=clamp(2*Math.atan(Math.tan(36*Math.PI/180)/asp),.85,1.25);}
   else if(cam==='boat'){eye=wpos(B,Rv,lane,1.05+Math.sin(t*1.25)*.05);tgt=wpos(ahead,Ra,lane,.95);fovy=clamp(2*Math.atan(Math.tan(38*Math.PI/180)/asp),.9,1.3);}
   else if(cam==='drone'){const bk=at(W_.z-11000);eye=wpos(bk,right(bk.h),lane*.5+sway*4,23);tgt=wpos(at(W_.z+6000),right(at(W_.z+6000).h),lane*.5,0);fovy=clamp(2*Math.atan(Math.tan(34*Math.PI/180)/asp),.8,1.2);}
@@ -1654,10 +1717,10 @@ void main(){vec2 d=vUv-.5;vec3 c;c.r=texture(uScene,vUv+d*uCA).r;c.g=texture(uSc
    for(const it of W_.items){if(it.z<zmin||it.z>zmax)continue;const Q=at(it.z),R=right(Q.h);if(it.bat){draw(M.crystal,wpos(Q,R,LANEX[it.lane]*K,1.2),Q.h+t*3,[.32,.45,.32],null,{emis:3,ec:[.2,.75,1]});draw(M.ball,wpos(Q,R,LANEX[it.lane]*K,1.2),0,[.55,.55,.55],null,{emis:.8,ec:[.15,.5,1]});continue;}if(it.heart){const b=.55+.06*Math.sin(t*7);draw(M.heart,wpos(Q,R,LANEX[it.lane]*K,1.25),Q.h+t*2.2,[b,b,b],null,{emis:2.8,ec:[1,.12,.3]});continue;}draw(it.star?M.crystal:M.coin,wpos(Q,R,LANEX[it.lane]*K,1.1),Q.h+t*3,it.star?[.35,.35,.35]:[.45,.45,.45],null,{emis:it.star?2.5:1.3,ec:it.star?[1,.9,.2]:[1,.72,.15]});}
    // cars
    const tail=lit?1.6:.8,head=lit?2.2:.5;
-   for(const c of W_.cars){if(c.z<zmin-5000||c.z>zmax)continue;const Q=at(c.z+CARL/2),R=right(Q.h);const m=M[c.type==='truck'?'truck':c.type==='suv'?'suv':'car'];
+   for(const c of W_.cars){if(c.z<zmin-5000||c.z>zmax)continue;const Q=at(c.z+CARL/2),R=right(Q.h);const m=M[c.type]||M.car;
     draw(m,wpos(Q,R,c.x*K,0),Q.h,[1,1,1],hex3(c.color),{tail:tail+(c.v<500?2:0),head});c._p=[Q,R];}
    if(!mirror&&cam!=='inside'&&cam!=='cinema'&&W_.blink&&Math.floor(t*2.5)%2===0){const Q=at(W_.z-130-CARL*.48),R=right(Q.h);draw(M.ball,wpos(Q,R,lane+W_.blink*.75,.72),0,[.12,.08,.06],null,{emis:5,ec:[1,.55,.05]});}
-   if(!mirror&&cam!=='inside'&&cam!=='cinema'){const Q=at(W_.z-130),R=right(Q.h);const fl=W_.roll?Math.cos(W_.roll):1;draw(W_.row?M.kayak:M[{small:'small',suv:'suv',truck:'truck',cyber:'cyber'}[S.vehicle]||'car'],wpos(Q,R,lane,(W_.jy||0)+(1-fl)*.8),Q.h+W_.steer*.06,[1,fl,1],hex3(S.carColor),{tail:tail+(W_.braking?2.2:0),head:lightsOn(W_,lit)?2.6:.4});}
+   if(!mirror&&cam!=='inside'&&cam!=='cinema'){const Q=at(W_.z-130),R=right(Q.h);const fl=W_.roll?Math.cos(W_.roll):1;draw(W_.row?M.kayak:M[{small:'small',suv:'suv',truck:'truck',cyber:'cyber',family:'family',luxsuv:'luxsuv',pickup:'pickup',hatch:'hatch',ev:'ev',crossover:'crossover',sport:'sport'}[S.vehicle]||'car'],wpos(Q,R,lane,(W_.jy||0)+(1-fl)*.8),Q.h+W_.steer*.06,[1,fl,1],hex3(S.carColor),{tail:tail+(W_.braking?2.2:0),head:lightsOn(W_,lit)?2.6:.4});}
    if(W_.peds){const pz1=mirror?zmax:W_.z+100000;for(const pd of W_.peds){if(pd.z<zmin||pd.z>pz1)continue;const Q=at(pd.z),R=right(Q.h),f=pd.act==='jog'?4.6:2.3,ph=t*f+pd.ph,stp=pd.act==='stand'?0:Math.floor(ph)%2,bob=pd.act==='stand'?0:Math.abs(Math.sin(ph*Math.PI))*(pd.act==='jog'?.07:.035);
      if(!pd._c)pd._c=[hex3(pd.shirt),hex3(pd.pants),hex3(pd.skin)];const pos=wpos(Q,R,pd.x*K,bob),yaw=Q.h+((pd.act==='stand'||pd.dir<0)?Math.PI:0),sc=[pd.h,pd.h,pd.h];
      if(pd.sty==='thobe'||pd.sty==='abaya'){draw(M.robe,pos,yaw,sc,pd._c[0]);draw(stp?M.feetB:M.feetA,pos,yaw,sc);}else{draw(stp?M.legsB:M.legsA,pos,yaw,sc,pd._c[1]);draw(M.torso,pos,yaw,sc,pd._c[0]);}
@@ -2167,7 +2230,7 @@ function buildGfxOpts(box){const ok=R3.supported();
  if(!ok){const h=document.createElement('div');h.className='hint';h.textContent='⚠️ جهازك أو المتصفح ما يدعم الوضع الواقعي 3D، فبيشتغل الكلاسيكي تلقائياً.';d.appendChild(h);}
  addChips(box,S,'grade','🎞️ ألوان التصوير (في الواقعي)',Object.keys(GRADES).map(k=>[k,GRADES[k].label]),save);
  addChips(box,S,'quality','⚙️ الجودة',[['ultra','فائقة ✨'],['high','عالية'],['eco','موفّرة للبطارية 🔋']],save);
- addChips(box,S,'vehicle','🚙 نوع سيارتك',[['small','صغيرة 🚗'],['sedan','سيدان 🚘'],['suv','جيب 🚙'],['truck','شاحنة 🚚'],['cyber','سايبر ⚡ (المضلّعة)']],()=>{if(S.vehicle==='cyber'&&!S.cyberSet){S.cyberSet=true;S.carColor='#c5c9ce';}save();try{changed();}catch(e){}});
+ addChips(box,S,'vehicle','🚙 نوع سيارتك',[['family','عائلية 🚘 (مثل كامري)'],['luxsuv','جيب كبير 🚙 (مثل لاندكروزر)'],['pickup','غمارة 🛻 (مثل هايلكس)'],['crossover','كروس أوفر (مثل جيلي)'],['ev','كهربائية ⚡ (مثل BYD)'],['hatch','هاتشباك صغيرة (مثل يارس)'],['sport','رياضية 🏎️'],['sedan','سيدان كلاسيك'],['small','صغيرة 🚗'],['suv','جيب 🚙'],['truck','شاحنة 🚚'],['cyber','سايبر ⚡ (المضلّعة)']],()=>{if(S.vehicle==='cyber'&&!S.cyberSet){S.cyberSet=true;S.carColor='#c5c9ce';}save();try{changed();}catch(e){}});
  addRange(box,S,'camH','⬆️ ارتفاع الكاميرا (رفع السيارة)',-0.4,3,0.1,v=>(v>0?'+':'')+fmt(Math.round(v*10)/10)+' م',save);
  addRange(box,S,'bright','☀️ سطوع الصورة (يفيد في الليل)',.8,1.8,.05,v=>fmt(Math.round(v*100))+'٪',save);}
 /* ================= COCKPIT GAME ================= */
@@ -2619,7 +2682,7 @@ let photoURL='',thumbURL='',lastScore=0,resDate='',faved=false;
 function showResult(o){lastScore=o.score||0;const best=store.get(o.bestKey,0);const isBest=lastScore>best;if(isBest)store.set(o.bestKey,lastScore);try{window.__onGameResult&&window.__onGameResult(o.bestKey,store.get(o.bestKey,0));}catch(e){}
  const cvs=o.canvas,sw=cvs.width,sh=Math.round(o.cropH||cvs.height),outW=480,outH=Math.round(outW*sh/sw);const p=document.createElement('canvas');p.width=outW;p.height=outH+56;const c=p.getContext('2d');
  c.drawImage(cvs,0,0,sw,sh,0,0,outW,outH);c.fillStyle='#fff';c.fillRect(0,outH,outW,56);c.fillStyle='#0f172a';c.font='bold 21px system-ui,sans-serif';c.textAlign='center';c.textBaseline='middle';c.direction='rtl';
- c.fillText(`السائق البطل • ${S.name} • ${fmt(lastScore)} نقطة`,outW/2,outH+28,outW-20);
+ c.fillText(`رحّال • ${S.name} • ${fmt(lastScore)} نقطة`,outW/2,outH+28,outW-20);
  photoURL=p.toDataURL('image/jpeg',.85);const tc=document.createElement('canvas');tc.width=240;tc.height=Math.round(240*p.height/p.width);tc.getContext('2d').drawImage(p,0,0,tc.width,tc.height);thumbURL=tc.toDataURL('image/jpeg',.7);
  const now=new Date();let ds,ts;try{ds=now.toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'});ts=now.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'});}catch(e){ds=now.toDateString();ts='';}
  $('#rDate').textContent=ds;$('#rTime').textContent=ts;$('#rImg').src=photoURL;
@@ -2631,7 +2694,7 @@ $('#favBtn').onclick=()=>{let favs=store.get('sb_favs',[]);
  if(!faved){favs.unshift({img:thumbURL,big:photoURL,score:lastScore,date:resDate});favs=favs.slice(0,10);let ok=store.set('sb_favs',favs);if(!ok){favs.forEach(f=>delete f.big);ok=store.set('sb_favs',favs);}
   if(!ok){rToast('ما قدرت أحفظ الصورة هنا 😕');return;}faved=true;$('#favBtn').classList.add('faved');$('#favBtn span').textContent='♥';sfx.coin();rToast('❤️ أُضيفت إلى المعرض');}
  else{favs=favs.filter(f=>f.img!==thumbURL);store.set('sb_favs',favs);faved=false;$('#favBtn').classList.remove('faved');$('#favBtn span').textContent='♡';rToast('أُزيلت من المفضلة');}};
-$('#shareBtn').onclick=async()=>{const txt=`🚗 حققت ${fmt(lastScore)} نقطة في لعبة «السائق البطل»! هل تقدر تغلبني؟`;
+$('#shareBtn').onclick=async()=>{const txt=`🚗 حققت ${fmt(lastScore)} نقطة في لعبة «رحّال»! هل تقدر تغلبني؟`;
  try{const bin=atob(photoURL.split(',')[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);const file=new File([u],'saeq.jpg',{type:'image/jpeg'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text:txt});return;}if(navigator.share){await navigator.share({text:txt});return;}}catch(e){if(e&&e.name==='AbortError')return;}
  if(DL){try{const bin=atob(photoURL.split(',')[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);await DL.save({filename:'saeq-albatal.jpg',data:new Blob([u])});rToast('✅ تم حفظ الصورة');return;}catch(e){if(e&&e.code==='declined')return;}}
@@ -2668,9 +2731,21 @@ function loop(ts){const dt=Math.min(.05,last?(ts-last)/1000:0);last=ts;
 ghostLoadMine();buildOpts();applyLook();$('#sceneTag').textContent=THEMES[homeG.sceneKey].label;show('home');requestAnimationFrame(loop);
 })();
 </script>
+<div id="verSheet"><div class="in"><h3>✨ الإصدارات</h3>
+<div class="v"><b>الإصدار ٣٫٠</b><small>٢٦ نوفمبر ٢٠٢٦</small><ul>
+<li>🏷️ اسم جديد: <b>رحّال</b></li><li>✈️ عالم السماء: طيران 3D بسماء واقعية، طرق جوية وإشارات معلّقة، طائرات وبالونات وطيور</li>
+<li>🚗➡️✈️ سيارة تتحوّل وتطير — حتى من وضع الروقان (زر ✈️)</li><li>🧑‍✈️ قمرة قيادة شبه حقيقية: أفق صناعي، سرعة، ارتفاع</li>
+<li>🚙 ٧ سيارات جديدة: عائلية، جيب كبير، غمارة، كروس أوفر، كهربائية، هاتشباك، رياضية — والزحمة صارت مثل شوارعنا</li>
+<li>🧘 قيادة الروقان صارت ناعمة: بدون وقوف مفاجئ ولا لف يمين ويسار</li><li>☄️ إصلاح سماء «نهاية العالم»</li></ul></div>
+<div class="v"><b>الإصدار ٢٫٥</b><small>٢٣–٢٥ نوفمبر</small><ul><li>😴 وضع النوم: ٣٠ صوت وموسيقى، ويكمّل والشاشة طافية</li><li>🛡️ «نومي خفيف»: حاجب أصوات وظلام تام</li><li>🌅 سماء وبحر أجمل، وجودة «فائقة»</li></ul></div>
+<div class="v"><b>الإصدار ٢٫٠</b><small>٢٢ نوفمبر</small><ul><li>🦘 القفزة فوق السيارات، 🎚️ الصعوبات، 📈 المستويات</li><li>🌊 إصلاح الخط الأزرق فوق البحر</li></ul></div>
+<div class="v"><b>الإصدار ١٫٠</b><small>نوفمبر ٢٠٢٦</small><ul><li>🎮 من داخل السيارة 3D، 🚗 الكلاسيكية، 🌙 وضع الروقان</li></ul></div>
+<button type="button" onclick="document.getElementById('verSheet').classList.remove('on')">تم ✓</button></div></div>
+<script>document.getElementById('verBtn').onclick=()=>document.getElementById('verSheet').classList.add('on');
+(function(){const a=document.querySelector('#dAudio');if(!a)return;const b=document.createElement('button');b.className='icon';b.type='button';b.textContent='✈️';b.setAttribute('aria-label','طِر');b.onclick=e=>{e.stopPropagation();location.href='flight.html?mode=chill&veh=flycar&from=drive&auto=1';};a.after(b);})();</script>
 <script src="../portal-sdk.js"></script>
 <script>
-/* ربط السائق البطل بالبوابة: حفظ أفضل النتائج في الحساب + لوحة المتصدرين */
+/* ربط رحّال بالبوابة: حفظ أفضل النتائج في الحساب + لوحة المتصدرين */
 (function(){
   var ID="saeq-albatal";
   function get(k){try{return JSON.parse(localStorage.getItem(k))||0}catch(e){return 0}}
@@ -2907,7 +2982,7 @@ function art(){if(artURL)return artURL;const c=document.createElement('canvas');
  g.fillStyle='#e0e7ff';g.font='bold 54px system-ui';g.textAlign='center';g.fillText('وضع النوم',256,450);artURL=c.toDataURL('image/png');return artURL;}
 function mixName(){const p=PRESETS.find(([n,m])=>JSON.stringify(m)===JSON.stringify(clean(st.mix)));if(p)return p[0];return SOUNDS.filter(([id])=>st.mix[id]>0).map(([,l])=>l).slice(0,3).join(' + ')||'—';}
 function clean(m){const o={};for(const k in m)if(m[k]>0)o[k]=m[k];return o;}
-function setMedia(){if(!('mediaSession' in navigator))return;try{navigator.mediaSession.metadata=new MediaMetadata({title:'😴 وضع النوم',artist:'السائق البطل',album:mixName(),artwork:[{src:art(),sizes:'512x512',type:'image/png'}]});
+function setMedia(){if(!('mediaSession' in navigator))return;try{navigator.mediaSession.metadata=new MediaMetadata({title:'😴 وضع النوم',artist:'رحّال',album:mixName(),artwork:[{src:art(),sizes:'512x512',type:'image/png'}]});
  navigator.mediaSession.setActionHandler('play',()=>play());navigator.mediaSession.setActionHandler('pause',()=>pause());navigator.mediaSession.setActionHandler('stop',()=>pause());}catch(e){}}
 function status(t){$('#slpStatus').textContent=t;}
 async function prepare(){const tok=++renderTok;status(Object.keys(st.mix).some(k=>LONG.has(k)&&st.mix[k]>0)?'⏳ أجهّز الموسيقى الطويلة… (حوالي ١٥ ثانية)':'⏳ أجهّز الأصوات… (ثواني)');let u;try{u=await renderMix(st.mix);}catch(e){status('ما قدرت أجهّز الصوت 😕');console.error(e);return;}

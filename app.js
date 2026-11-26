@@ -131,6 +131,7 @@
       info.innerHTML = "<h3></h3><p></p>";
       info.querySelector("h3").textContent = a.name;
       info.querySelector("p").textContent = a.description || "";
+      if (a.version) { const v = document.createElement("div"); v.className = "ver"; v.textContent = "الإصدار " + a.version; info.appendChild(v); }
       const saved = store.get("save:" + a.id, null);
       if (saved && saved.summary) {
         const pr = document.createElement("div");
