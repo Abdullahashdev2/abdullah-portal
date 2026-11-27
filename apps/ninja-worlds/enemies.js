@@ -198,7 +198,8 @@ export class Enemies {
   sees(e, pl, d, dy, dx, dz) {
     const hidden = this.g.playerHidden && this.g.playerHidden();
     if (hidden === 'locker') return 0;
-    const range = hidden ? 2.4 : e.ship ? 11 : 9;
+    const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
+    const range = hidden ? 2.4 : (e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1); // ملزوق بالجدار وساكن = أصعب تنشاف
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
     if (d > range || Math.abs(dy) > 3.5) return 0;
     if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;

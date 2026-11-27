@@ -64,6 +64,47 @@ export class Player {
     }
     return best;
   }
+  /* أي جدار (حتى لو مو للركض) بمستوى الصدر: للالتصاق والطلّة */
+  wallFace(pos = this.pos, reach = R + 0.15, wantN = null) {
+    const p = pos; let best = null, bd = reach;
+    for (const b of this.boxes()) {
+      if (!b.active || b.door) continue; if (b.min.y > p.y + 0.5 || b.max.y < p.y + 1.5) continue;
+      const cx = clamp(p.x, b.min.x, b.max.x), cz = clamp(p.z, b.min.z, b.max.z), dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+      if (d < 1e-4 || d >= bd) continue;
+      const n = Math.abs(dx) > Math.abs(dz) ? new V(Math.sign(dx), 0, 0) : new V(0, 0, Math.sign(dz));
+      if (wantN && (n.x !== wantN.x || n.z !== wantN.z)) continue;
+      const al = n.x ? 'z' : 'x'; if (p[al] < b.min[al] - 0.02 || p[al] > b.max[al] + 0.02) continue;
+      if (b.max[al] - b.min[al] < 0.5) continue;
+      bd = d; best = { b, d, n };
+    }
+    return best;
+  }
+  /* ---------- الالتصاق بالجدار (ظهرك على الحديد) + الطلّة من الزاوية ---------- */
+  startHug(w) {
+    this.state = 'hug'; this.hug = { n: w.n.clone(), t: new V(-w.n.z, 0, w.n.x), edge: 0, peek: 0, move: 0, still: 0 };
+    this.vel.set(0, 0, 0); this.yaw = Math.atan2(w.n.x, w.n.z); this.hugIn = 0; this.g.sfx.land && this.g.sfx.land(0.35);
+  }
+  hugUpd(dt, inp) {
+    const H = this.hug, { v, m } = this.moveInput(inp), vn = m > 0.1 ? v.dot(H.n) : 0;
+    if (inp.jumpP || inp.rollP || inp.atkP || this.carry || this.dragging || this.aiming || (m > 0.3 && vn > 0.55)) { this.state = 'ground'; this.hug = null; this.locomotion(dt, inp); return; }
+    const tin = m > 0.1 ? v.dot(H.t) : 0;
+    H.move = 0;
+    if (Math.abs(tin) > 0.15) {
+      const step = H.t.clone().multiplyScalar(Math.sign(tin) * Math.min(1, Math.abs(tin)) * 2.1 * dt), np = this.pos.clone().add(step);
+      // الجدار لازم يكمّل تحتك عند النقطة الجديدة (نفحص من الجسم + نص قطر للأمام عشان نوقف قبل الطرف)
+      const probe = np.clone().addScaledVector(H.t, Math.sign(tin) * 0.22);
+      const w = this.wallFace(probe, R + 0.35, H.n);
+      if (w) { this.pos.copy(np); H.edge = 0; H.move = Math.sign(tin); H.peek = Math.max(0, H.peek - dt * 4); }
+      else { H.edge = Math.sign(tin); H.peek = Math.min(1, H.peek + dt * 3.2); }
+    } else H.peek = Math.max(0, H.peek - dt * 3);
+    const w = this.wallFace(this.pos, R + 0.35, H.n);
+    if (!w) { this.state = 'ground'; this.hug = null; return; }
+    this.pos.addScaledVector(H.n, (R + 0.03) - w.d); // ظهرك ملزوق
+    this.yaw += angDiff(this.yaw, Math.atan2(H.n.x, H.n.z)) * Math.min(1, dt * 12);
+    H.still = H.move ? 0 : H.still + dt;
+    this.vel.set(0, Math.min(0, this.vel.y), 0); this.phys(dt);
+    if (!this.onGround) { this.state = 'air'; this.hug = null; }
+  }
   findLedge() {
     const p = this.pos, f = this.fwd;
     for (const b of this.boxes()) {
@@ -98,6 +139,7 @@ export class Player {
       case 'slam': this.slamUpd(dt); break;
       case 'swing': this.swingUpd(dt, inp); break;
       case 'swim': this.swimUpd(dt, inp); break;
+      case 'hug': this.hugUpd(dt, inp); break;
       case 'spin': this.spinUpd(dt); break;
       case 'hurt': this.st.hurtT -= dt; this.phys(dt); if (this.st.hurtT <= 0) this.state = this.onGround ? 'ground' : 'air'; break;
     }
@@ -134,6 +176,10 @@ export class Player {
       if (this.vel.y < 2 && this.noGrab <= 0) { const L = this.findLedge(); if (L) return this.startHang(L); }
       const bar = this.findBar(); if (bar) return this.startSwing(bar);
     }
+    if (this.onGround && this.g.level.cfg.ship && !this.carry && !this.dragging && !this.aiming && m > 0.45) {
+      const wf = this.wallFace(this.pos, R + 0.18);
+      if (wf && v.clone().normalize().dot(wf.n) < -0.8) { this.hugIn = (this.hugIn || 0) + dt; if (this.hugIn > 0.2) return this.startHug(wf); } else this.hugIn = 0;
+    } else this.hugIn = 0;
     if (inp.atkP && !this.carry && !this.dragging && !this.aiming) { if (this.onGround || this.coyote > 0) return this.startAttack(); if (this.vel.y < 5) return this.startSlam(); }
     if (inp.rollP && this.onGround && !this.carry && !this.dragging) return this.startRoll(v, m);
     if (inp.rollP && !this.onGround && !this.carry && this.g.upg.dash && !this.dashed) {
@@ -353,11 +399,19 @@ export class Player {
     };
     const st = this.state;
     const hs = Math.hypot(this.vel.x, this.vel.z);
-    this.phase += dt * (st === 'wallrun' ? 15 : st === 'wallup' ? 16 : Math.max(2, hs * 1.45));
+    this.phase += dt * (st === 'wallrun' ? 15 : st === 'wallup' ? 16 : st === 'hug' ? (this.hug && this.hug.move ? 9 : 1) : Math.max(2, hs * 1.45));
     if (st === 'ground' || (st === 'roll' && false)) {
       if (s > 0.06) run(Math.min(1, s * (this.onBeam ? 1.6 : 1)));
       else { P.chestX = Math.sin(t * 2) * 0.03; P.hipY = Math.sin(t * 2) * 0.012 - 0.04; P.knL = P.knR = 0.18; P.thLx = P.thRx = 0.06; P.shRx = 0.65; P.elR = 1.0; P.shRz = 0.25; P.shLz = 0.25; P.elL = 0.5; P.headY = Math.sin(t * 0.5) * 0.2; }
       if (this.onBeam) { P.shLz = 1.35; P.shRz = 1.35; P.shLx = 0.1; P.shRx = 0.2; P.elL = P.elR = 0.2; P.rootRoll = Math.sin(t * 2.3) * 0.08; P.spineX = 0.15; }
+    } else if (st === 'hug' && this.hug) {
+      const H = this.hug, side = this.phase;
+      P.spineX = -0.12; P.chestX = -0.06; P.headX = -0.1; P.knL = P.knR = 0.22; P.thLx = P.thRx = 0.08;
+      P.shLz = 0.55; P.shRz = 0.55; P.shLx = -0.35; P.shRx = -0.35; P.elL = P.elR = 0.25; // كفوف على الحديد
+      if (H.move) { P.thLx = 0.08 + Math.sin(side) * 0.35; P.thRx = 0.08 - Math.sin(side) * 0.35; P.knL = 0.25 + Math.max(0, Math.sin(side)) * 0.5; P.knR = 0.25 + Math.max(0, -Math.sin(side)) * 0.5; }
+      // نحسب يمين/يسار الطرف بالنسبة لوجه البطل: الوجه = n
+      const lr = H.edge ? Math.sign(H.t.x * H.n.z - H.t.z * H.n.x) * H.edge : 0;
+      P.headY = -lr * 1.0 * H.peek; P.spineY = -lr * 0.25 * H.peek; P.hipYaw = -lr * 0.1 * H.peek;
     } else if (st === 'air' || st === 'hurt') {
       const up = clamp(this.vel.y / 8, -1, 1);
       if (up > 0) { P.thLx = 0.9; P.knL = 1.3; P.thRx = -0.25; P.knR = 0.5; P.shLx = 0.4; P.shLz = 0.7; P.shRx = 0.8; P.shRz = 0.5; P.spineX = 0.12; }

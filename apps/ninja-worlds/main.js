@@ -400,7 +400,7 @@ applyMirror();
 $('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
 if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -438,6 +438,39 @@ $('#startBtn').onclick = () => {
 function nearItem() { let best = null, bd = 1.7; for (const it of level.items) { if (it.carried || it.placed) continue; const d = Math.hypot(it.pos.x - player.pos.x, it.pos.z - player.pos.z); if (d < bd && Math.abs(it.pos.y - 0.6 - player.pos.y) < 1.6) { bd = d; best = it; } } return best; }
 function nearPed() { if (!player.carry) return null; for (const p of level.pedestals) { if (p.filled >= p.need || p.accept !== player.carry.kind) continue; if (Math.hypot(p.pos.x - player.pos.x, p.pos.z - player.pos.z) < 2.6 && Math.abs(p.pos.y - player.pos.y) < 1.5) return p; } return null; }
 function nearNpc() { return npc && player.pos.distanceTo(npc.root.position) < 3 ? npc : null; }
+/* طَرق على الجدار: صوت معدني يجذب أقرب حارس يفتّش مكان الطرق — تكتيك تسلل */
+let knockCd = 0;
+function knockWall() {
+  if (knockCd > 0) return; knockCd = 0.6;
+  const H = player.hug, at = player.pos.clone().addScaledVector(H.n, 0.4); at.y = player.pos.y;
+  for (let i = 0; i < 2; i++) { sfx.tone(180 - i * 20, 120, 0.07, 'square', 0.12, i * 0.13); sfx.noise(0.06, 700, 2, 0.22, 'bandpass', i * 0.13); }
+  enemies.noise(at, 10); sparks.emit(player.pos.clone().add(new V(0, 1.1, 0)).addScaledVector(H.n, -0.3), { color: 0xcbd5e1, count: 6, speed: 1.5, life: 0.3, size: 0.15 });
+  if (!level._knockTip) { level._knockTip = true; say('🤜 طقّيت على الحديد — أقرب حارس بيجي يشوف وش الصوت. اختبئ واستغل اللحظة!'); }
+}
+/* «حاسة الأرض»: النينجا المعصوب ملزوق على الحديد يحس بخطوات الحراس — نبضات تبيّن من ورا الجدران */
+const senseMarks = new Map();
+function wallSense(dt) {
+  knockCd = Math.max(0, knockCd - dt);
+  const on = player.state === 'hug' && player.hug && player.hug.still > 0.35;
+  for (const e of enemies.list) {
+    let mk = senseMarks.get(e);
+    const d = e.pos.distanceTo(player.pos), want = on && e.alive && !e.hidden && d < 16;
+    if (!mk) { if (!want) continue; mk = makeSenseMark(); scene.add(mk); senseMarks.set(e, mk); }
+    mk.userData.k = Math.max(0, Math.min(1, mk.userData.k + (want ? dt * 2.5 : -dt * 3)));
+    mk.visible = mk.userData.k > 0.01; if (!mk.visible) continue;
+    const walking = e.st !== 'sleep' && e.st !== 'idle' || e.wait <= 0, beat = 0.55 + 0.45 * Math.max(0, Math.sin(tNow * (walking ? 9 : 3) + e.pos.x));
+    mk.position.set(e.pos.x, e.pos.y + 1.0, e.pos.z); mk.material.opacity = mk.userData.k * beat * (1 - d / 18);
+    mk.material.color.setHex(e.alert ? 0xff4d4d : e.st === 'sleep' ? 0x60a5fa : e.st === 'inv' ? 0xfacc15 : 0xf8fafc);
+  }
+  for (const [e, mk] of senseMarks) if (!enemies.list.includes(e)) { mk.removeFromParent(); senseMarks.delete(e); }
+  if (on && !level._senseTip) { level._senseTip = true; say('👂 وأنت ملزوق بالحديد تحس بخطوات الحراس: أبيض = يمشي عادي، أصفر = يفتّش، أحمر = منتبه، أزرق = نايم.'); }
+}
+let senseTex = null;
+function makeSenseMark() {
+  if (!senseTex) { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = 3; x.beginPath(); x.arc(32, 32, 20, 0, Math.PI * 2); x.stroke(); senseTex = new THREE.CanvasTexture(c); }
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: senseTex, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  s.scale.set(1.6, 2.6, 1); s.renderOrder = 999; s.userData.k = 0; s.visible = false; return s;
+}
 function interact() {
   for (const P of level.panels || []) if (!P.done && Math.hypot(P.front.x - player.pos.x, P.front.z - player.pos.z) < 1.5 && Math.abs(P.pos.y - player.pos.y) < 1.2) {
     P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.tone(600, 200, 0.4, 'sawtooth', 0.1); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
@@ -445,6 +478,7 @@ function interact() {
     say(left ? `⚙️ ${P.label} — باقي ${left}` : `⚙️ ${P.label} — خلصت الكل!`); if (!left && level.onPanels && level.onPanels[P.group]) level.onPanels[P.group]();
     return;
   }
+  if (player.state === 'hug' && player.hug && !stealth.dragging) { knockWall(); return; }
   if (stealth.interact()) return;
   if (player.carry) { const p = nearPed(); if (p) placeItem(p); else dropItem(false); return; }
   const it = nearItem(); if (it && player.onGround) { it.carried = true; it.follow = null; player.carry = it; sfx.pickup(); sparks.emit(it.pos, { color: it.color, count: 20, speed: 3, life: 0.5 }); if (it.onPick) it.onPick(); return; }
@@ -573,6 +607,16 @@ const ray = new THREE.Raycaster(); let tNow = 0;
 function updateCamera(dt) {
   if (stealth.camera(dt, cam)) { if (shakeAmt > 0) { camera.position.x += (Math.random() - 0.5) * shakeAmt * 0.3; shakeAmt = Math.max(0, shakeAmt - dt * 1.6); } return; }
   const p = player.pos, tgt = new V(p.x, p.y + 1.5, p.z);
+  if (player.state === 'hug' && player.hug) {
+    // كاميرا الالتصاق: قدّام البطل تشوف الجدار ووجهه — ولما يطل، تنتقل فوق كتفه وتشوف ورا الزاوية
+    const H = player.hug, n = H.n, pk = H.peek, e = H.edge || 0;
+    const hugYaw = Math.atan2(-n.x, -n.z) + (e ? 0 : 0.35), look = e ? new V(H.t.x * e, 0, H.t.z * e) : null;
+    const peekYaw = look ? Math.atan2(look.x, look.z) : hugYaw;
+    let want = hugYaw + angDiff(hugYaw, peekYaw) * pk;
+    if (tNow - cam.lastManual > 0.8) cam.yaw += angDiff(cam.yaw, want) * Math.min(1, dt * 5);
+    tgt.addScaledVector(n, 0.35 + 0.5 * pk); if (look) tgt.addScaledVector(look, 0.55 * pk); tgt.y -= 0.15 * pk;
+    cam.hugK = Math.min(1, (cam.hugK || 0) + dt * 3);
+  } else cam.hugK = Math.max(0, (cam.hugK || 0) - dt * 3);
   // keep the camera off the wall while wall-running / climbing
   const wallOff = (player.state === 'wallrun' || player.state === 'wallup' || player.state === 'hang') && (player.wall || player.hang);
   cam.off = cam.off || new V();
@@ -592,7 +636,7 @@ function updateCamera(dt) {
   ray.set(cam.target, new V(0, 1, 0)); ray.far = 3.2; const roof = ray.intersectObjects(level.camMeshes, false).length > 0;
   const restP = roof ? 0.1 : 0.32; cam.roof = roof;
   if (tNow - cam.lastManual > 2 || roof) cam.pitch += (restP - cam.pitch) * Math.min(1, dt * (roof ? 2.5 : 0.8));
-  cam.want = innerWidth < innerHeight ? 7.6 : 6.4;
+  cam.want = innerWidth < innerHeight ? 7.6 : 6.4; if (cam.hugK) cam.want += (((player.hug && player.hug.peek > 0.3) ? 2.6 : 4.2) - cam.want) * cam.hugK;
   const dir = new V(-Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch));
   ray.set(cam.target, dir); ray.far = cam.want + 0.4;
   const hits = ray.intersectObjects(level.camMeshes, false);
@@ -607,7 +651,7 @@ function updateCamera(dt) {
 let promptKind = '';
 function worldLogic(dt) {
   const p = player.pos;
-  stealth.update(dt);
+  stealth.update(dt); wallSense(dt);
   // automatic sliding doors (locked ones need the right keycard)
   for (const D of level.doors || []) {
     const dp = Math.hypot(D.pos.x - p.x, D.pos.z - p.z), near = dp < 2.4 && Math.abs(D.pos.y - p.y) < 2;
@@ -694,7 +738,8 @@ function worldLogic(dt) {
   }
   // prompt
   let label = '';
-  if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
+  if (player.state === 'hug' && !player.carry) label = player.hug && player.hug.peek > 0.5 ? 'طق 🤜 (أنت تطل 👀)' : 'طق على الجدار 🤜';
+  else if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
   else if (nearItem() && player.onGround) label = 'شيل';
   else if (nearNpc()) label = 'كلّمه';
   if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
