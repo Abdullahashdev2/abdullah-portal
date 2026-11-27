@@ -85,6 +85,7 @@ button{font-family:inherit;cursor:pointer}
     <p>كل رسمة رسمها علي تقدر تصير <b>شخصية حيّة</b> — انقر على أي رسمة وشوفها تطلع من الورقة وتتحوّل هولوجرام ثلاثي الأبعاد، بعدين امشِ فيها بين العوالم 🌍</p>
   </div>
   <button id="addBtn" type="button">📷 أضف رسمة جديدة لعلي</button>
+  <button id="geminiBtn" type="button" style="display:block;width:min(100%,520px);margin:-6px auto 18px;border:1px solid rgba(167,139,250,.6);background:rgba(124,58,237,.15);color:#ddd6fe;border-radius:18px;padding:12px;font-size:15px;font-weight:800">🪄 لوّنها مجاناً عن طريق تطبيق Gemini</button>
   <div id="grid"></div>
   <div class="foot">كل الشخصيات من خيال وإبداع <b>علي</b> 💛<br>الرسمات اللي تضيفها تنحفظ في هذا الجهاز</div>
   <input type="file" id="file" accept="image/*" hidden>
@@ -96,6 +97,7 @@ button{font-family:inherit;cursor:pointer}
   <canvas id="cropCv"></canvas>
   <div id="cropBar">
     <div class="two"><button class="big gray" id="rotL" type="button">⟲ لف</button><button class="big gray" id="rotR" type="button">⟳ لف</button><button class="big gray" id="cropAll" type="button">🔲 الكل</button></div>
+    <div class="chips" id="cropKind" style="margin-top:10px;justify-content:center"><button type="button" data-k="pencil" class="on">✏️ رسمة رصاص</button><button type="button" data-k="color">🎨 صورة ملوّنة جاهزة (من Gemini)</button></div>
     <input class="txt" id="newName" maxlength="24" placeholder="اسم الشخصية (مثلاً: البطل الخارق)" style="margin-top:10px">
     <button class="big" id="cropGo" type="button">✨ حوّلها لشخصية حيّة</button>
   </div>
@@ -157,6 +159,12 @@ button{font-family:inherit;cursor:pointer}
   <button class="big" id="kFull" type="button" style="text-align:right;background:linear-gradient(90deg,#f59e0b,#ec4899)">🧍 شخصية كاملة<br><small style="font-weight:600;opacity:.9">رأس الرسمة على جسم كرتوني كامل: رجلين وقدمين ويدين، يمشي ويجري وينط ويلوّح</small></button>
   <button class="big" id="kAI" type="button" style="text-align:right;background:linear-gradient(90deg,#7c3aed,#06b6d4)">🪄 أنمي ملوّن بالذكاء الاصطناعي<br><small style="font-weight:600;opacity:.9">يعيد رسمها شخصية كاملة ملوّنة من الراس للرجول بنفس تصميم علي، وتصير شخصية جديدة تمشي (يحتاج تسجيل دخول)</small></button>
   <button class="big gray" data-close type="button">إلغاء</button>
+</aside>
+<aside class="sheet" id="geminiSheet">
+  <h3>🪄 لوّنها بتطبيق Gemini</h3>
+  <p style="color:#cbd5e1;line-height:1.9;font-size:14px;margin:6px 0">١. افتح تطبيق <b>Gemini</b> وارفع صورة رسمة علي.<br>٢. اضغط الزر تحت عشان تنسخ الوصف، والصقه مع الصورة.<br>٣. احفظ الصورة اللي يطلّعها Gemini في جوالك.<br>٤. ارجع هنا واضغط <b>📷 أضف رسمة</b>، واختر <b>🎨 صورة ملوّنة جاهزة</b>.</p>
+  <button class="big" id="copyPrompt" type="button">📋 انسخ الوصف لـ Gemini</button>
+  <button class="big gray" data-close type="button">تم</button>
 </aside>
 <div id="busy">✨ أجهّز الرسمة…</div>
 
@@ -568,8 +576,16 @@ function drawCrop(){cropSrc=rotated();const cv=$('#cropCv'),mw=innerWidth-24,mh=
 $('#rotL').onclick=()=>{cropRot=(cropRot+3)%4;cropRect=null;drawCrop();};$('#rotR').onclick=()=>{cropRot=(cropRot+1)%4;cropRect=null;drawCrop();};
 $('#cropAll').onclick=()=>{const cv=$('#cropCv');cropRect={x:0,y:0,w:cv.width,h:cv.height};drawCrop();};
 $('#cropBack').onclick=()=>show('gallery');
+let cropKind='pencil';document.querySelectorAll('#cropKind button').forEach(b=>b.onclick=()=>{cropKind=b.dataset.k;document.querySelectorAll('#cropKind button').forEach(x=>x.classList.toggle('on',x===b));});
+const GEMINI_PROMPT=`Redraw this child's hand-drawn pencil sketch as a finished, full-colour anime / cartoon character illustration, like a character from a modern animated series or video game. Keep the SAME character as in the sketch: the same face, hairstyle, eyes, expression, accessories and clothing details — stay faithful to the child's design, just finish it professionally. Complete everything the sketch is missing so it becomes a full character: full body from the top of the head to the feet, standing upright, front view, arms held slightly away from the body, legs slightly apart, both hands and both feet clearly visible. Clean confident line art, vibrant cel shading, friendly and family-appropriate. Plain pure white background, no text, no frame, no ground shadow, no other objects.`;
+$('#geminiBtn').onclick=()=>sheet('geminiSheet',true);
+$('#copyPrompt').onclick=async()=>{try{await navigator.clipboard.writeText(GEMINI_PROMPT);$('#copyPrompt').textContent='✅ انتسخ! الصقه في Gemini';}catch(e){prompt('انسخ الوصف:',GEMINI_PROMPT);}setTimeout(()=>$('#copyPrompt').textContent='📋 انسخ الوصف لـ Gemini',2500);};
 $('#cropGo').onclick=async()=>{$('#busy').classList.add('on');await new Promise(r=>setTimeout(r,50));try{
   const r=cropRect,s=1/cropScale,c=document.createElement('canvas');c.width=Math.max(8,Math.round(r.w*s));c.height=Math.max(8,Math.round(r.h*s));c.getContext('2d').drawImage(cropSrc,r.x*s,r.y*s,r.w*s,r.h*s,0,0,c.width,c.height);
+  if(cropKind==='color'){const o2=await artFromAI(c.toDataURL('image/png'));if(!o2){alert('ما قدرت أفصل الشخصية عن الخلفية 😕 تأكد إن خلفيتها بيضاء');return;}
+   const small2=document.createElement('canvas');const k2=Math.min(1,640/Math.max(c.width,c.height));small2.width=Math.round(c.width*k2);small2.height=Math.round(c.height*k2);small2.getContext('2d').drawImage(c,0,0,small2.width,small2.height);
+   const d2={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي الملوّنة',src:small2.toDataURL('image/jpeg',.88),mask:o2.mask,art:o2.art,cfg:Object.assign({},DEF,{size:2}),created:Date.now()};
+   await DB.put(d2);await loadChars();renderGrid();$('#busy').classList.remove('on');openChar(CHARS.find(x=>x.id===d2.id),'cut');return;}
   const out=AliProcess.process(c);if(!out){alert('ما لقيت خطوط واضحة في الصورة 😕 جرّب صورة أوضح أو قرّب أكثر');return;}
   const small=document.createElement('canvas');const k=Math.min(1,640/Math.max(c.width,c.height));small.width=Math.round(c.width*k);small.height=Math.round(c.height*k);small.getContext('2d').drawImage(c,0,0,small.width,small.height);
   const def={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي الجديدة',src:small.toDataURL('image/jpeg',.88),mask:out.url,cfg:Object.assign({},DEF),created:Date.now()};
