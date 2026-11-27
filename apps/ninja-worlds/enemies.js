@@ -55,6 +55,7 @@ export class Enemies {
     const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() + (archer ? 1 : 0), archer };
     if (archer) { e.hp = e.maxHp = 2; e.speed = 2.6; }
     if (guard) { Object.assign(e, { guard: true, alert: !!def.alert, sus: def.alert ? 1 : 0, pi: 0, wait: 0, speed: 3.6 }); e.yaw = def.yaw || 0; }
+    if (def.captain) { Object.assign(e, { captain: true, capHp: 6, capMax: 6, ammo: 3, reloadT: 0, cd: 1.5, alert: true, sus: 1 }); m.g.scale.setScalar(1.14); if (m.bodyM) m.bodyM.color.setHex(0x1e293b); }
     if (guard && this.g.level.cfg && this.g.level.cfg.ship) {
       Object.assign(e, { ship: true, archer: true, hp: 3, maxHp: 3, speed: 3.2 });
       const ex = textSprite('!', { size: 110, color: '#ff4040', glow: '#ff0000', scale: 0.55 }), qu = textSprite('?', { size: 110, color: '#ffd23f', glow: '#ffaa00', scale: 0.55 }), zz = textSprite('Zzz', { size: 70, color: '#bfdbfe', glow: '#3b82f6', scale: 0.45 });
@@ -201,10 +202,11 @@ export class Enemies {
     // متنكّر بزي حارس: من بعيد ما يشكّون — قريب منهم يتمعّنون فيك شوي شوي، والركض/الضرب/السحب يفضحك
     // وقت الموجة الكبيرة: حراس السطح المكشوف متمسكين بالحديد — ما يشوفون شي
     if (e.ship && this.g.level.waveHit > 0 && e.pos.y > -0.6 && e.pos.y < 1.6 && !(e.pos.z > 117 && e.pos.z < 157 && Math.abs(e.pos.x) < 9)) return 0;
+    if (pl.state === 'hang' && pl.hang && pl.hang.b.hull && d > 1.4) return 0; // متعلّق برّا السفينة
     const dis = this.g.disguised && this.g.disguised();
-    if (dis && !dis.reveal) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
+    if (dis && !dis.reveal && !e.captain) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
     const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
-    const range = hidden ? 2.4 : (e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1); // ملزوق بالجدار وساكن = أصعب تنشاف
+    const range = hidden ? 2.4 : (e.captain ? 19 : e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1); // ملزوق بالجدار وساكن = أصعب تنشاف
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
     if (d > range || Math.abs(dy) > 3.5) return 0;
     if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
@@ -229,6 +231,12 @@ export class Enemies {
   /* ---------- tanker-style stealth (ship world): sleep darts, radio calls, noise, bodies ---------- */
   tranq(e, head) {
     if (!e.alive || e.st === 'sleep' || e.st === 'dragged' || e.st === 'held' || e.st === 'dying') return false;
+    if (e.captain) {
+      e.capHp -= head ? 2 : 1; e.flash = 0.25; this.g.fx.emit(e.pos.clone().add(new V(0, head ? 1.9 : 1.2, 0)), { color: 0x93c5fd, count: 16, speed: 3, life: 0.5, size: 0.25 });
+      if (e.capHp <= 0) { this.sleep(e); e.sleepT = 1e9; this.g.onCaptainDown && this.g.onCaptainDown(e, 'sleep'); }
+      else { e.st = 'drowsy'; e.drowsyT = 0.9; e.t = 0; this.g.say && this.g.say(head ? `🎯 رأس! القائد يترنّح — باقي ${e.capHp}` : `💉 أصبته — باقي ${e.capHp} (الرأس يحسب ٢)`); }
+      return true;
+    }
     if (head || e.st === 'drowsy') this.sleep(e); else { e.st = 'drowsy'; e.drowsyT = 2.4; e.t = 0; }
     this.g.fx.emit(e.pos.clone().add(new V(0, head ? 1.7 : 1.1, 0)), { color: 0x93c5fd, count: 12, speed: 3, life: 0.4, size: 0.2 });
     return true;
@@ -265,6 +273,7 @@ export class Enemies {
   shipThink(e, dt, pl, d, dy, dx, dz, toYaw) {
     const phase = this.g.level.phase || 'normal';
     if (e.st === 'dragged' || e.st === 'held') return 'idle';
+    if (e.captain) return this.captainThink(e, dt, pl, d, dy, dx, dz, toYaw);
     if (this.g.level.waveHit > 0 && e.pos.y > -0.6 && e.pos.y < 1.6 && !['sleep', 'thrown'].includes(e.st) && !(e.pos.z > 117 && e.pos.z < 157 && Math.abs(e.pos.x) < 9)) return 'idle'; // متمسك بالحديد
     if (e.st === 'sleep') { e.sleepT -= dt; if (Math.random() < dt * 0.8) this.g.fx.emit(e.pos.clone().add(new V(0, 0.8, 0)), { color: 0xbfdbfe, count: 1, speed: 0.4, up: 1, life: 1.4, size: 0.18, grav: -0.6 });
       if (e.sleepT <= 0 && !e.hidden) { e.st = 'idle'; e.sus = 0; e.wait = 1.5; this.g.onGuardWoke && this.g.onGuardWoke(e); } return 'idle'; }
@@ -303,6 +312,29 @@ export class Enemies {
     else if (e.st === 'thrown') { P.shLz = P.shRz = 2.2; P.thLx = 0.8; P.thRx = -0.6; P.knL = P.knR = 0.4; P.spineX = -0.4; }
     else if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
     blendPose(h, P, dt, e.st === 'sleep' ? 5 : 12);
+  }
+  /* ⚓ القائد «عاصفة»: يصطادك على مهبط المقدمة — يطلق ٣ طلقات ثم يعبّي (فرصتك) — ما ينخنق، بس ينرمى في البحر أو ينام بالمهدّئ */
+  captainThink(e, dt, pl, d, dy, dx, dz, toYaw) {
+    const z = e.zone, L = this.g.level;
+    if (e.st === 'drowsy') { e.drowsyT -= dt; e.yaw += Math.sin(e.t * 6) * dt; if (e.drowsyT <= 0) { e.st = 'idle'; } return 'stagger'; }
+    if (L.waveHit > 0) return 'idle';
+    e.alert = true; e.cd -= dt;
+    if (e.reloadT > 0) { e.reloadT -= dt; if (e.reloadT <= 0) { e.ammo = 3; this.g.say && this.g.say('⚓ القائد خلّص تعبئة!'); } }
+    const s = pl.hp > 0 ? this.sees(e, pl, d, dy, dx, dz) : 0;
+    if (s) { e.lastP = pl.pos.clone(); e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 6); }
+    let anim = 'idle';
+    // يحافظ على مسافة ٧-١٠م، ولو ما يشوفك يمشي لآخر مكان شافك فيه
+    const tgt = e.lastP || new V((z.x0 + z.x1) / 2, e.pos.y, (z.z0 + z.z1) / 2), vx = tgt.x - e.pos.x, vz = tgt.z - e.pos.z, l = Math.hypot(vx, vz);
+    const want = s ? (d < 6 ? -1 : d > 10 ? 1 : 0) : (l > 1.5 ? 1 : 0), sp = e.reloadT > 0 ? 1.4 : 2.6;
+    if (want && l > 0.01) { const sx = s ? dx / (d || 1) : vx / l, sz = s ? dz / (d || 1) : vz / l; e.pos.x += sx * sp * want * dt; e.pos.z += sz * sp * want * dt; anim = 'walk'; if (!s) e.yaw += angDiff(e.yaw, Math.atan2(vx, vz)) * Math.min(1, dt * 4); }
+    else if (!s) e.yaw += dt * 1.1;
+    e.pos.x = Math.max(z.x0, Math.min(z.x1, e.pos.x)); e.pos.z = Math.max(z.z0, Math.min(z.z1, e.pos.z));
+    if (s && e.reloadT <= 0 && e.cd <= 0) {
+      e.cd = 0.85; e.ammo--; this.fire(e, pl, (Math.random() - 0.5) * 0.08, 0xffd166); this.g.sfx.tone(160, 70, 0.12, 'square', 0.12);
+      if (e.ammo <= 0) { e.reloadT = 2.8; this.g.say && this.g.say('🔄 القائد يعبّي سلاحه! هذي فرصتك — صوّب على راسه أو امسكه من الخلف'); }
+      anim = 'windup';
+    }
+    return anim;
   }
   bossThink(e, dt, pl, d, dx, dz, toYaw) {
     const phase = e.hp > 26 ? 1 : e.hp > 13 ? 2 : 3; let anim = 'idle';

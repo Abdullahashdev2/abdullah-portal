@@ -181,6 +181,9 @@ const G = {
   onAlarm: () => { level.alarms = (level.alarms || 0) + 1; sfx.tone(880, 660, 0.25, 'square', 0.12); sfx.tone(880, 660, 0.25, 'square', 0.12, 0.3); if (level.alarms <= 3) say('🚨 انكشفت! الحارس شافك — حاربه أو اهرب للظل.'); },
   onRadio: (e) => stealth.radioDone(e),
   tryGrab: () => stealth.tryGrab(),
+  onEdgeHang: () => { if (!level._edgeTip) { level._edgeTip = true; say('🧗 متعلّق برّا السفينة — الحراس ما يشوفونك! تحرّك يمين/يسار على طول الحافة، واقفز (أو ادفع للجدار) عشان تطلع.'); } },
+  say: (t) => say(t),
+  onCaptainDown: (e, how) => captainDown(e, how),
   disguised: () => stealth.disguisedInfo(),
   onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.12); stealth.spotted(e, search); },
   onBodyFound: () => stealth.bodyFound(),
@@ -404,7 +407,7 @@ applyMirror();
 $('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 تصويب' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(stealth.gadgetLabel() ? [{ id: 'sp', label: stealth.gadgetLabel() }] : G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : player && player.hullEdge && player.hullEdge() ? '🧗 تعلّق برّا' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 مسدس' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(stealth.gadgetLabel() ? [{ id: 'sp', label: stealth.gadgetLabel() }] : G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
 if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -444,6 +447,19 @@ function nearPed() { if (!player.carry) return null; for (const p of level.pedes
 function nearNpc() { return npc && player.pos.distanceTo(npc.root.position) < 3 ? npc : null; }
 /* طَرق على الجدار: صوت معدني يجذب أقرب حارس يفتّش مكان الطرق — تكتيك تسلل */
 let knockCd = 0;
+/* أزرار اللمس تتغيّر حسب الوضع (ضرب/أطلق/اخنق…) */
+const PISTOL_SVG = '<svg viewBox="0 0 64 40" width="34" height="22" aria-hidden="true"><path fill="#e5e7eb" d="M4 8h44l4-4h8v10h-6l-2 3H30l-3 4h-6l-4 15H7l5-17H4z"/><rect x="48" y="9" width="12" height="3" fill="#9ca3af"/><circle cx="24" cy="16" r="3" fill="#111827"/></svg>';
+const touchCache = {};
+function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (b) b.innerHTML = html; }
+function touchLabels() {
+  if (!TOUCH) return;
+  const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, edge = sh && !aim && player.hullEdge && player.hullEdge();
+  setBtn('atkBtn', aim ? '🎯<small>أطلق</small>' : hold ? '😵<small>اخنق</small>' : sh ? (canGrab() ? '🤫<small>امسكه</small>' : '👊<small>ضرب</small>') : '⚔️<small>ضرب</small>');
+  setBtn('aimBtn', aim ? '❌<small>إلغاء التصويب</small>' : PISTOL_SVG + '<small>مسدس</small>');
+  setBtn('actBtn', aim ? '🔁<small>' + (stealth.weapon === 'pistol' ? 'للقنّاصة' : 'للمسدس') + '</small>' : hold ? '🌊<small>ارمِ</small>' : player.state === 'hug' ? '🤜<small>طق</small>' : player.state === 'hang' && player.edgeHang ? '✋<small>—</small>' : '✋<small>شيل</small>');
+  setBtn('jumpBtn', aim ? '🫁<small>احبس نفسك</small>' : edge ? '🧗<small>تعلّق برّا</small>' : player.state === 'hang' && player.edgeHang ? '⬆️<small>اطلع</small>' : '🦘<small>قفز</small>');
+  setBtn('rollBtn', aim ? '↩️<small>رجوع</small>' : hold ? '💨<small>دفّه</small>' : player.state === 'hang' && player.edgeHang ? '🌀<small>—</small>' : player.state === 'hang' ? '⬇️<small>نزول</small>' : '🌀<small>تدحرج</small>');
+}
 function canGrab() {
   for (const e of enemies.list) {
     if (!e.ship || !e.alive || e.alert || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio', 'drowsy'].includes(e.st)) continue;
@@ -533,7 +549,7 @@ const keys = {}, prev = {};
 const vin = { jump: 0, atk: 0, roll: 0, act: 0, sp: 0, aim: 0 }, held = { jump: false, roll: false };
 const virt = { mx: 0, my: 0 }; // joystick
 const cam = { yaw: 0, pitch: 0.32, dist: 6.4, want: 6.4, target: new V(), lastManual: -9, dx: 0, dy: 0 };
-const stealth = new Stealth({ setDisguise: (on) => setDisguise(hero, on), pauseFor: (v) => { if (v) { if (!paused) { paused = true; radioPaused = true; } } else if (radioPaused) { paused = false; radioPaused = false; } }, camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
+const stealth = new Stealth({ onCaptainDown: (e, how) => captainDown(e, how), setDisguise: (on) => setDisguise(hero, on), pauseFor: (v) => { if (v) { if (!paused) { paused = true; radioPaused = true; } } else if (radioPaused) { paused = false; radioPaused = false; } }, camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
 let stormT = 4, flash = 0;
 addEventListener('keydown', (e) => {
   /* TV remote / keyboard menu navigation: arrows move, OK/Enter selects, Back returns */
@@ -564,6 +580,11 @@ canvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { i
 canvas.addEventListener('pointercancel', touchUp);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 document.querySelectorAll('#radio .rcmd').forEach((b) => (b.onclick = () => stealth.command(b.dataset.cmd))); $('#rClose').onclick = () => stealth.closeRadio();
+// قرص بإصبعين على الشاشة وقت التصويب = تكبير/تصغير
+{ let pd = 0; const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  addEventListener('touchstart', (e) => { if (stealth.aiming && e.touches.length === 2) pd = dist(e.touches); }, { passive: true });
+  addEventListener('touchmove', (e) => { if (!stealth.aiming || e.touches.length !== 2 || !pd) return; const d = dist(e.touches); if (d / pd > 1.35) { stealth.zoomStep(1); pd = d; } else if (pd / d > 1.35) { stealth.zoomStep(-1); pd = d; } }, { passive: true });
+  addEventListener('touchend', (e) => { if (e.touches.length < 2) pd = 0; }, { passive: true }); }
 addEventListener('wheel', (e) => { if (!stealth.aiming) return; e.preventDefault(); stealth.zoomStep(e.deltaY < 0 ? 1 : -1); }, { passive: false });
 { const zi = $('#zIn'), zo = $('#zOut'), zb = $('#zBreath');
   const tap = (el, fn) => el && el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
@@ -680,6 +701,20 @@ let promptKind = '';
 /* ---------- 🌊 تمايل السفينة + الموجات الكبيرة ---------- */
 let swellT = 0, waveNext = 40, waveWarn = 0, waveHit = 0;
 function shipDeckOutdoor(p) { return p.y > -0.6 && p.y < 1.6 && !(p.z > 117 && p.z < 157 && Math.abs(p.x) < 9); }
+function captainDown(e, how) {
+  if (level.captainDown) return; level.captainDown = true; level.complete = true; if (level.exitPortal) level.exitPortal.setActive(true);
+  addCoins(100, player.pos); sfx.win && sfx.win(); G.shake(0.4);
+  say(how === 'sea' ? '⚓🌊 رميت القائد «عاصفة» في البحر!! السفينة صارت لك — المروحية تنتظرك على المهبط 🚁' : '⚓😴 القائد «عاصفة» نام! السفينة صارت لك — المروحية تنتظرك على المهبط 🚁');
+}
+function captainLogic() {
+  if (!cfg || !cfg.captain || !level.relicTaken || level.capSpawned) return;
+  if (player.pos.z > 200 && player.pos.y > -0.6 && player.pos.y < 2) {
+    level.capSpawned = true; const c = cfg.captain;
+    const e = enemies.spawn({ x: c.x, y: c.y, z: c.z, type: 'guard', alert: true, zone: c.zone, captain: true }); e.yaw = Math.PI;
+    say('⚓ «عاصفة»: «توقّعتك تجي… محد يطلع من سفينتي.» — صوّب على راسه (٣ رؤوس تنيّمه)، ولما يعبّي سلاحه أو تضرب الموجة: امسكه من الخلف وارمه في البحر!');
+    sfx.tone(110, 80, 1.2, 'sawtooth', 0.12); G.shake(0.3);
+  }
+}
 function waveLogic(dt) {
   if (!cfg || !cfg.ship || !started) { level && (level.waveHit = 0); return; }
   swellT += dt;
@@ -703,7 +738,7 @@ function applySwell(dt) {
   camera.rotateZ(roll * k); camera.rotateX(pitch * k * 0.6);
 }
 function worldLogic(dt) {
-  waveLogic(dt);
+  waveLogic(dt); captainLogic();
   const p = player.pos;
   stealth.update(dt); wallSense(dt);
   // automatic sliding doors (locked ones need the right keycard)
@@ -747,9 +782,9 @@ function worldLogic(dt) {
     const bb = $('#breath'); bb.classList.toggle('on', breath < BREATH - 0.05); $('#breathFill').style.width = Math.max(0, (breath / BREATH) * 100) + '%'; $('#breathFill').style.background = breath < 4 ? '#f87171' : '#7dd3fc';
   }
   // boss bar
-  const boss = enemies.list.find((e) => e.boss && e.alive);
+  const boss = enemies.list.find((e) => (e.boss || e.captain) && e.alive && e.st !== 'sleep');
   $('#bossbar').classList.toggle('on', !!boss && boss.pos.distanceTo(p) < 35);
-  if (boss) $('#bossFill').style.width = (boss.hp / boss.maxHp) * 100 + '%';
+  if (boss) { $('#bossFill').style.width = (boss.captain ? boss.capHp / boss.capMax : boss.hp / boss.maxHp) * 100 + '%'; const nm = boss.captain ? '⚓ القائد «عاصفة»' + (boss.reloadT > 0 ? ' — يعبّي!' : '') : '🌋 عملاق الحمم'; const bb = $('#bossbar'); if (bb.firstChild.nodeValue !== nm) bb.firstChild.nodeValue = nm; }
   // special cooldown
   const spb = document.getElementById('spBtn'); if (spb && G.upg.spin) spb.classList.toggle('cool', tNow < (player.spinReady || 0) - 0.01 && player.t < (player.spinReady || 0));
   // traps
@@ -793,15 +828,18 @@ function worldLogic(dt) {
   // prompt
   let label = '';
   { const gl = stealth.gadgetLabel(), spb = $('#spBtn'); if (spb) { const want = gl || (G.upg.spin ? '✴️<small>دوّامة</small>' : null); const html = gl ? gl.split(' ')[0] + '<small>' + gl.split(' ').slice(1).join(' ') + '</small>' : want; if (spb.dataset.h !== String(html)) { spb.dataset.h = String(html); if (html) spb.innerHTML = html; spb.style.display = html ? '' : 'none'; } } }
+  touchLabels();
   const edgeN = stealth.on && stealth.seaEdge();
   if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
   else if (stealth.dragging && edgeN) label = 'ارمه في البحر 🌊';
   else if (stealth.on && !stealth.dragging && canGrab()) label = 'امسكه من الخلف ⚔️';
+  else if (stealth.on && !stealth.aiming && player.hullEdge && player.hullEdge()) label = 'اقفز 🦘 = تعلّق برّا السفينة وتختفي 🧗';
+  else if (player.state === 'hang' && player.edgeHang) label = 'متعلّق برّا 🧗 — تحرّك يمين/يسار • اقفز = اطلع';
   else if (player.state === 'hug' && !player.carry) label = player.hug && player.hug.peek > 0.5 ? 'طق 🤜 (أنت تطل 👀)' : 'طق على الجدار 🤜';
   else if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
   else if (nearItem() && player.onGround) label = 'شيل';
   else if (nearNpc()) label = 'كلّمه';
-  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (/⚔️|🌊/.test(label) ? '' : TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
+  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (/⚔️|🌊|🧗/.test(label) ? '' : TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
   // ambience
   if (Math.random() < dt * 18) { const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 14; motes.emit(new V(p.x + Math.cos(a) * r, p.y + Math.random() * 6, p.z + Math.sin(a) * r), { color: cfg.motes, count: 1, speed: 0.3, life: 4, size: 0.12, grav: -0.06, drag: 0.2 }); }
   if (level.petalTrees && Math.random() < dt * 4) { const t = level.petalTrees[Math.floor(Math.random() * level.petalTrees.length)]; dust.emit(t.pos.clone().add(new V((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), { color: t.color, count: 1, speed: 0.6, life: 4.5, size: 0.14, grav: 0.35, drag: 0.6 }); }

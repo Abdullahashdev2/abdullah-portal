@@ -12,7 +12,7 @@ export class Stealth {
   constructor(c) {
     this.c = c; this.on = false; this.aiming = false; this.weapon = 'pistol'; this.ammo = { pistol: 0, sniper: 0 };
     this.aimPitch = 0; this.noiseT = 0; this.radarT = 0; this.tracers = [];
-    this.zoomI = { pistol: 0, sniper: 1 }; this.breath = 1; this.tired = 0; this.recoil = 0; this.boltT = 0; this.pickT = 0; this.pick = null; this.touchBreath = false;
+    this.zoomI = { pistol: 0, sniper: 0 }; this.breath = 1; this.tired = 0; this.recoil = 0; this.boltT = 0; this.pickT = 0; this.pick = null; this.touchBreath = false;
     // first-person tranquilizer pistol held in front of the camera
     const g = new THREE.Group(), M = (c2, m = 0.5) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.4, metalness: m });
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.32), M(0x1f2937)); g.add(body);
@@ -83,7 +83,8 @@ export class Stealth {
     if (!this.on || this.holding || this.dragging || this.aiming) return false;
     const P = this.c.player;
     for (const e of this.c.enemies.list) {
-      if (!e.ship || !e.alive || e.alert || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio', 'drowsy'].includes(e.st)) continue;
+      const capOK = e.captain && (e.reloadT > 0 || e.st === 'drowsy' || (this.L.waveHit > 0));
+      if (!e.ship || !e.alive || (e.alert && !capOK) || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio'].includes(e.st) || (e.st === 'drowsy' && !e.captain)) continue;
       const dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, d = Math.hypot(dx, dz);
       if (d > 1.6 || Math.abs(P.pos.y - e.pos.y) > 1) continue;
       if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) > -0.25) continue; // لازم تكون وراه
@@ -96,6 +97,7 @@ export class Stealth {
   }
   choke() {
     const e = this.holding; if (!e) return;
+    if (e.captain) { this.c.say('💪 القائد أقوى من إنك تخنقه! جرّه لحافة السفينة وارمه في البحر 🌊 — بسرعة قبل يفلت!'); return; }
     e.choke = Math.min(1, e.choke + 0.17 + (this.c.upg().dmg || 0) * 0.04); e.flash = 0.08;
     this.c.sfx.tone(140 + e.choke * 80, 110, 0.12, 'sawtooth', 0.05);
     if (e.choke >= 1) {
@@ -108,6 +110,7 @@ export class Stealth {
   release(silent, shove) {
     const e = this.holding, P = this.c.player; this.holding = null; if (P) P.holding = false; if (!e || silent) return;
     if (shove) { this.c.enemies.sleep(e, true); e.sleepT = 3.5; this.c.sfx.hit(); } // دفّة قوية: يطيح ثواني
+    else if (e.captain) { e.st = 'idle'; e.reloadT = 0; e.ammo = 3; e.cd = 0.4; }
     else { e.st = 'inv'; e.invPos = P.pos.clone(); e.invT = 0; e.sus = 1; }
   }
   seaEdge() {
@@ -123,6 +126,7 @@ export class Stealth {
     this.flying.push({ e, from, to, t: 0, n });
     this.c.sfx.noise(0.35, 600, 0.8, 0.2, 'bandpass', 0, 200); this.c.sfx.tone(260, 140, 0.3, 'triangle', 0.1);
     this.L.thrown = (this.L.thrown || 0) + 1; this.c.addCoins(8, P.pos);
+    if (e.captain) { this.c.onCaptainDown && this.c.onCaptainDown(e, 'sea'); return true; }
     this.c.say(this.L.thrown === 1 ? '🌊 رميته في البحر! محد بيلقى جثته ولا بيصحى — بس انتبه: الحارس اللي يشوفك ترمي، بيعلن الإنذار.' : '🌊 للبحر! (' + this.L.thrown + ')');
     return true;
   }
@@ -248,7 +252,7 @@ export class Stealth {
       const e = this.holding, fwd = new V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), tgt = P.pos.clone().addScaledVector(fwd, 0.5);
       e.pos.lerp(tgt, Math.min(1, dt * 14)); e.pos.y = P.pos.y; e.yaw = P.yaw; e.heldT += dt; e.choke = Math.max(0, e.choke - dt * 0.06);
       if (!e.alive || P.state === 'hurt' || P.state === 'air' || P.inLocker) this.release(true);
-      else if (e.heldT > 6.5 + (this.c.upg().dmg || 0)) { this.c.say('😠 فلت منك!'); this.release(false); this.c.sfx.tone(500, 900, 0.2, 'square', 0.1); }
+      else if (e.heldT > (e.captain ? 3.4 : 6.5 + (this.c.upg().dmg || 0))) { this.c.say('😠 فلت منك!'); this.release(false); this.c.sfx.tone(500, 900, 0.2, 'square', 0.1); }
     }
     // dragged body follows behind the player
     if (this.dragging) {
@@ -303,10 +307,10 @@ export class Stealth {
     const holding = this.holdBreath && this.breath > 0 && this.tired <= 0;
     if (holding) { this.breath = Math.max(0, this.breath - dt / 4.5); if (this.breath <= 0) { this.tired = 2.2; this.c.sfx.tone(300, 200, 0.4, 'sine', 0.06); } }
     else this.breath = Math.min(1, this.breath + dt / (this.tired > 0 ? 6 : 3)); this.tired = Math.max(0, this.tired - dt);
-    const k = (fov / 62) * (sn ? 0.95 : 1);
+    const k = (fov / 62) * (sn ? 0.95 : 1) * (this.pick && this.pick.target ? 0.55 : 1); // يبطّئ لما تكون على هدف (أسهل بالجوال)
     if (look.dx || look.dy) { cam.yaw -= look.dx * 0.0035 * k; this.aimPitch = Math.max(-1.2, Math.min(1.2, this.aimPitch - look.dy * 0.003 * k)); look.dx = look.dy = 0; }
-    const t = performance.now() / 1000, base = sn ? 0.0042 : 0.0016, sway = base * (holding ? 0.1 : this.tired > 0 ? 2.2 : 1) * (P.vel && Math.hypot(P.vel.x, P.vel.z) > 0.5 ? 2.5 : 1);
-    const yaw = cam.yaw + (Math.sin(t * 1.1) + Math.sin(t * 2.3 + 1) * 0.5) * sway, pitch = this.aimPitch + this.recoil + (Math.sin(t * 1.6) * 0.8 + Math.sin(t * 0.55) * 0.6) * sway;
+    const t = performance.now() / 1000, base = sn ? 0.0017 : 0.0012, sway = base * (holding ? 0.12 : this.tired > 0 ? 2.2 : 1) * (P.vel && Math.hypot(P.vel.x, P.vel.z) > 0.5 ? 2.5 : 1);
+    const yaw = cam.yaw + (Math.sin(t * 0.7) + Math.sin(t * 1.3 + 1) * 0.4) * sway, pitch = this.aimPitch + this.recoil + (Math.sin(t * 0.9) * 0.8 + Math.sin(t * 0.4) * 0.5) * sway;
     camera.position.copy(P.pos).add(new V(0, 1.62, 0));
     const dir = new V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camera.position.clone().add(dir));
@@ -370,7 +374,7 @@ export class Stealth {
   /* ---------- HUD ---------- */
   hud(force) {
     const $ = (s) => document.querySelector(s);
-    $('#ammo').textContent = this.on ? `${this.weapon === 'pistol' ? '🔫' : '🎯'} ${this.ammo[this.weapon]}  ·  ${this.weapon === 'pistol' ? '🎯 ' + this.ammo.sniper : '🔫 ' + this.ammo.pistol}` : '';
+    $('#ammo').textContent = this.on ? (this.weapon === 'pistol' ? `▶ مسدس ${this.ammo.pistol}  ·  قنّاصة ${this.ammo.sniper}` : `▶ قنّاصة ${this.ammo.sniper}  ·  مسدس ${this.ammo.pistol}`) : '';
     $('#cross').classList.toggle('on', this.aiming && this.weapon === 'pistol');
     $('#scope').classList.remove('on'); const zb = $('#zoomBtns'); if (zb) { zb.classList.toggle('on', this.aiming); zb.classList.toggle('sn', this.weapon === 'sniper'); }
     $('#aimHint').classList.toggle('on', this.aiming);

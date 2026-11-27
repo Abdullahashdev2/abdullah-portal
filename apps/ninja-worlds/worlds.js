@@ -448,7 +448,7 @@ export function w7(K, L, S) {
   [-1, 1].forEach((sd) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.12, 8, 241.4), hullM); c.position.set(sd * 15.62, -5, 120); L.add(c); });
   [-0.62, 240.62].forEach((zz) => { const c = new THREE.Mesh(new THREE.BoxGeometry(31.4, 8, 0.12), hullM); c.position.set(0, -5, zz); L.add(c); });
   const bowM = new THREE.Mesh(new THREE.ConeGeometry(15.5, 18, 4, 1), hullM); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.3); bowM.position.set(0, -3.5, 249); L.add(bowM);
-  [-1, 1].forEach((sd) => K.wall({ x: sd * 15.25, y: 1.2, z: 120, w: 0.5, d: 240, h: 7.7, m: 'metal', ledge: false }));
+  [-1, 1].forEach((sd) => { K.wall({ x: sd * 15.25, y: 1.2, z: 120, w: 0.5, d: 240, h: 7.7, m: 'metal', ledge: false }).hull = true; }); // hull = تقدر تتعلّق من برّا
   K.wall({ x: 0, y: 1.2, z: -0.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false }); K.wall({ x: 0, y: 1.2, z: 240.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false });
   K.slab({ x0: -15, x1: 15, z0: 0, z1: 118, y: -6, h: 0.5 }); // lower deck floor
   // main deck with two stairwell holes (H1 stern: x 9.2..12.8, z 21.6..30 ; H2 cargo: x -12.8..-9.2, z 100..108.4)
@@ -550,7 +550,8 @@ export function w7(K, L, S) {
   K.checkpoint(4, 12, 146, Math.PI);
   const relic = K.relic({ x: 0, y: 12, z: 131, color: 0x38bdf8 });
   const exit = K.portal({ x: 0, y: 0, z: 228, rot: Math.PI, to: 'hub', label: 'مهبط الهروب', color: 0x38bdf8, active: false });
-  K.trigger({ x: 0, z: 131, y: 12, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.complete = true; exit.setActive(true); L.sfx('win'); }, text: '🧭 «بوصلة الظل» معك! المروحية تنتظرك عند مهبط المقدمة 🚁 — انزل من الدرج الخلفي واعبر مقدمة السفينة. انتبه: تعزيزات جديدة هناك.' });
+  L.exitPortal = exit; cfg.captain = { x: 0, y: 0, z: 222, zone: { x0: -13, x1: 13, z0: 204, z1: 236 } };
+  K.trigger({ x: 0, z: 131, y: 12, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.relicTaken = true; L.sfx('win'); }, text: '🧭 «بوصلة الظل» معك! المروحية تنتظرك عند مهبط المقدمة 🚁 — بس انتبه: القائد «عاصفة» بنفسه واقف على المهبط ⚓ وما ينخدع بأي تنكّر.' });
   sh(9, 6.5, 12.8, 125);
   /* ---------- F: bow + helideck ---------- */
   [[-9, 175, 1], [8, 182, 2], [-4, 195, 1], [10, 200, 1], [-11, 206, 2]].forEach(([x, z, st]) => K.container({ x, z, stack: st }));

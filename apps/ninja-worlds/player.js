@@ -79,6 +79,19 @@ export class Player {
     }
     return best;
   }
+  /* حاجز السفينة (الهيكل): تقفز فوقه وتتعلّق من برّا — تختفي عن عيون الحراس */
+  hullEdge() {
+    if (!this.g.level.cfg.ship || !this.onGround || this.carry || this.dragging || this.holding || this.aiming) return null;
+    const p = this.pos;
+    for (const b of this.boxes()) {
+      if (!b.hull || !b.active) continue; if (p.y < b.max.y - 1.8 || p.y > b.max.y - 0.6) continue;
+      if (p.z < b.min.z + 0.5 || p.z > b.max.z - 0.5) continue;
+      const inner = b.min.x > 0 ? b.min.x : b.max.x, d = Math.abs(p.x - inner); if (d > R + 0.45) continue;
+      const out = new V(b.min.x > 0 ? 1 : -1, 0, 0); return { b, n: out, top: b.max.y };
+    }
+    return null;
+  }
+  startEdgeHang(E) { this.startHang(E); this.g.sfx.jump(); this.edgeHang = true; this.g.onEdgeHang && this.g.onEdgeHang(); }
   /* ---------- الالتصاق بالجدار (ظهرك على الحديد) + الطلّة من الزاوية ---------- */
   startHug(w) {
     this.state = 'hug'; this.hug = { n: w.n.clone(), t: new V(-w.n.z, 0, w.n.x), edge: 0, peek: 0, move: 0, still: 0 };
@@ -160,6 +173,7 @@ export class Player {
     if (this.dragging || this.aiming || this.holding) this.jumpBuf = 0;
     if (m > 0.1 && this.airLock <= 0 && !this.aiming && !(this.holding && v.dot(this.fwd) < -0.3)) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * (this.onGround ? 14 : 5));
     this.coyote = Math.max(0, this.coyote - dt);
+    if (this.jumpBuf > 0 && this.onGround) { const E = this.hullEdge(); if (E && (m < 0.2 || v.clone().normalize().dot(E.n) > 0.5 || this.fwd.dot(E.n) > 0.5)) { this.jumpBuf = 0; return this.startEdgeHang(E); } }
     if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
       this.jumpBuf = 0; this.coyote = 0;
       const w = this.nearWall(R + 0.45);
@@ -240,7 +254,7 @@ export class Player {
     this.yaw = Math.atan2(-n.x, -n.z); this.st.hT = 0; this.st.push = 0; this.g.sfx.grab(); this.flip = 0; this.ground = L.b;
   }
   hangUpd(dt, inp) {
-    const L = this.hang, b = L.b, n = L.n; this.st.hT += dt;
+    const L = this.hang, b = L.b, n = L.n; this.st.hT += dt; this.edgeHang = !!b.hull;
     if (!b.active) { this.state = 'air'; this.ground = null; return; }
     this.pos.y = L.top - 2.0 + (b.max.y - L.top); L.top = b.max.y;
     const { v, m } = this.moveInput(inp), t = new V(-n.z, 0, n.x), al = v.dot(t), into = -v.dot(n), ax = n.x ? 'z' : 'x';
@@ -250,6 +264,7 @@ export class Player {
     if (this.jumpBuf > 0 && this.st.hT > 0.12) { this.jumpBuf = 0; if (-into > 0.5) { this.ground = null; return this.wallJump(n, null); } return this.startClimb(); }
     if (this.st.push > 0.28) return this.startClimb();
     if (-into > 0.7) this.st.pull = (this.st.pull || 0) + dt; else this.st.pull = 0;
+    if (b.hull) return; // متعلّق برّا السفينة: ما نطيّحك في البحر بالغلط
     if ((inp.rollP || this.st.pull > 0.35) && this.st.hT > 0.2) { this.state = 'air'; this.ground = null; this.noGrab = 0.4; this.vel.set(n.x * 1.5, 0, n.z * 1.5); }
   }
   startClimb() {
