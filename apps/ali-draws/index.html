@@ -194,16 +194,19 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.par
 /* ======================= Ali's drawings ======================= */
 const DEF={style:'real',line:'#1e293b',fill:'#fde7c8',holo:'#22d3ee',size:1.4,sw:1,sh:1,thick:.22,glow:.35};
 const SEEDS=[
+ // Gemini turnaround sheets made from Ali's drawings (4 views each: front, three-quarter, side, back)
+ ['masked_ninja_sheet','النينجا المعصوب ✨',{size:2},{views:4}],['hero_hand_sheet','البطل الهادئ ✨',{size:2},{views:4}],
  ['masked_ninja','النينجا المعصوب',{fill:'#fde2c4',line:'#0f172a'}],['spiky_shaded','صاحب الشعر المنفوش',{fill:'#fef3c7',line:'#111827'}],
  ['hero_hand','البطل الهادئ',{fill:'#e0f2fe',line:'#1e3a8a'}],['wild_hair','الشعر الطائر',{fill:'#ede9fe',line:'#312e81'}],
  ['flame_fighter','مقاتل اللهب',{fill:'#ffedd5',line:'#7c2d12',holo:'#fb923c'}],['robot_box','الروبوت المربّع',{fill:'#dcfce7',line:'#14532d',holo:'#4ade80'}],
  ['standing','الواقف بالظل',{fill:'#e2e8f0',line:'#0f172a'}],['can','علبة الضحك',{fill:'#fee2e2',line:'#7f1d1d',holo:'#f472b6'}]];
 let CHARS=[];
-async function loadChars(){const saved=ls.get('ali_seed_cfg',{});const seeds=SEEDS.map(([id,name,o],i)=>({id,name:(saved[id]&&saved[id].name)||name,seed:true,src:'seed/'+id+'.jpg',mask:'seed/'+id+'.png',cfg:Object.assign({},DEF,o,(saved[id]||{}).cfg||{}),order:i}));
+async function loadChars(){const saved=ls.get('ali_seed_cfg',{});const seeds=SEEDS.map(([id,name,o,x],i)=>{const d={id,name:(saved[id]&&saved[id].name)||name,seed:true,src:'seed/'+id+'.jpg',mask:'seed/'+id+'.png',cfg:Object.assign({},DEF,o,(saved[id]||{}).cfg||{}),order:i};
+  if(x&&x.views){d.views=[...Array(x.views)].map((_,k)=>({art:`seed/${id}_a${k}.png`,mask:`seed/${id}_m${k}.png`}));d.art=d.views[0].art;d.mask=d.views[0].mask;}return d;});
  const mine=(await DB.all()).sort((a,b)=>b.created-a.created).map(c=>Object.assign(c,{cfg:Object.assign({},DEF,c.cfg||{})}));CHARS=[...mine,...seeds];}
 function renderGrid(){const g=$('#grid');g.innerHTML='';CHARS.forEach((c,i)=>{const b=document.createElement('button');b.className='dcard';b.type='button';b.style.setProperty('--r',((i*37)%7-3)*.6+'deg');
  b.innerHTML=`<div class="pic"><img alt="" draggable="false"><div class="scan" style="animation-delay:${(i%5)*.4}s"></div></div><b></b><span class="tap">👆 انقر لتتحوّل</span>`;
- b.querySelector('img').src=c.src;b.querySelector('b').textContent=c.name;if(!c.seed){const m=document.createElement('span');m.className='mine';m.textContent=c.glb?'🧊 3D':c.views?'🔄 زوايا':c.art?'🪄 ملوّنة':'جديدة';b.appendChild(m);}
+ b.querySelector('img').src=c.src;b.querySelector('b').textContent=c.name;if(!c.seed||c.views){const m=document.createElement('span');m.className='mine';m.textContent=c.glb?'🧊 3D':c.views?'🔄 كل الزوايا':c.art?'🪄 ملوّنة':'جديدة';b.appendChild(m);}
  b.onclick=()=>chooseKind(c);g.appendChild(b);});}
 let kindFor=null;function chooseKind(c){if(c.glb){openChar(c,'glb');return;}kindFor=c;$('#kindName').textContent=c.name;$('#kFull').style.order=ls.get('ali_kind','cut')==='full'?-1:0;sheet('kindSheet',true);}
 
@@ -624,7 +627,7 @@ async function idToken(){try{const P=(window.parent&&window.parent!==window&&win
 async function toDataURL(src,max){const img=new Image();img.src=src;await img.decode();const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.9);}
 // remove the plain white background the AI was asked to draw on, crop, and build the line/body mask our renderer uses
-async function artFromAI(url){const img=new Image();img.src=url;await img.decode();const s=Math.min(1,900/Math.max(img.width,img.height));const w=Math.round(img.width*s),h=Math.round(img.height*s);
+async function artFromAI(url,maxSide){const img=new Image();img.src=url;await img.decode();const s=Math.min(1,(maxSide||900)/Math.max(img.width,img.height));const w=Math.round(img.width*s),h=Math.round(img.height*s);
  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(img,0,0,w,h);const im=x.getImageData(0,0,w,h),d=im.data;
  const white=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2];return Math.min(r,g,b)>228&&Math.max(r,g,b)-Math.min(r,g,b)<22;};
  const bg=new Uint8Array(w*h),q=new Int32Array(w*h);let qh=0,qt=0;const push=i=>{if(!bg[i]&&white(i)){bg[i]=1;q[qt++]=i;}};
@@ -640,7 +643,7 @@ async function artFromAI(url){const img=new Image();img.src=url;await img.decode
  for(let i=0;i<cw*ch;i++){const a=ad.data[i*4+3]/255,l=(.299*ad.data[i*4]+.587*ad.data[i*4+1]+.114*ad.data[i*4+2])/255;md.data[i*4]=Math.round(Math.max(0,Math.min(1,(.55-l)*2.4))*a*255);md.data[i*4+1]=a>.5?255:0;md.data[i*4+3]=Math.round(a*255);}
  mx.putImageData(md,0,0);return{art:art.toDataURL('image/png'),mask:mk.toDataURL('image/png')};}
 // split a turnaround sheet (views side by side on white) into separate views, each with its own art + mask
-async function splitSheet(canvas){const full=await artFromAI(canvas.toDataURL('image/png'));if(!full)return null;const img=new Image();img.src=full.art;await img.decode();
+async function splitSheet(canvas){const full=await artFromAI(canvas.toDataURL('image/png'),2600);if(!full)return null;const img=new Image();img.src=full.art;await img.decode();
  const w=img.width,h=img.height,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(img,0,0);const d=x.getImageData(0,0,w,h).data;
  const col=new Float32Array(w);for(let i=0;i<w;i++){let n=0;for(let j=0;j<h;j++)if(d[(j*w+i)*4+3]>40)n++;col[i]=n;}
  const minGap=Math.max(4,Math.round(w*.012)),segs=[];let st=-1,gap=0;
@@ -712,6 +715,7 @@ function loop(){requestAnimationFrame(loop);if(!renderer||!$('#play').classList.
 requestAnimationFrame(loop);
 worldKey=ls.get('ali_world','paper');if(!WORLDS[worldKey])worldKey='paper';
 await loadChars();renderGrid();
+window.__splitSheet=(c)=>splitSheet(c);
 window.__ALI={get camera(){return camera},get pending(){return pendingBody},get tf(){return tf},get mode(){return mode},get hero(){return hero},get world(){return world},goWorld,get stars(){return starsGot}};
 </script>
 </body>

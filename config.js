@@ -35,6 +35,17 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "ali-draws-1-4",
+      date: "2026-11-27",
+      app: "ali-draws",
+      title: "✨ وصلوا! «النينجا المعصوب» و«البطل الهادئ» بكل الزوايا",
+      items: [
+        "🎨 رسمتين لعلي صاروا شخصيات أنمي ملوّنة كاملة (من Gemini)",
+        "🔄 تشوفهم من قدّام لما يجون لك، ومن الجنب، ومن الخلف لما يمشون بعيد",
+        "👆 تلقاهم أول شي في معرض رسمات علي",
+      ],
+    },
+    {
       id: "ali-draws-1-3",
       date: "2026-11-27",
       app: "ali-draws",
@@ -197,7 +208,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ali-draws/",
       open: "inside",
-      version: "1.3",
+      version: "1.4",
     },
     {
       id: "saeq-albatal",
