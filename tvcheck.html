@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>فحص التلفزيون</title>
+<style>
+html,body{margin:0;background:#0b0b16;color:#fff;font-family:system-ui,Tahoma,sans-serif}
+body{padding:3vw 4vw}
+h1{margin:0 0 2vh;font-size:clamp(22px,3.2vw,48px)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:2vw}
+.box{background:#161a2e;border:1px solid #2b3150;border-radius:18px;padding:2vw}
+.box b{display:block;font-size:clamp(15px,1.5vw,24px);opacity:.75;margin-bottom:1vh}
+.box div{font-size:clamp(18px,2.4vw,38px);font-weight:800;word-break:break-word}
+.small{font-size:clamp(12px,1.1vw,18px)!important;font-weight:400!important;opacity:.8}
+button{font:inherit;font-size:clamp(18px,2vw,32px);padding:1.2vh 2.4vw;border-radius:999px;border:0;background:#ffd166;color:#111;font-weight:800;margin:2vh 0 0 1vw;cursor:pointer}
+button:focus{outline:5px solid #fff;outline-offset:4px}
+canvas{position:fixed;left:0;top:0;opacity:0;pointer-events:none}
+.ok{color:#5be37d}.mid{color:#ffd166}.bad{color:#ff6b6b}
+</style>
+</head>
+<body>
+<h1>📺 فحص قوة التلفزيون — صوّر هذي الشاشة وأرسلها</h1>
+<div class="grid">
+  <div class="box"><b>المتصفح</b><div id="br">…</div><div class="small" id="ua"></div></div>
+  <div class="box"><b>كرت الشاشة (GPU)</b><div id="gpu" style="font-size:clamp(14px,1.5vw,24px)">…</div></div>
+  <div class="box"><b>دقة الشاشة</b><div id="res">…</div></div>
+  <div class="box"><b>النينجا بدقة ٧٢٠p</b><div id="f720">انتظر…</div></div>
+  <div class="box"><b>النينجا بدقة ١٠٨٠p</b><div id="f1080">انتظر…</div></div>
+  <div class="box"><b>الصوت</b><div id="snd">اضغط الزر</div></div>
+  <div class="box"><b>مزايا</b><div id="feat" class="small">…</div></div>
+</div>
+<button id="again">🔁 أعد الاختبار</button><button id="beep">🔊 جرّب الصوت</button>
+<canvas id="c"></canvas>
+<script>
+(function () {
+  var $ = function (i) { return document.getElementById(i); };
+  var ua = navigator.userAgent; $('ua').textContent = ua;
+  var m = ua.match(/(Chrome|Chromium)\/(\d+)/), br = m ? 'Chromium ' + m[2] : (ua.match(/Firefox\/(\d+)/) ? 'Firefox' : (ua.match(/Version\/(\d+).*Safari/) ? 'Safari' : 'غير معروف'));
+  if (/wv\)/.test(ua)) br += ' (WebView)';
+  $('br').textContent = br;
+  $('br').className = m && +m[2] >= 100 ? 'ok' : m && +m[2] >= 80 ? 'mid' : 'bad';
+  $('res').textContent = screen.width + '×' + screen.height + ' · نافذة ' + innerWidth + '×' + innerHeight + ' · dpr ' + (window.devicePixelRatio || 1);
+  var cv = $('c'), gl = cv.getContext('webgl2') || cv.getContext('webgl');
+  var feat = [];
+  feat.push(gl ? (cv.getContext('webgl2') ? 'WebGL2 ✅' : 'WebGL1 فقط ⚠️') : 'بدون WebGL ❌');
+  try { feat.push(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap') ? 'importmap ✅' : 'importmap ❌'); } catch (e) { feat.push('importmap ?'); }
+  feat.push(window.RTCPeerConnection ? 'WebRTC ✅' : 'WebRTC ❌');
+  feat.push(navigator.getGamepads ? 'Gamepad ✅' : 'Gamepad ❌');
+  feat.push('أنوية المعالج: ' + (navigator.hardwareConcurrency || '?'));
+  feat.push('الذاكرة: ' + (navigator.deviceMemory ? navigator.deviceMemory + 'GB' : '?'));
+  $('feat').innerHTML = feat.join('<br>');
+  if (!gl) { $('gpu').textContent = 'لا يوجد'; $('f720').textContent = $('f1080').textContent = '—'; return; }
+  var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  $('gpu').textContent = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+
+  // الاختبار الحقيقي: نشغّل لعبة النينجا نفسها داخل الصفحة ونعدّ الإطارات
+  var fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;left:0;bottom:0;border:0;opacity:.35;pointer-events:none';
+  function run(w, h, el, done) {
+    el.textContent = 'يحمّل اللعبة…'; el.className = '';
+    fr.style.width = w + 'px'; fr.style.height = h + 'px'; fr.style.transform = 'scale(' + Math.min(1, 0.3 * innerWidth / w) + ')'; fr.style.transformOrigin = '0 100%';
+    fr.onload = function () {
+      var win = fr.contentWindow, tries = 0;
+      (function wait() {
+        if (!(win.__G && win.__G.start)) { if (++tries < 80) return setTimeout(wait, 250); el.textContent = 'ما اشتغلت ❌'; el.className = 'bad'; return done && done(); }
+        try { win.__G.start(); } catch (e) {}
+        el.textContent = 'يقيس…';
+        setTimeout(function () {
+          var n = 0, t0 = win.performance.now();
+          (function f() { n++; if (win.performance.now() - t0 < 6000) win.requestAnimationFrame(f); else {
+            var fps = Math.round(n * 1000 / (win.performance.now() - t0));
+            el.textContent = fps + ' إطار/ثانية'; el.className = fps >= 45 ? 'ok' : fps >= 25 ? 'mid' : 'bad'; done && done(); } })();
+        }, 3000);
+      })();
+    };
+    fr.src = 'apps/ninja-worlds/?bench=' + Date.now();
+    if (!fr.parentNode) document.body.appendChild(fr);
+  }
+  function all() { run(1280, 720, $('f720'), function () { run(1920, 1080, $('f1080'), function () { fr.src = 'about:blank'; }); }); }
+  setTimeout(all, 500);
+  $('again').onclick = all;
+  $('beep').onclick = function () {
+    try {
+      var A = window.AudioContext || window.webkitAudioContext, a = new A(), o = a.createOscillator(), g = a.createGain();
+      o.frequency.value = 660; g.gain.value = 0.25; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.5);
+      a.resume && a.resume(); setTimeout(function () { $('snd').textContent = 'حالة الصوت: ' + a.state + ' — سمعت صفّارة؟'; }, 300);
+    } catch (e) { $('snd').textContent = 'خطأ: ' + e.message; }
+  };
+})();
+</script>
+</body>
+</html>
