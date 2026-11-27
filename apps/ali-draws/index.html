@@ -155,6 +155,7 @@ button{font-family:inherit;cursor:pointer}
   <p style="text-align:center;color:#94a3b8;margin:0 0 6px;font-size:14px">كيف تبغى الرسمة تصحى؟</p>
   <button class="big" id="kCut" type="button" style="text-align:right">✂️ رسمة مقصوصة<br><small style="font-weight:600;opacity:.85">نفس رسمة علي بالضبط، تطلع من الورقة وتمشي كأنها مقصوصة بسماكة</small></button>
   <button class="big" id="kFull" type="button" style="text-align:right;background:linear-gradient(90deg,#f59e0b,#ec4899)">🧍 شخصية كاملة<br><small style="font-weight:600;opacity:.9">رأس الرسمة على جسم كرتوني كامل: رجلين وقدمين ويدين، يمشي ويجري وينط ويلوّح</small></button>
+  <button class="big" id="kAI" type="button" style="text-align:right;background:linear-gradient(90deg,#7c3aed,#06b6d4)">🪄 أنمي ملوّن بالذكاء الاصطناعي<br><small style="font-weight:600;opacity:.9">يعيد رسمها شخصية كاملة ملوّنة من الراس للرجول بنفس تصميم علي، وتصير شخصية جديدة تمشي (يحتاج تسجيل دخول)</small></button>
   <button class="big gray" data-close type="button">إلغاء</button>
 </aside>
 <div id="busy">✨ أجهّز الرسمة…</div>
@@ -225,7 +226,7 @@ void main(){vUv=uv;vLayer=uLayer;vec3 p=position;float v=uv.y,side=uv.x<.5?-1.:1
  p.z+=uLayer;
  gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`;
 const CHAR_FS=`
-uniform sampler2D uMask;uniform vec3 uLine,uFill,uHolo;uniform float uReal,uTime,uSide,uGlow,uReveal,uOpacity,uPencil;
+uniform sampler2D uMask,uArt;uniform vec3 uLine,uFill,uHolo;uniform float uReal,uTime,uSide,uGlow,uReveal,uOpacity,uPencil,uArtMode;
 varying vec2 vUv;varying float vLayer;
 void main(){vec4 m=texture2D(uMask,vUv);float L=m.r,B=m.g,A=m.a;
  if(vUv.y>uReveal)discard;
@@ -234,11 +235,12 @@ void main(){vec4 m=texture2D(uMask,vUv);float L=m.r,B=m.g,A=m.a;
  vec3 fill=uSide>.5?uFill*.62:uFill;vec3 real=mix(fill,uLine,uSide>.5?0.:L);
  real=mix(real,mix(vec3(1.),vec3(.12),L),uPencil);
  float aReal=uSide>.5?step(.5,B):max(B,L);
+ if(uArtMode>.5){vec4 art=texture2D(uArt,vUv);real=mix(uSide>.5?art.rgb*.55:art.rgb,mix(vec3(1.),vec3(.12),L),uPencil);aReal=uSide>.5?step(.5,art.a):art.a;}
  // hologram look: glowing lines, faint body, scanlines and flicker
  float scan=.55+.45*sin(vUv.y*220.-uTime*9.);float flick=.88+.12*sin(uTime*37.)*sin(uTime*13.);
  vec3 holo=uHolo*(.25*B+1.7*L)*scan*flick;float aHolo=(B*.32+L*.95)*(uSide>.5?.35:1.);
  vec3 col=mix(holo,real,uReal);float a=mix(aHolo,aReal,uReal);
- col+=uHolo*uGlow*L*(1.-uSide)*.6+edgeLine*uHolo*2.5;
+ col+=uHolo*uGlow*L*(1.-uSide)*.6*(1.-uArtMode*uReal)+edgeLine*uHolo*2.5;
  a=max(a,edgeLine);a*=uOpacity;if(a<.04)discard;
  gl_FragColor=vec4(col,a);
  #include <colorspace_fragment>
@@ -246,7 +248,7 @@ void main(){vec4 m=texture2D(uMask,vUv);float L=m.r,B=m.g,A=m.a;
 class Character{
  constructor(def,tex){this.def=def;this.cfg=Object.assign({},def.cfg);this.tex=tex;this.group=new THREE.Group();this.inner=new THREE.Group();this.group.add(this.inner);
   this.aspect=tex.image.width/tex.image.height;this.layers=[];this.N=10;this.u={uTime:{value:0},uWalk:{value:0},uPhase:{value:0},uSquash:{value:1},uLean:{value:0},uWave:{value:0},uReal:{value:1},uReveal:{value:1.2},uOpacity:{value:1},uGlow:{value:.35},uPencil:{value:0},
-   uLine:{value:new THREE.Color()},uFill:{value:new THREE.Color()},uHolo:{value:new THREE.Color()},uDepth:{value:1}};
+   uLine:{value:new THREE.Color()},uFill:{value:new THREE.Color()},uHolo:{value:new THREE.Color()},uDepth:{value:1},uArt:{value:def.artTex||null},uArtMode:{value:def.artTex?1:0}};
   this.geo=new THREE.PlaneGeometry(1,1,20,32);this.geo.translate(0,.5,0);
   for(let i=0;i<this.N;i++){const side=i>0&&i<this.N-1;const mat=new THREE.ShaderMaterial({vertexShader:CHAR_VS,fragmentShader:CHAR_FS,transparent:true,side:THREE.DoubleSide,depthWrite:true,
     uniforms:Object.assign({},this.u,{uMask:{value:tex},uLayer:{value:0},uSide:{value:side?1:0}})});const m=new THREE.Mesh(this.geo,mat);m.renderOrder=i;this.inner.add(m);this.layers.push(m);}
@@ -338,7 +340,7 @@ function makeDoor(label){const g=new THREE.Group();const fm=mat(0xfef3c7,.6);
 /* ======================= the transformation (drawing -> hologram -> real) ======================= */
 let hero=null,friends=[],stage=null,mode='idle',tf=0,starsGot=0;
 const PARTICLES=1400;let parts=null,partData=null,ringFx=null,dust=null;
-async function makeCharacter(def){const tex=await loadTex(def.mask,false);tex.colorSpace=THREE.NoColorSpace;tex.generateMipmaps=true;tex.minFilter=THREE.LinearMipmapLinearFilter;return new Character(def,tex);}
+async function makeCharacter(def){if(def.art&&!def.artTex){def.artTex=await loadTex(def.art,true);}const tex=await loadTex(def.mask,false);tex.colorSpace=THREE.NoColorSpace;tex.generateMipmaps=true;tex.minFilter=THREE.LinearMipmapLinearFilter;return new Character(def,tex);}
 async function pencilTex(def){const img=new Image();img.src=def.mask;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);
  const d=x.getImageData(0,0,c.width,c.height),o=x.createImageData(c.width,c.height);for(let i=0;i<c.width*c.height;i++){const L=d.data[i*4]/255;const g=58+20*Math.random();o.data[i*4]=255-(255-g)*L;o.data[i*4+1]=253-(253-g)*L;o.data[i*4+2]=246-(246-g-6)*L;o.data[i*4+3]=255;}
  x.putImageData(o,0,0);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;}
@@ -483,6 +485,7 @@ let hT=0;function hint(t){const h=$('#hint');h.textContent=t;h.style.opacity=t?1
 function flash(on){const f=$('#flash');if(on===false){f.style.opacity=0;return;}f.style.opacity=.85;if(on!==true)setTimeout(()=>f.style.opacity=0,180);}
 function sheet(id,on){document.querySelectorAll('.sheet').forEach(s=>s.classList.toggle('on',s.id===id&&on));}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>sheet(null,false));
+$('#kAI').onclick=()=>{sheet(null,false);aiRedraw(kindFor);};
 $('#kCut').onclick=()=>{sheet(null,false);ls.set('ali_kind','cut');openChar(kindFor,'cut');};$('#kFull').onclick=()=>{sheet(null,false);ls.set('ali_kind','full');openChar(kindFor,'full');};
 
 /* joystick */
@@ -516,7 +519,7 @@ $('#pEdit').onclick=()=>{if(!hero)return;$('#eName').value=hero.def.name;
  [['#eSize','size'],['#eW','sw'],['#eH','sh'],['#eT','thick'],['#eGlow','glow']].forEach(([s,k])=>{const el=$(s);el.value=hero.cfg[k];const f=()=>{hero.cfg[k]=+el.value;hero.apply();};el.oninput=hero.full?null:f;el.onchange=f;});
  $('#eDel').style.display=hero.def.seed?'none':'';sheet('editSheet',true);};
 $('#eSave').onclick=async()=>{const d=hero.def;d.name=$('#eName').value.trim()||d.name;d.cfg=Object.assign({},hero.cfg);
- if(d.seed){const s=ls.get('ali_seed_cfg',{});s[d.id]={name:d.name,cfg:d.cfg};ls.set('ali_seed_cfg',s);}else await DB.put({id:d.id,name:d.name,src:d.src,mask:d.mask,cfg:d.cfg,created:d.created});
+ if(d.seed){const s=ls.get('ali_seed_cfg',{});s[d.id]={name:d.name,cfg:d.cfg};ls.set('ali_seed_cfg',s);}else await DB.put({id:d.id,name:d.name,src:d.src,mask:d.mask,art:d.art,cfg:d.cfg,created:d.created,fromId:d.fromId});
  sheet(null,false);hint('💾 انحفظت');renderGrid();};
 $('#eReplay').onclick=async()=>{sheet(null,false);hero.def.cfg=Object.assign({},hero.cfg);openChar(hero.def,hero.full?'full':'cut');};
 $('#eDel').onclick=async()=>{if(!confirm('أكيد تبغى تحذف هذي الرسمة؟'))return;await DB.del(hero.def.id);await loadChars();renderGrid();sheet(null,false);mode='idle';show('gallery');};
@@ -525,7 +528,7 @@ $('#eDel').onclick=async()=>{if(!confirm('أكيد تبغى تحذف هذي ال
 function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
 async function maskData(def){const img=new Image();img.src=def.mask;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return{c,d:x.getImageData(0,0,c.width,c.height).data,w:c.width,h:c.height};}
 $('#pExport').onclick=()=>sheet('exportSheet',true);
-$('#xPng').onclick=async()=>{const {d,w,h}=await maskData(hero.def);const S=2,c=document.createElement('canvas');c.width=w*S;c.height=h*S;const x=c.getContext('2d');const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tx=tmp.getContext('2d'),im=tx.createImageData(w,h);
+$('#xPng').onclick=async()=>{if(hero.def.art){const b=await (await fetch(hero.def.art)).blob();download((hero.def.name||'شخصية')+'.png',b);return;}const {d,w,h}=await maskData(hero.def);const S=2,c=document.createElement('canvas');c.width=w*S;c.height=h*S;const x=c.getContext('2d');const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tx=tmp.getContext('2d'),im=tx.createImageData(w,h);
  const hex=s=>[parseInt(s.slice(1,3),16),parseInt(s.slice(3,5),16),parseInt(s.slice(5,7),16)];const cf=hero.cfg,F=hex(cf.fill),Ln=hex(cf.line),Hl=hex(cf.holo);
  for(let i=0;i<w*h;i++){const L=d[i*4]/255,B=d[i*4+1]/255,A=d[i*4+3]/255;let c=cf.style==='holo'?Hl.map(v=>v*(.3+L)):cf.style==='pencil'?[255*(1-L)+30*L,255*(1-L)+30*L,255*(1-L)+35*L]:F.map((v,k)=>v*(1-L)+Ln[k]*L);
   im.data[i*4]=c[0];im.data[i*4+1]=c[1];im.data[i*4+2]=c[2];im.data[i*4+3]=(cf.style==='holo'?(B*.4+L):Math.max(B,L))*255*(A>0?1:0);}
@@ -571,6 +574,39 @@ $('#cropGo').onclick=async()=>{$('#busy').classList.add('on');await new Promise(
   const small=document.createElement('canvas');const k=Math.min(1,640/Math.max(c.width,c.height));small.width=Math.round(c.width*k);small.height=Math.round(c.height*k);small.getContext('2d').drawImage(c,0,0,small.width,small.height);
   const def={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي الجديدة',src:small.toDataURL('image/jpeg',.88),mask:out.url,cfg:Object.assign({},DEF),created:Date.now()};
   await DB.put(def);await loadChars();renderGrid();$('#busy').classList.remove('on');show('gallery');chooseKind(CHARS.find(x=>x.id===def.id));}catch(e){console.error(e);alert('صار خطأ في تجهيز الرسمة');}finally{$('#busy').classList.remove('on');}};
+
+/* ======================= 🪄 AI redraw (Google Gemini via our protected Netlify function) ======================= */
+async function idToken(){try{const P=(window.parent&&window.parent!==window&&window.parent.PortalAuth)||window.PortalAuth;return P?await P.getIdToken():null;}catch(e){return null;}}
+async function toDataURL(src,max){const img=new Image();img.src=src;await img.decode();const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+ const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.9);}
+// remove the plain white background the AI was asked to draw on, crop, and build the line/body mask our renderer uses
+async function artFromAI(url){const img=new Image();img.src=url;await img.decode();const s=Math.min(1,900/Math.max(img.width,img.height));const w=Math.round(img.width*s),h=Math.round(img.height*s);
+ const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(img,0,0,w,h);const im=x.getImageData(0,0,w,h),d=im.data;
+ const white=i=>{const r=d[i*4],g=d[i*4+1],b=d[i*4+2];return Math.min(r,g,b)>228&&Math.max(r,g,b)-Math.min(r,g,b)<22;};
+ const bg=new Uint8Array(w*h),q=new Int32Array(w*h);let qh=0,qt=0;const push=i=>{if(!bg[i]&&white(i)){bg[i]=1;q[qt++]=i;}};
+ for(let i=0;i<w;i++){push(i);push((h-1)*w+i);}for(let j=0;j<h;j++){push(j*w);push(j*w+w-1);}
+ while(qh<qt){const i=q[qh++],px=i%w,py=(i/w)|0;if(px>0)push(i-1);if(px<w-1)push(i+1);if(py>0)push(i-w);if(py<h-1)push(i+w);}
+ let x0=w,y0=h,x1=0,y1=0;for(let i=0;i<w*h;i++){if(bg[i]){d[i*4+3]=0;continue;}
+  // soften the outline where the figure touches the background
+  const px=i%w,py=(i/w)|0;let n=0;if(px>0&&bg[i-1])n++;if(px<w-1&&bg[i+1])n++;if(py>0&&bg[i-w])n++;if(py<h-1&&bg[i+w])n++;if(n)d[i*4+3]=white(i)?90:200;
+  if(px<x0)x0=px;if(px>x1)x1=px;if(py<y0)y0=py;if(py>y1)y1=py;}
+ if(x1<=x0||y1<=y0)return null;x.putImageData(im,0,0);const m=6;x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(w-1,x1+m);y1=Math.min(h-1,y1+m);
+ const cw=x1-x0+1,ch=y1-y0+1,art=document.createElement('canvas');art.width=cw;art.height=ch;art.getContext('2d').drawImage(c,x0,y0,cw,ch,0,0,cw,ch);
+ const ad=art.getContext('2d').getImageData(0,0,cw,ch),mk=document.createElement('canvas');mk.width=cw;mk.height=ch;const mx=mk.getContext('2d'),md=mx.createImageData(cw,ch);
+ for(let i=0;i<cw*ch;i++){const a=ad.data[i*4+3]/255,l=(.299*ad.data[i*4]+.587*ad.data[i*4+1]+.114*ad.data[i*4+2])/255;md.data[i*4]=Math.round(Math.max(0,Math.min(1,(.55-l)*2.4))*a*255);md.data[i*4+1]=a>.5?255:0;md.data[i*4+3]=Math.round(a*255);}
+ mx.putImageData(md,0,0);return{art:art.toDataURL('image/png'),mask:mk.toDataURL('image/png')};}
+let aiBusy=false;
+async function aiRedraw(def){if(aiBusy)return;const tok=await idToken();
+ if(!tok){alert('🪄 هذي الميزة تحتاج تسجيل دخول في البوابة أول (زر 👤 فوق في صفحة البوابة) عشان ما أحد يستخدمها من برا العائلة.');return;}
+ aiBusy=true;const busy=$('#busy');busy.classList.add('on');let dots=0;const iv=setInterval(()=>{dots=(dots+1)%4;busy.textContent='🪄 الذكاء الاصطناعي يرسم «'+def.name+'» كشخصية كاملة'+'.'.repeat(dots)+'\n(حوالي ١٠–٢٠ ثانية)';},500);busy.style.whiteSpace='pre-line';busy.style.textAlign='center';
+ try{const image=await toDataURL(def.src,1024);const r=await fetch('/api/ali-ai',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({image,name:def.name,idToken:tok})});
+  let j={};try{j=await r.json();}catch(e){}
+  if(!r.ok||!j.image)throw new Error(j.error||('خطأ '+r.status));
+  const out=await artFromAI(j.image);if(!out)throw new Error('ما قدرت أفصل الشخصية عن الخلفية');
+  const nd={id:'ai'+Date.now(),name:def.name+' 🪄',src:await toDataURL(j.image,640),mask:out.mask,art:out.art,cfg:Object.assign({},DEF,{size:2,style:'real',kind:'cut',holo:def.cfg.holo||DEF.holo}),created:Date.now(),fromId:def.id};
+  await DB.put(nd);await loadChars();renderGrid();clearInterval(iv);busy.classList.remove('on');openChar(CHARS.find(c=>c.id===nd.id),'cut');}
+ catch(e){console.error(e);alert('🪄 ما زبط هالمرة: '+(e.message||e));}
+ finally{clearInterval(iv);busy.classList.remove('on');busy.textContent='✨ أجهّز الرسمة…';aiBusy=false;}}
 
 /* ======================= main loop ======================= */
 function loop(){requestAnimationFrame(loop);if(!renderer||!$('#play').classList.contains('on'))return;const dt=Math.min(.05,clock.getDelta()),t=clock.elapsedTime;

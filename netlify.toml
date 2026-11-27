@@ -1,0 +1,6 @@
+# Netlify: static site at the repo root + serverless functions (used by «رسمات علي» AI redraw)
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"

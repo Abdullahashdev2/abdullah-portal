@@ -12,6 +12,8 @@ async function init() {
   ]);
   const app = initializeApp(cfg);
   const auth = A.getAuth(app);
+  // apps inside the portal (e.g. «رسمات علي») can ask for the signed-in user's token for protected features
+  window.PortalAuth = { user: () => auth.currentUser, getIdToken: async () => (auth.currentUser ? auth.currentUser.getIdToken() : null) };
   const db = F.getFirestore(app);
   auth.languageCode = "ar";
 
