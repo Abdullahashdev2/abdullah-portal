@@ -44,7 +44,7 @@ export default async (req) => {
   // tolerate the usual paste mistakes: spaces, new lines, quotes, "GEMINI_API_KEY=" prefix
   const key = String(process.env.GEMINI_API_KEY || '').replace(/^\s*GEMINI_API_KEY\s*=\s*/i, '').replace(/["'`\s]/g, '');
   if (!key) return json(503, { error: 'المفتاح GEMINI_API_KEY مو مضاف في إعدادات Netlify بعد' });
-  const keyHint = !/^AIza/.test(key) ? 'المفتاح المحفوظ ما يبدأ بـ AIza — يمكن نسخت شي ثاني غير المفتاح' : key.length !== 39 ? `المفتاح المحفوظ طوله ${key.length} حرف والمفروض 39 — يمكن انقص أو زاد عند النسخ` : key.includes('.') ? 'المفتاح فيه نقاط — يمكن نسخت النسخة المختصرة من القائمة' : '';
+  const keyHint = !/^AIza/.test(key) ? `القيمة المحفوظة تبدأ بـ «${key.slice(0, 4)}» وطولها ${key.length} — هذا مو المفتاح${/^gen-|^proj/i.test(key) ? ' (هذا اسم المشروع)' : /^gemini/i.test(key) ? ' (هذا اسم المفتاح)' : ''}. المفتاح الصحيح يبدأ بـ AIza وطوله 39` : key.length !== 39 ? `المفتاح المحفوظ طوله ${key.length} حرف والمفروض 39 — يمكن انقص أو زاد عند النسخ` : key.includes('.') ? 'المفتاح فيه نقاط — يمكن نسخت النسخة المختصرة من القائمة' : '';
   let body; try { body = await req.json(); } catch (e) { return json(400, { error: 'bad json' }); }
   const user = await verifyUser(body.idToken).catch(() => null);
   if (!user) return json(401, { error: 'سجّل دخول في البوابة أول' });
