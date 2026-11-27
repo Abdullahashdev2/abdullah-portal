@@ -117,6 +117,18 @@ button{font-family:inherit;cursor:pointer}
   <aside class="sheet" id="editSheet">
     <h3>🎨 عدّل الشخصية</h3>
     <input class="txt" id="eName" maxlength="24" placeholder="الاسم">
+    <div class="lbl">🧍 النوع</div><div class="chips" id="eKind"></div>
+    <div id="eFullBox">
+      <div class="lbl">👕 اللبس</div><div class="chips" id="eOutfit"></div>
+      <div class="lbl">🧑 لون البشرة</div><div class="sw" id="eSkin"></div>
+      <div class="lbl">👔 لون الملابس</div><div class="sw" id="eShirt"></div>
+      <div class="lbl">👖 لون البنطلون</div><div class="sw" id="ePants"></div>
+      <div class="lbl">👟 لون الجزمة</div><div class="sw" id="eShoes"></div>
+      <div class="row"><span>📐 حد الرأس</span><input type="range" id="eCut" min="0.3" max="1" step="0.01"></div>
+      <div class="row"><span>🙂 حجم الرأس</span><input type="range" id="eHead" min="0.9" max="1.9" step="0.05"></div>
+      <div class="row"><span>💪 الجسم</span><input type="range" id="eBuild" min="0.8" max="1.3" step="0.02"></div>
+      <div class="row"><span>🦵 طول الرجلين</span><input type="range" id="eLegs" min="0.75" max="1.3" step="0.02"></div>
+    </div>
     <div class="lbl">✨ الشكل</div><div class="chips" id="eStyle"></div>
     <div class="lbl">🖍️ لون الخطوط</div><div class="sw" id="eLine"></div>
     <div class="lbl">🎨 لون الجسم</div><div class="sw" id="eFill"></div>
@@ -138,6 +150,13 @@ button{font-family:inherit;cursor:pointer}
     <button class="big gray" data-close type="button">إغلاق</button>
   </aside>
 </section>
+<aside class="sheet" id="kindSheet">
+  <h3>✨ <span id="kindName"></span></h3>
+  <p style="text-align:center;color:#94a3b8;margin:0 0 6px;font-size:14px">كيف تبغى الرسمة تصحى؟</p>
+  <button class="big" id="kCut" type="button" style="text-align:right">✂️ رسمة مقصوصة<br><small style="font-weight:600;opacity:.85">نفس رسمة علي بالضبط، تطلع من الورقة وتمشي كأنها مقصوصة بسماكة</small></button>
+  <button class="big" id="kFull" type="button" style="text-align:right;background:linear-gradient(90deg,#f59e0b,#ec4899)">🧍 شخصية كاملة<br><small style="font-weight:600;opacity:.9">رأس الرسمة على جسم كرتوني كامل: رجلين وقدمين ويدين، يمشي ويجري وينط ويلوّح</small></button>
+  <button class="big gray" data-close type="button">إلغاء</button>
+</aside>
 <div id="busy">✨ أجهّز الرسمة…</div>
 
 <script src="process.js"></script>
@@ -145,6 +164,7 @@ button{font-family:inherit;cursor:pointer}
 <script type="module">
 import * as THREE from 'three';
 import { Sky } from '../saeq-albatal/lib/Sky.js';
+import { createFullKit } from './fullbody.js';
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t,rand=(a,b)=>a+Math.random()*(b-a);
 const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,outBack=t=>{const c=1.70158,c3=c+1;return 1+c3*Math.pow(t-1,3)+c*Math.pow(t-1,2);},seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
@@ -172,7 +192,8 @@ async function loadChars(){const saved=ls.get('ali_seed_cfg',{});const seeds=SEE
 function renderGrid(){const g=$('#grid');g.innerHTML='';CHARS.forEach((c,i)=>{const b=document.createElement('button');b.className='dcard';b.type='button';b.style.setProperty('--r',((i*37)%7-3)*.6+'deg');
  b.innerHTML=`<div class="pic"><img alt="" draggable="false"><div class="scan" style="animation-delay:${(i%5)*.4}s"></div></div><b></b><span class="tap">👆 انقر لتتحوّل</span>`;
  b.querySelector('img').src=c.src;b.querySelector('b').textContent=c.name;if(!c.seed){const m=document.createElement('span');m.className='mine';m.textContent='جديدة';b.appendChild(m);}
- b.onclick=()=>openChar(c);g.appendChild(b);});}
+ b.onclick=()=>chooseKind(c);g.appendChild(b);});}
+let kindFor=null;function chooseKind(c){kindFor=c;$('#kindName').textContent=c.name;$('#kFull').style.order=ls.get('ali_kind','cut')==='full'?-1:0;sheet('kindSheet',true);}
 
 /* ======================= renderer ======================= */
 const canvas=$('#gl');let renderer=null,scene,camera,clock=new THREE.Clock();
@@ -241,9 +262,11 @@ class Character{
   // squash on landing, stretch in the air
   const target=this.y>.02?1+clamp(this.vy*.03,-.12,.14):1;u.uSquash.value=lerp(u.uSquash.value,target,dt*12);if(this.land>0){this.land-=dt;u.uSquash.value=1-.22*Math.sin(Math.min(1,1-this.land/.25)*Math.PI);}
   this.shadow.material.opacity=.5*clamp(1-this.y/4,.15,1);this.shadow.position.y=.01;this.shadow.scale.setScalar(Math.max(.6,this.W*.9)*clamp(1-this.y/6,.5,1));}
+ steer(dt){if(Math.abs(this.vel.x)>.3)this.face=Math.sign(this.vel.x);this.inner.scale.x=lerp(this.inner.scale.x,this.W*this.face,dt*12);if(this.dance<=0)this.inner.rotation.y=lerp(this.inner.rotation.y,clamp(-this.vel.z*.06,-.45,.45)*this.face,dt*6);}
  dispose(){this.geo.dispose();this.layers.forEach(m=>m.material.dispose());this.shadow.geometry.dispose();}}
 const SHADOW_TEX=canvasTex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(0,0,0,.7)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
 SHADOW_TEX.colorSpace=THREE.NoColorSpace;
+let FULL=null;
 const DOT_TEX=canvasTex(32,32,(x,w,h)=>{const g=x.createRadialGradient(16,16,0,16,16,16);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.35,'rgba(255,255,255,.7)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
 
 /* ======================= worlds ======================= */
@@ -322,8 +345,11 @@ async function pencilTex(def){const img=new Image();img.src=def.mask;await img.d
 async function samplePoints(def){const img=new Image();img.src=def.mask;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);const d=x.getImageData(0,0,c.width,c.height).data;
  const pts=[];for(let k=0;k<20000&&pts.length<PARTICLES;k++){const i=Math.floor(Math.random()*c.width),j=Math.floor(Math.random()*c.height);const o=(j*c.width+i)*4;if(d[o]>120||(d[o+1]>200&&Math.random()<.15))pts.push([i/c.width,1-j/c.height]);}
  while(pts.length<PARTICLES)pts.push([Math.random(),Math.random()]);return pts;}
-async function openChar(def){$('#busy').classList.add('on');try{initGL();show('play');
- if(!world||world.key!==worldKey)buildWorld(worldKey);if(hero){scene.remove(hero.group);hero.dispose();}hero=await makeCharacter(def);hero.def=def;
+let pendingBody=null;
+async function openChar(def,kind){$('#busy').classList.add('on');try{initGL();show('play');if(!FULL)FULL=createFullKit(THREE,{Character,SHADOW_TEX});
+ if(!world||world.key!==worldKey)buildWorld(worldKey);if(hero){scene.remove(hero.group);hero.dispose();}if(pendingBody){scene.remove(pendingBody.group);pendingBody=null;}
+ kind=kind||def.cfg.kind||'cut';def.cfg.kind=kind;hero=await makeCharacter(def);hero.def=def;
+ if(kind==='full'){const c=Object.assign({outfit:'casual',build:1,legs:1},def.cfg);pendingBody=new FULL.FullBody(def,hero.tex.image,c);pendingBody.group.visible=false;}
  const pts=await samplePoints(def);await startTransform(def,pts);}catch(e){console.error(e);alert('ما قدرت أفتح الرسمة 😕');show('gallery');}finally{$('#busy').classList.remove('on');}}
 async function startTransform(def,pts){mode='transform';tf=0;hero.transforming=true;starsGot=0;updStars();playUI(false);
  // the paper sheet with Ali's drawing, standing in front of the camera
@@ -349,7 +375,7 @@ async function startTransform(def,pts){mode='transform';tf=0;hero.transforming=t
  camera.position.set(0,gx+2.6,-3+Math.max(6.2,lh*2.3));camera.lookAt(0,gx+2.6,-3);
  sfx.whoosh();banner('');hint('✨ الرسمة تصحى…');}
 const TF_LEN=4.2;
-function stepTransform(dt){tf+=dt;const t=tf,st=stage,H=hero,gy=st.g.position.y;
+function stepTransform(dt){tf+=dt;if(pendingBody&&tf>=2.3){stepAssemble(dt);return;}const t=tf,st=stage,H=hero,gy=st.g.position.y;
  // 0.0–1.1  scan beam sweeps the drawing, its lines start glowing
  const scan=seg(t,.15,1.15);st.lines.material.uniforms.uScan.value=lerp(1.05,-.05,ease(scan));
  // 0.9–1.9  the hologram rises out of the page, layer by layer (thickness grows), particles burst from the lines
@@ -377,7 +403,34 @@ function stepTransform(dt){tf+=dt;const t=tf,st=stage,H=hero,gy=st.g.position.y;
  camera.position.lerpVectors(near,far,ck);const look=new THREE.Vector3(0,lerp(gy+2.6,gy+H.H*.55,ck),lerp(-3,cz,ck));camera.lookAt(look);camLook.copy(look);
  if(t>=3.5&&!H.saidHi){H.saidHi=true;banner(`✨ ${H.def.name} صار حقيقي!`);hint('👈 حرّك العصا وامشِ • ⤴️ نط • 🚪 ادفع الأبواب');}
  if(t>=TF_LEN){finishTransform();}}
-function finishTransform(){mode='play';const H=hero;H.transforming=false;H.flashed=H.landed=H.saidHi=false;H.inner.rotation.y=0;H.inner.position.set(0,0,0);H.apply();H.setThick(1);H.u.uReveal.value=1.2;H.u.uReal.value=H.base;H.shadow.visible=true;
+const TF_FULL=5.0;
+function stepAssemble(dt){const t=tf,st=stage,I=hero,B=pendingBody,gy=st.g.position.y;
+ if(!B.started){B.started=true;B.group.position.copy(I.group.position);B.group.position.y=gy;B.group.visible=true;scene.add(B.group);B.yaw=0;B.inner.rotation.y=0;
+  B.parts={torso:[],arms:[],legs:[],neck:[]};const R=B.rig;
+  const grab=(obj,list)=>obj.traverse(o=>{if(o.isMesh&&o.material!==undefined&&o.parent&&!o.parent.isMesh)list.push(o);});
+  R.spine.children.forEach(o=>{if(o.isMesh)B.parts.torso.push(o);});grab(R.shL,B.parts.arms);grab(R.shR,B.parts.arms);grab(R.hipL,B.parts.legs);grab(R.hipR,B.parts.legs);R.neck.children.forEach(o=>{if(o.isMesh)B.parts.neck.push(o);});
+  B.head.u.uReal.value=0;B.head.u.uOpacity.value=0;B.inner.position.y=1;}
+ const a=seg(t,2.3,3.6);
+ // the full drawing shrinks and fades while the drawn head takes its place on top of the new body
+ I.u.uOpacity.value=1-seg(t,2.3,2.8);I.inner.scale.multiplyScalar(1-dt*1.2);
+ B.head.u.uOpacity.value=seg(t,2.4,2.9);B.head.u.uReal.value=seg(t,2.6,3.3)*B.head.base;
+ // body parts build up from the neck down: torso -> arms -> legs, as glowing hologram that turns solid
+ const grow=(list,a0,a1)=>{const k=seg(a,a0,a1),e=k<=0?0:outBack(k);list.forEach(m=>m.scale.setScalar(Math.max(.001,e)));};
+ grow(B.parts.neck,0,.2);grow(B.parts.torso,.08,.42);grow(B.parts.arms,.25,.6);grow(B.parts.legs,.4,.8);
+ B.setGlow(1.6*(1-seg(t,3.0,3.8)),hero.cfg.holo);
+ if(ringFx.visible){const k=seg(t,2.25,2.9);ringFx.position.set(0,gy+1.4+I.H*.5,I.group.position.z);ringFx.scale.setScalar(.3+k*4);ringFx.material.opacity=1-k;if(k>=1)ringFx.visible=false;}
+ if(parts)parts.material.opacity*=Math.max(0,1-dt*3);
+ // hover, then drop, land and wave hello
+ const drop=seg(t,3.7,4.05);B.inner.position.y=lerp(1,0,drop*drop);B.y=B.inner.position.y;
+ if(drop>=1&&!B.landed){B.landed=true;B.land=.25;sfx.land();dust.position.set(B.group.position.x,gy+.03,B.group.position.z);}
+ if(B.landed){const k=seg(t,4.05,4.6);dust.scale.setScalar(.5+k*3);dust.material.opacity=.6*(1-k);if(t>4.15&&!B.waved){B.waved=true;B.wave=1.3;}}
+ B.update(dt,t,false,0);B.lookAt(camera.position);
+ const pb=seg(t,3.0,4.0);st.g.position.z=-3-pb*6;st.g.visible=pb<1;st.g.traverse(o=>{if(o.material&&'opacity'in o.material&&o!==st.lines){o.material.transparent=true;o.material.opacity=Math.min(o.material.opacity,1-pb);}});
+ const cz=B.group.position.z,ck=ease(seg(t,2.6,TF_FULL));const near=new THREE.Vector3(0,gy+2.6,-3+Math.max(6.2,st.lh*2.3)),far=new THREE.Vector3(0,gy+B.H*1.05+2.4,cz+5.2+B.H*1.5);
+ camera.position.lerpVectors(near,far,ck);const look=new THREE.Vector3(0,lerp(gy+2.6,gy+B.H*.55,ck),lerp(-3,cz,ck));camera.lookAt(look);camLook.copy(look);
+ if(t>=4.1&&!B.saidHi){B.saidHi=true;banner(`✨ ${I.def.name} صار شخصية حقيقية!`);hint('👈 حرّك العصا وامشِ • ⤴️ نط • 💃 رقصة • 🚪 ادفع الأبواب');}
+ if(t>=TF_FULL){scene.remove(I.group);I.dispose();hero=B;B.def=I.def;B.vel.set(0,0,0);pendingBody=null;B.setGlow(0,'#000');finishTransform();}}
+function finishTransform(){mode='play';const H=hero;if(H.full){H.inner.position.y=0;H.y=0;H.group.position.y=world.ground(H.group.position.x,H.group.position.z);if(stage){scene.remove(stage.g);stage=null;}if(parts)parts.material.opacity=0;playUI(true);setTimeout(()=>banner(''),2200);spawnFriends();return;}H.transforming=false;H.flashed=H.landed=H.saidHi=false;H.inner.rotation.y=0;H.inner.position.set(0,0,0);H.apply();H.setThick(1);H.u.uReveal.value=1.2;H.u.uReal.value=H.base;H.shadow.visible=true;
  if(stage){scene.remove(stage.g);stage=null;}if(parts)parts.material.opacity=0;H.group.position.y=world.ground(H.group.position.x,H.group.position.z);playUI(true);setTimeout(()=>banner(''),2200);spawnFriends();}
 
 /* ======================= play ======================= */
@@ -387,10 +440,8 @@ function updStars(){$('#stars').textContent=`⭐ ${ar(starsGot)} / ${ar(world?wo
 function stepPlay(dt,t){const H=hero,k=IN.keys;let ix=IN.x+((k.arrowright||k.d)?1:0)-((k.arrowleft||k.a)?1:0),iy=IN.y+((k.arrowdown||k.s)?1:0)-((k.arrowup||k.w)?1:0);const L=Math.hypot(ix,iy);if(L>1){ix/=L;iy/=L;}
  const spd=4.2*Math.max(.8,Math.sqrt(H.cfg.size));const tv=new THREE.Vector3(ix*spd,0,iy*spd);H.vel.lerp(tv,1-Math.exp(-dt*10));const moving=H.vel.length()>.25;
  const p=H.group.position;p.x+=H.vel.x*dt;p.z+=H.vel.z*dt;const b=world.bounds;p.x=clamp(p.x,-b,b);p.z=clamp(p.z,-b,world.limitZ||b);
- if(Math.abs(H.vel.x)>.3)H.face=Math.sign(H.vel.x);H.inner.scale.x=lerp(H.inner.scale.x,H.W*H.face,dt*12);
- // turn a little toward the walking direction (stays readable: it is a drawing!)
- if(H.dance<=0)H.inner.rotation.y=lerp(H.inner.rotation.y,clamp(-H.vel.z*.06,-.45,.45)*H.face,dt*6);
- const g=world.ground(p.x,p.z),G=WORLDS[worldKey].g;if((IN.jump||k[' '])&&H.y<=.001){H.vy=Math.sqrt(2*G*(worldKey==='space'?4.5:1.6));sfx.jump();}IN.jump=false;
+ H.steer(dt);
+ const g=world.ground(p.x,p.z),G=WORLDS[worldKey].g;if((IN.jump||k[' '])&&H.y<=.001){if(H.full)H.crouch=1;H.vy=Math.sqrt(2*G*(worldKey==='space'?4.5:1.6));sfx.jump();}IN.jump=false;
  H.vy-=G*dt;H.y=Math.max(0,H.y+H.vy*dt);if(H.y===0&&H.vy<-2){H.land=.25;sfx.land();}if(H.y===0)H.vy=0;p.y=g;H.inner.position.y=H.y;
  H.update(dt,t,moving&&H.y<.05,H.vel.length());
  // stars
@@ -402,7 +453,7 @@ function stepPlay(dt,t){const H=hero,k=IN.keys;let ix=IN.x+((k.arrowright||k.d)?
  for(const f of friends)stepFriend(f,dt,t);
  for(const pl of world.props)if(pl.userData.fly){pl.position.x+=Math.cos(t*.3)*dt*pl.userData.fly*4;pl.position.z+=Math.sin(t*.3)*dt*pl.userData.fly*4;pl.rotation.z=Math.PI/2+Math.sin(t)*.2;}
  // follow camera (3/4 view so the drawing always faces you)
- const want=new THREE.Vector3(p.x,p.y+H.H*1.05+2.4,p.z+5.2+H.H*1.5);camera.position.lerp(want,1-Math.exp(-dt*4));camLook.lerp(new THREE.Vector3(p.x,p.y+H.y*.5+H.H*.5,p.z),1-Math.exp(-dt*6));camera.lookAt(camLook);}
+ const want=new THREE.Vector3(p.x,p.y+H.H*1.05+2.4,p.z+5.2+H.H*1.5);camera.position.lerp(want,1-Math.exp(-dt*4));camLook.lerp(new THREE.Vector3(p.x,p.y+H.y*.5+H.H*.5,p.z),1-Math.exp(-dt*6));camera.lookAt(camLook);if(H.full)H.lookAt(camera.position);}
 async function goWorld(key,viaDoor){if(mode==='portal')return;const from=worldKey;mode='portal';sfx.whoosh();flash(true);await new Promise(r=>setTimeout(r,260));
  friends.forEach(f=>scene.remove(f.c.group));buildWorld(key);scene.add(hero.group);
  const d=viaDoor?(world.doors.find(x=>x.userData.to===from)||world.doors[0]):null;hero.group.position.set(0,world.ground(0,4),4);if(d){const v=new THREE.Vector3(0,0,3.2);d.localToWorld(v);hero.group.position.set(v.x,world.ground(v.x,v.z),v.z);}
@@ -432,11 +483,12 @@ let hT=0;function hint(t){const h=$('#hint');h.textContent=t;h.style.opacity=t?1
 function flash(on){const f=$('#flash');if(on===false){f.style.opacity=0;return;}f.style.opacity=.85;if(on!==true)setTimeout(()=>f.style.opacity=0,180);}
 function sheet(id,on){document.querySelectorAll('.sheet').forEach(s=>s.classList.toggle('on',s.id===id&&on));}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>sheet(null,false));
+$('#kCut').onclick=()=>{sheet(null,false);ls.set('ali_kind','cut');openChar(kindFor,'cut');};$('#kFull').onclick=()=>{sheet(null,false);ls.set('ali_kind','full');openChar(kindFor,'full');};
 
 /* joystick */
 {const st=$('#stick'),kn=$('#knob');let id=null;const set=e=>{const r=st.getBoundingClientRect();let x=(e.clientX-r.left-r.width/2)/(r.width/2),y=(e.clientY-r.top-r.height/2)/(r.height/2);const l=Math.hypot(x,y);if(l>1){x/=l;y/=l;}IN.x=x;IN.y=y;kn.style.transform=`translate(${x*42}px,${y*42}px)`;};
  st.addEventListener('pointerdown',e=>{id=e.pointerId;st.setPointerCapture(id);set(e);ac();});st.addEventListener('pointermove',e=>{if(e.pointerId===id)set(e);});const up=e=>{if(e.pointerId!==id)return;id=null;IN.x=IN.y=0;kn.style.transform='';};st.addEventListener('pointerup',up);st.addEventListener('pointercancel',up);}
-$('#aJump').onclick=()=>{IN.jump=true;};$('#aDance').onclick=()=>{if(hero){hero.dance=1.4;sfx.shine();}};
+$('#aJump').onclick=()=>{IN.jump=true;};$('#aDance').onclick=()=>{if(hero){if(hero.full&&Math.random()<.4)hero.wave=1.4;else hero.dance=1.4;sfx.shine();}};
 addEventListener('keydown',e=>{IN.keys[e.key.toLowerCase()]=true;});addEventListener('keyup',e=>{IN.keys[e.key.toLowerCase()]=false;});
 $('#pBack').onclick=()=>{mode='idle';sheet(null,false);show('gallery');};
 $('#pWorld').onclick=()=>{const c=$('#worldChips');c.innerHTML='';Object.entries(WORLDS).forEach(([k,w])=>{const b=document.createElement('button');b.type='button';b.textContent=w.name;if(k===worldKey)b.className='on';b.onclick=()=>{sheet(null,false);goWorld(k,false);};c.appendChild(b);});sheet('worldSheet',true);};
@@ -448,14 +500,25 @@ const FILL_C=['#fde7c8','#fef3c7','#e0f2fe','#dcfce7','#ede9fe','#fee2e2','#f1f5
 const HOLO_C=['#22d3ee','#a78bfa','#4ade80','#fb923c','#f472b6','#facc15','#ffffff'];
 function swatches(box,list,key){box.innerHTML='';list.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;if(hero.cfg[key]===c)b.className='on';b.onclick=()=>{hero.cfg[key]=c;hero.apply();swatches(box,list,key);};box.appendChild(b);});
  const i=document.createElement('input');i.type='color';i.value=hero.cfg[key];i.oninput=()=>{hero.cfg[key]=i.value;hero.apply();};box.appendChild(i);}
-$('#pEdit').onclick=()=>{if(!hero)return;$('#eName').value=hero.def.name;const st=$('#eStyle');st.innerHTML='';[['real','🎨 حقيقي'],['holo','💠 هولوجرام'],['pencil','✏️ رصاص']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if(hero.cfg.style===k)b.className='on';b.onclick=()=>{hero.cfg.style=k;hero.apply();st.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));};st.appendChild(b);});
+$('#pEdit').onclick=()=>{if(!hero)return;$('#eName').value=hero.def.name;
+ const ek=$('#eKind');ek.innerHTML='';[['cut','✂️ مقصوصة'],['full','🧍 شخصية كاملة']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if((hero.full?'full':'cut')===k)b.className='on';
+  b.onclick=()=>{if((hero.full?'full':'cut')===k)return;sheet(null,false);hero.def.cfg=Object.assign({},hero.cfg,{kind:k});openChar(hero.def,k);};ek.appendChild(b);});
+ $('#eFullBox').style.display=hero.full?'':'none';
+ if(hero.full){const O=FULL.OUTFITS,oc=$('#eOutfit');oc.innerHTML='';Object.entries(O).forEach(([k,o])=>{const b=document.createElement('button');b.type='button';b.textContent=o.name;if((hero.cfg.outfit||'casual')===k)b.className='on';
+   b.onclick=()=>{hero.cfg.outfit=k;['shirt','pants','shoes'].forEach(x=>delete hero.cfg[x]);hero.apply();$('#pEdit').onclick();};oc.appendChild(b);});
+  const cur=(k,d)=>hero.cfg[k]||d;const o=O[hero.cfg.outfit||'casual'];
+  const SK=['#fde7c8','#f5cfa5','#e0ac69','#c68642','#8d5524','#5c3a21'],CL=['#f8fafc','#111827','#3b82f6','#dc2626','#16a34a','#7c3aed','#f59e0b','#ec4899','#0ea5e9','#78716c'];
+  if(!hero.cfg.skin)hero.cfg.skin=hero.cfg.fill;if(!hero.cfg.shirt)hero.cfg.shirt=o.shirt;if(!hero.cfg.pants)hero.cfg.pants=o.pants;if(!hero.cfg.shoes)hero.cfg.shoes=o.shoes;
+  swatches($('#eSkin'),SK,'skin');swatches($('#eShirt'),CL,'shirt');swatches($('#ePants'),CL,'pants');swatches($('#eShoes'),CL,'shoes');
+  const ec=$('#eCut');ec.value=hero.cfg.headCut!=null?hero.cfg.headCut:hero.cut;ec.onchange=()=>{hero.cfg.headCut=+ec.value;hero.apply();};
+  [['#eBuild','build',1],['#eLegs','legs',1],['#eHead','headK',1.35]].forEach(([s2,k,d0])=>{const el=$(s2);el.value=hero.cfg[k]||d0;el.onchange=()=>{hero.cfg[k]=+el.value;hero.apply();};});}const st=$('#eStyle');st.innerHTML='';[['real','🎨 حقيقي'],['holo','💠 هولوجرام'],['pencil','✏️ رصاص']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if(hero.cfg.style===k)b.className='on';b.onclick=()=>{hero.cfg.style=k;hero.apply();st.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));};st.appendChild(b);});
  swatches($('#eLine'),LINE_C,'line');swatches($('#eFill'),FILL_C,'fill');swatches($('#eHolo'),HOLO_C,'holo');
- [['#eSize','size'],['#eW','sw'],['#eH','sh'],['#eT','thick'],['#eGlow','glow']].forEach(([s,k])=>{const el=$(s);el.value=hero.cfg[k];el.oninput=()=>{hero.cfg[k]=+el.value;hero.apply();};});
+ [['#eSize','size'],['#eW','sw'],['#eH','sh'],['#eT','thick'],['#eGlow','glow']].forEach(([s,k])=>{const el=$(s);el.value=hero.cfg[k];const f=()=>{hero.cfg[k]=+el.value;hero.apply();};el.oninput=hero.full?null:f;el.onchange=f;});
  $('#eDel').style.display=hero.def.seed?'none':'';sheet('editSheet',true);};
 $('#eSave').onclick=async()=>{const d=hero.def;d.name=$('#eName').value.trim()||d.name;d.cfg=Object.assign({},hero.cfg);
  if(d.seed){const s=ls.get('ali_seed_cfg',{});s[d.id]={name:d.name,cfg:d.cfg};ls.set('ali_seed_cfg',s);}else await DB.put({id:d.id,name:d.name,src:d.src,mask:d.mask,cfg:d.cfg,created:d.created});
  sheet(null,false);hint('💾 انحفظت');renderGrid();};
-$('#eReplay').onclick=async()=>{sheet(null,false);hero.cfg=Object.assign({},hero.cfg);const pts=await samplePoints(hero.def);hero.group.position.set(0,world.ground(0,-3),-3);await startTransform(hero.def,pts);};
+$('#eReplay').onclick=async()=>{sheet(null,false);hero.def.cfg=Object.assign({},hero.cfg);openChar(hero.def,hero.full?'full':'cut');};
 $('#eDel').onclick=async()=>{if(!confirm('أكيد تبغى تحذف هذي الرسمة؟'))return;await DB.del(hero.def.id);await loadChars();renderGrid();sheet(null,false);mode='idle';show('gallery');};
 
 /* ======================= export: transparent PNG + 3D-print STL ======================= */
@@ -507,7 +570,7 @@ $('#cropGo').onclick=async()=>{$('#busy').classList.add('on');await new Promise(
   const out=AliProcess.process(c);if(!out){alert('ما لقيت خطوط واضحة في الصورة 😕 جرّب صورة أوضح أو قرّب أكثر');return;}
   const small=document.createElement('canvas');const k=Math.min(1,640/Math.max(c.width,c.height));small.width=Math.round(c.width*k);small.height=Math.round(c.height*k);small.getContext('2d').drawImage(c,0,0,small.width,small.height);
   const def={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي الجديدة',src:small.toDataURL('image/jpeg',.88),mask:out.url,cfg:Object.assign({},DEF),created:Date.now()};
-  await DB.put(def);await loadChars();renderGrid();$('#busy').classList.remove('on');openChar(CHARS.find(x=>x.id===def.id));}catch(e){console.error(e);alert('صار خطأ في تجهيز الرسمة');}finally{$('#busy').classList.remove('on');}};
+  await DB.put(def);await loadChars();renderGrid();$('#busy').classList.remove('on');show('gallery');chooseKind(CHARS.find(x=>x.id===def.id));}catch(e){console.error(e);alert('صار خطأ في تجهيز الرسمة');}finally{$('#busy').classList.remove('on');}};
 
 /* ======================= main loop ======================= */
 function loop(){requestAnimationFrame(loop);if(!renderer||!$('#play').classList.contains('on'))return;const dt=Math.min(.05,clock.getDelta()),t=clock.elapsedTime;
@@ -517,7 +580,7 @@ function loop(){requestAnimationFrame(loop);if(!renderer||!$('#play').classList.
 requestAnimationFrame(loop);
 worldKey=ls.get('ali_world','paper');if(!WORLDS[worldKey])worldKey='paper';
 await loadChars();renderGrid();
-window.__ALI={get tf(){return tf},get mode(){return mode},get hero(){return hero},get world(){return world},goWorld,get stars(){return starsGot}};
+window.__ALI={get pending(){return pendingBody},get tf(){return tf},get mode(){return mode},get hero(){return hero},get world(){return world},goWorld,get stars(){return starsGot}};
 </script>
 </body>
 </html>
