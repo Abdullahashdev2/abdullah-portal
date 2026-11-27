@@ -182,17 +182,20 @@
     if (ids.some((i) => !seenNews.has(i))) { markSeen(ids); renderNewsState(); renderGrid(); }
     if (a.open === "tab") { window.open(a.url, "_blank", "noopener"); return; }
     $("#viewerTitle").textContent = a.name;
-    $("#frame").src = a.url;
+    // replace() عشان ما تنضاف خطوة للتاريخ (وإلا "رجوع" يرجّع الإطار بدل ما يقفل التطبيق)
+    try { $("#frame").contentWindow.location.replace(new URL(a.url, location.href).href); } catch { $("#frame").src = a.url; }
     $("#viewer").hidden = false;
     window.PortalCast && window.PortalCast.setApp(a);
     document.body.style.overflow = "hidden";
     history.pushState({ viewer: true }, "");
   }
   function closeViewer() {
-    $("#viewer").hidden = true; $("#frame").src = "about:blank";
+    $("#viewer").hidden = true; try { $("#frame").contentWindow.location.replace("about:blank"); } catch { $("#frame").src = "about:blank"; }
     window.PortalCast && window.PortalCast.clearApp();
     document.body.style.overflow = "";
   }
+  window.PortalLaunch = launch;
+  window.PortalViewerOpen = () => !$("#viewer").hidden;
   $("#closeViewer").onclick = () => history.back();
   window.addEventListener("popstate", () => { if (!$("#viewer").hidden) closeViewer(); });
   $("#fullViewer").onclick = () => $("#viewer").requestFullscreen?.();

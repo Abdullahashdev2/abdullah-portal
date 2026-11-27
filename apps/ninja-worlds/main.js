@@ -476,7 +476,18 @@ const virt = { mx: 0, my: 0 }; // joystick
 const cam = { yaw: 0, pitch: 0.32, dist: 6.4, want: 6.4, target: new V(), lastManual: -9, dx: 0, dy: 0 };
 const stealth = new Stealth({ camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
 let stormT = 4, flash = 0;
-addEventListener('keydown', (e) => { keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); if (e.code === 'Enter' && !started) $('#startBtn').click(); });
+addEventListener('keydown', (e) => {
+  /* TV remote / keyboard menu navigation: arrows move, OK/Enter selects, Back returns */
+  const kc = e.keyCode, isBack = e.code === 'Backspace' || kc === 10009 || kc === 461 || e.key === 'GoBack' || e.key === 'BrowserBack';
+  const m = activeMenu();
+  if (m) {
+    const k = e.code || e.key;
+    if (k === 'ArrowUp' || k === 'ArrowLeft') { menuNav(-1); e.preventDefault(); return; }
+    if (k === 'ArrowDown' || k === 'ArrowRight') { menuNav(1); e.preventDefault(); return; }
+    if (k === 'Enter' || k === 'NumpadEnter' || kc === 13) { menuSelect(); e.preventDefault(); return; }
+    if (isBack) { menuBack(); e.preventDefault(); return; }
+  } else if (isBack && started) { togglePause(true); e.preventDefault(); return; }
+  keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); if (e.code === 'Enter' && !started) $('#startBtn').click(); });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 let mouse = null;

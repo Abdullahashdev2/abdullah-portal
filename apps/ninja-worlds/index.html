@@ -73,9 +73,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 #actBtn{width:60px;height:60px;right:14px;bottom:112px;opacity:.55}
 #actBtn.hot{opacity:1;border-color:var(--gold);box-shadow:0 0 20px rgba(255,209,102,.6);animation:pulse 1.2s infinite}
 /* sheets */
-.sheet{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(3,4,12,.6);backdrop-filter:blur(6px);padding:20px}
+.sheet{position:fixed;inset:0;z-index:30;display:none;align-items:safe center;justify-content:center;background:rgba(3,4,12,.6);backdrop-filter:blur(6px);padding:20px}
 .sheet.on{display:flex}
-.card{width:min(440px,100%);background:linear-gradient(180deg,#141a33,#0d1024);border:1px solid var(--line);border-radius:24px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.card{width:min(440px,100%);max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;background:linear-gradient(180deg,#141a33,#0d1024);border:1px solid var(--line);border-radius:24px;padding:22px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .card h2{margin:0 0 14px;font-size:24px}
 .card button{display:block;width:100%;margin:8px 0;padding:13px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:#fff;font-size:16px;font-weight:800;cursor:pointer}
 .card button.main{background:linear-gradient(180deg,#ffe08a,#f59e0b);color:#1a1200;border:0}
