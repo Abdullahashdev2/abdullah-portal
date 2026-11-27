@@ -43,7 +43,8 @@ const BREATH = 12; let breath = 12, normalFog = null; const waterFog = new THREE
 let post = null, HQ = !LOW, bloomSamples = 2;
 /* ---------- 📺 TV mode: built for weak smart-TV browsers (render small + upscale, cheap materials, no sky/shadows/glow, 30 fps lock) ---------- */
 const TVUA = /SMART-?TV|SmartTV|Tizen|Web0S|webOS|NetCast|BRAVIA|HbbTV|Android ?TV|AFT[A-Z]|CrKey|GoogleTV|VIDAA|Hisense|TV Safari|Opera TV|Viera|AQUOS|Philips|Roku/i.test(navigator.userAgent);
-let LITE = TVUA; try { const v = localStorage.getItem('nw_tv'); if (v != null) LITE = v === '1'; } catch (e) {}
+const STREAM_MODE = new URLSearchParams(location.search).has('stream');
+let LITE = TVUA && !STREAM_MODE; try { const v = localStorage.getItem('nw_tv'); if (v != null && !STREAM_MODE) LITE = v === '1'; } catch (e) {}
 const LITE_W = [960, 800, 680, 560, 440]; let liteLvl = 1, lock30 = false, skipFrame = false;
 const liteCache = new Map();
 function liteMat(m) {
@@ -78,7 +79,7 @@ function applyLite() {
 function applyQuality(i) {
   if (LITE) { liteLvl = Math.max(0, Math.min(LITE_W.length - 1, i)); applyLite(); qChanged = performance.now(); resize(); return; }
   qLevel = Math.max(0, Math.min(QL.length - 1, i)); const q = QL[qLevel];
-  renderer.setPixelRatio(Math.min(devicePixelRatio, q.dpr)); HQ = q.bloom; bloomSamples = q.msaa;
+  renderer.setPixelRatio(STREAM_MODE ? (q.dpr >= 1.6 ? 1.5 : q.dpr >= 1.3 ? 1.2 : 1) : Math.min(devicePixelRatio, q.dpr)); HQ = q.bloom; bloomSamples = q.msaa;
   const wantShadow = q.shadow > 0;
   if (sun.castShadow !== wantShadow || (wantShadow && sun.shadow.mapSize.x !== q.shadow) || renderer.shadowMap.type !== (q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap)) {
     sun.castShadow = wantShadow; if (wantShadow) sun.shadow.mapSize.set(q.shadow, q.shadow);
@@ -258,8 +259,52 @@ function tuneEnv() { const k = (cfg && cfg.env) ?? 0.35; scene.traverse((o) => {
 
 /* ---------------- UI ---------------- */
 let toastT = 0, bannerT = 0, started = false, paused = false;
+/* ---------- 📡 stream mode: this device (the phone) renders, the TV only plays it as live video ---------- */
+const STREAM = new URLSearchParams(location.search).has('stream');
+let streamCv = null, streamG = null, bannerShowT = 0;
+if (STREAM) {
+  streamCv = document.createElement('canvas'); streamCv.width = 1920; streamCv.height = 1080; streamG = streamCv.getContext('2d');
+  window.__getStream = (fps = 60) => { const ms = streamCv.captureStream(fps); if (sfx.streamDest) sfx.streamDest.stream.getAudioTracks().forEach((t) => ms.addTrack(t)); return ms; };
+}
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function wrap(g, text, maxW) { const words = String(text).split(' '), lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
+function streamDraw() {
+  const g = streamG, W = streamCv.width, H = streamCv.height, s = H / 720, F = (px, w = 800) => `${w} ${Math.round(px * s)}px system-ui, "Segoe UI", Tahoma, sans-serif`;
+  g.drawImage(renderer.domElement, 0, 0, W, H);
+  g.save(); g.direction = 'rtl'; g.textBaseline = 'middle';
+  const pill = (x, y, w, h, txt, col = '#fff') => { g.fillStyle = 'rgba(10,12,28,.62)'; rr(g, x, y, w, h, h / 2); g.fill(); g.fillStyle = col; g.font = F(17); g.textAlign = 'center'; g.fillText(txt, x + w / 2, y + h / 2 + 1); };
+  if (started) {
+    // top bar (right side in RTL)
+    g.font = F(30); g.textAlign = 'right'; let x = W - 24 * s;
+    for (let i = 0; i < player.maxHp; i++) { g.fillStyle = i < player.hp ? '#ff4d6d' : 'rgba(255,255,255,.25)'; g.fillText('❤', x, 40 * s); x -= 34 * s; }
+    x -= 10 * s; const pills = [[$('#shards').textContent, '#fff'], [$('#coins').textContent, '#ffd23f'], [$('#wname').textContent, '#e2e8f0']];
+    for (const [t, c] of pills) { g.font = F(17); const w = g.measureText(t).width + 34 * s; pill(x - w, 22 * s, w, 36 * s, t, c); x -= w + 10 * s; }
+    if (document.body.classList.contains('shipmode')) { const rc = $('#radar'); g.drawImage(rc, 20 * s, 70 * s, 132 * s, 132 * s); g.font = F(18, 900); g.textAlign = 'left'; g.fillStyle = '#fff'; g.direction = 'ltr'; g.fillText($('#ammo').textContent, 22 * s, 222 * s); g.direction = 'rtl'; }
+    const ph = $('#phase'); if (ph.classList.contains('on')) { g.font = F(28, 900); g.textAlign = 'center'; g.fillStyle = ph.style.color || '#ff3b3b'; g.fillText(ph.textContent, W / 2, 92 * s); }
+    const tm = $('#timer'); if (tm.classList.contains('on')) { g.font = F(34, 900); g.textAlign = 'center'; g.fillStyle = '#ffd166'; g.fillText(tm.textContent, W / 2, 92 * s); }
+    if ($('#toast').classList.contains('on')) { g.font = F(19, 700); const lines = wrap(g, $('#toastText').textContent, 700 * s), bw = 780 * s, bh = (34 + lines.length * 28) * s, bx = (W - bw) / 2, by = 118 * s; g.fillStyle = 'rgba(20,24,60,.88)'; rr(g, bx, by, bw, bh, 18 * s); g.fill(); g.strokeStyle = 'rgba(125,211,252,.45)'; g.lineWidth = 2 * s; g.stroke(); g.fillStyle = '#7dd3fc'; g.font = F(14, 800); g.textAlign = 'right'; g.fillText('🧘 البطل الهادئ', bx + bw - 20 * s, by + 18 * s); g.fillStyle = '#fff'; g.font = F(19, 700); lines.forEach((l, i) => g.fillText(l, bx + bw - 20 * s, by + (44 + i * 28) * s)); }
+    if ($('#prompt').classList.contains('on')) pill(W / 2 - 110 * s, H - 120 * s, 220 * s, 44 * s, $('#prompt').textContent.replace('[E] ', '✋ '), '#231600');
+    if ($('#breath').classList.contains('on')) { const f = parseFloat($('#breathFill').style.width) / 100 || 0; g.fillStyle = 'rgba(0,0,0,.5)'; rr(g, W / 2 - 130 * s, 150 * s, 260 * s, 14 * s, 7 * s); g.fill(); g.fillStyle = f < 0.33 ? '#f87171' : '#7dd3fc'; rr(g, W / 2 - 130 * s, 150 * s, 260 * s * f, 14 * s, 7 * s); g.fill(); }
+    if ($('#bossbar').classList.contains('on')) { const f = parseFloat($('#bossFill').style.width) / 100 || 0; g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, W / 2 - 260 * s, H - 40 * s, 520 * s, 16 * s, 8 * s); g.fill(); g.fillStyle = '#ff6a00'; rr(g, W / 2 - 260 * s, H - 40 * s, 520 * s * f, 16 * s, 8 * s); g.fill(); g.font = F(15, 900); g.textAlign = 'center'; g.fillStyle = '#fff'; g.fillText('🌋 عملاق الحمم', W / 2, H - 56 * s); }
+    if ($('#cross').classList.contains('on')) { g.strokeStyle = '#ff3030'; g.lineWidth = 3 * s; g.beginPath(); g.moveTo(W / 2 - 16 * s, H / 2); g.lineTo(W / 2 + 16 * s, H / 2); g.moveTo(W / 2, H / 2 - 16 * s); g.lineTo(W / 2, H / 2 + 16 * s); g.stroke(); }
+    if ($('#scope').classList.contains('on')) { const R = H * 0.32; g.fillStyle = 'rgba(0,0,0,.96)'; g.beginPath(); g.rect(0, 0, W, H); g.arc(W / 2, H / 2, R, 0, Math.PI * 2, true); g.fill(); g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(W / 2 - R, H / 2); g.lineTo(W / 2 + R, H / 2); g.moveTo(W / 2, H / 2 - R); g.lineTo(W / 2, H / 2 + R); g.stroke(); }
+    if (bannerShowT > 0) { bannerShowT -= 1 / 60; const a = Math.min(1, bannerShowT, 3.4 - bannerShowT); g.globalAlpha = Math.max(0, a); g.textAlign = 'center'; g.fillStyle = '#7dd3fc'; g.font = F(16, 800); g.fillText($('#bSub').textContent, W / 2, H * 0.24); g.fillStyle = '#fff'; g.font = F(52, 900); g.fillText($('#bName').textContent, W / 2, H * 0.3); g.globalAlpha = 1; }
+    if ($('#fade').classList.contains('on')) { g.fillStyle = 'rgba(5,5,12,.85)'; g.fillRect(0, 0, W, H); }
+  }
+  // menus (title / pause / done) drawn as a panel with the focused button highlighted
+  const menu = activeMenu();
+  if (menu) {
+    const title = menu.id === 'title', bs = menuButtons(menu), head = title ? 'النينجا المعصوب' : (menu.querySelector('h2') || {}).textContent || '';
+    g.fillStyle = title ? 'rgba(5,5,15,.55)' : 'rgba(3,4,12,.66)'; g.fillRect(0, 0, W, H);
+    const bw = 560 * s, bh = (140 + bs.length * 62) * s, bx = (W - bw) / 2, by = Math.max(20 * s, (H - bh) / 2);
+    g.fillStyle = 'rgba(20,26,51,.95)'; rr(g, bx, by, bw, bh, 26 * s); g.fill();
+    g.textAlign = 'center'; g.fillStyle = title ? '#ffd166' : '#fff'; g.font = F(title ? 46 : 30, 900); g.fillText(head, W / 2, by + 56 * s);
+    bs.forEach((b, i) => { const y = by + (100 + i * 62) * s, foc = b.classList.contains('navfocus'); g.fillStyle = foc ? '#f59e0b' : 'rgba(255,255,255,.08)'; rr(g, bx + 30 * s, y, bw - 60 * s, 50 * s, 14 * s); g.fill(); if (foc) { g.strokeStyle = '#ffd166'; g.lineWidth = 3 * s; g.stroke(); } g.fillStyle = foc ? '#1a1200' : '#fff'; g.font = F(20, 800); g.fillText(b.textContent.trim().slice(0, 40), W / 2, y + 26 * s); });
+  }
+  g.restore();
+}
 function say(text) { $('#toastText').textContent = text; $('#toast').classList.add('on'); toastT = Math.min(11, 3.5 + text.length * 0.055); }
-function banner(name, sub) { $('#bName').textContent = name; $('#bSub').textContent = sub || ''; const b = $('#banner'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); }
+function banner(name, sub) { bannerShowT = 3.4; $('#bName').textContent = name; $('#bSub').textContent = sub || ''; const b = $('#banner'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); }
 function hudUpdate() {
   if (!player) return;
   $('#coins').textContent = '🪙 ' + (SAVE.coins || 0);
@@ -330,11 +375,13 @@ const tvHooks = {
 };
 function autoTV() {
   let pref = null; try { pref = localStorage.getItem('nw_tv'); } catch (e) {}
-  if (!LITE && pref !== '0') { LITE = true; applyQuality(1); setTimeout(() => say('📺 فعّلت «وضع التلفزيون» عشان تكون اللعبة سلسة على الشاشة — تقدر تطفيه من ⏸'), 1500); }
+  if (false && !LITE && pref !== '0') { LITE = true; applyQuality(1); setTimeout(() => say('📺 فعّلت «وضع التلفزيون» عشان تكون اللعبة سلسة على الشاشة — تقدر تطفيه من ⏸'), 1500); }
 }
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+attachPortal(tvHooks, ninjaLayout);
+if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
 $('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
 $('#tvClose').onclick = () => closeTV();
@@ -359,7 +406,7 @@ loadSkinFile().then((buf) => { if (buf) applySkin(buf, false); });
 $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
-  sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
+  if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
   sfx.music(cfg.music); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
   try { if (TOUCH && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
   setTimeout(() => { const t = level.triggers.find((t) => !t.fired && Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z) < t.r); if (t) { t.fired = true; say(t.text); } }, 900);
@@ -690,6 +737,7 @@ function frame(now) {
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
   scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw);
   renderFrame();
+  if (STREAM) streamDraw();
 }
 requestAnimationFrame(frame);
 

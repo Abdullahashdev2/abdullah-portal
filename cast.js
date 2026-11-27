@@ -35,6 +35,8 @@
     });
     peer.on('error', (e) => { if (e.type === 'unavailable-id') { peer.destroy(); create(); } else if (/network|server|socket/.test(e.type)) status('⚠️ انقطع الاتصال بخادم الربط — سكّر وجرّب مرة ثانية'); });
     peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+    // 📡 the phone renders the game and streams it here as live video (smooth even on weak TVs)
+    peer.on('call', (call) => { call.answer(); call.on('stream', (st) => showVideo(st, call)); call.on('close', hideVideo); call.on('error', hideVideo); });
     peer.on('connection', (c) => {
       if (conn) try { conn.close(); } catch (e) {}
       conn = c; last = {}; gotFirst = false; held = {}; dirs = {}; layoutStr = '';
@@ -141,6 +143,28 @@
     if (fresh.__ok) { const els = candidates(); if (!focusEl || !els.includes(focusEl)) setFocus(els[0]); else { const el = focusEl; if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) el.focus(); else el.click(); setTimeout(() => { if (focusEl && !candidates().includes(focusEl)) clearFocus(); }, 80); } }
   }
 
+  /* ---------- live video from the phone ---------- */
+  let vbox = null;
+  function showVideo(stream, call) {
+    hideVideo();
+    if (!$('#viewer').hidden) history.back(); // free the TV: nothing else renders while streaming
+    $('#castSheet').hidden = true;
+    vbox = document.createElement('div');
+    vbox.style.cssText = 'position:fixed;inset:0;z-index:500;background:#000;display:flex;align-items:center;justify-content:center';
+    const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.srcObject = stream;
+    v.style.cssText = 'width:100%;height:100%;object-fit:contain;background:#000';
+    const tip = document.createElement('div'); tip.textContent = '📡 بث مباشر من الجوال — الجوال يشغّل اللعبة والشاشة تعرضها';
+    tip.style.cssText = 'position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;padding:8px 16px;border-radius:999px;font:700 15px system-ui;transition:opacity 1s';
+    const btn = document.createElement('button'); btn.textContent = '🔊 اضغط هنا (أو OK بالريموت) لتشغيل الصوت'; btn.hidden = true;
+    btn.style.cssText = 'position:absolute;top:20px;left:50%;transform:translateX(-50%);padding:14px 22px;border-radius:14px;border:0;background:#f59e0b;color:#1a1200;font:900 18px system-ui;cursor:pointer';
+    btn.onclick = () => { v.muted = false; v.play().catch(() => {}); btn.hidden = true; };
+    vbox.append(v, tip, btn); document.body.appendChild(vbox);
+    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); btn.hidden = false; btn.focus(); });
+    setTimeout(() => (tip.style.opacity = '0'), 5000);
+    try { vbox.requestFullscreen && vbox.requestFullscreen().catch(() => {}); } catch (e) {}
+    window.KeepAwake && window.KeepAwake.on();
+  }
+  function hideVideo() { if (vbox) { try { const v = vbox.querySelector('video'); v.srcObject = null; } catch (e) {} vbox.remove(); vbox = null; try { document.fullscreenElement && document.exitFullscreen(); } catch (e) {} } }
   /* ---------- hooks for the portal ---------- */
   window.PortalCast = {
     open, send: (o) => send(o),

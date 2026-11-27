@@ -21,6 +21,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 #sp{flex:1}
 #hearts{color:#ff4d6d}
 #look{position:fixed;inset:0;z-index:1}
+#gameFrame{position:fixed;left:0;top:0;width:1280px;height:720px;border:0;transform-origin:0 0;z-index:0;pointer-events:none;opacity:.35}
+#streamB.on{background:rgba(74,222,128,.25);border-color:#4ade80}
 #stickZone{position:fixed;left:0;top:56px;bottom:0;width:45%;z-index:2}
 #base{position:fixed;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:radial-gradient(circle,rgba(255,255,255,.08),rgba(255,255,255,.02));display:none;pointer-events:none;z-index:3}
 #knob{position:absolute;left:50%;top:50%;width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.65);transform:translate(-50%,-50%)}
@@ -52,6 +54,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
   <span id="title"></span>
   <span class="pill" id="hearts" hidden></span><span class="pill" id="shards" hidden></span>
   <span id="sp"></span>
+  <button class="tb" id="streamB" title="الجوال يشغّل اللعبة والتلفزيون يعرضها فيديو">📡 بث فائق</button>
   <button class="tb" id="menuB">🧭 قوائم</button>
   <button class="tb" id="pauseB" hidden>⏸</button>
 </div>
@@ -95,8 +98,39 @@ function render() {
     pad.appendChild(el);
   });
 }
+/* ---------- 📡 super stream: this phone runs the game in 1080p and streams it to the TV as live video ---------- */
+let gameFrame = null, call = null, streaming = false, codeUsed = '';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function startStream() {
+  if (!conn || !conn.open) return;
+  const btn = $('#streamB'); btn.textContent = '⏳ تجهيز…'; btn.disabled = true;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; window.__padAudio = new AC(); await window.__padAudio.resume();
+    gameFrame = document.createElement('iframe'); gameFrame.id = 'gameFrame'; gameFrame.src = 'apps/ninja-worlds/?stream=1'; gameFrame.allow = 'autoplay';
+    document.body.appendChild(gameFrame); fitFrame();
+    let w = null; for (let i = 0; i < 150; i++) { await sleep(100); try { w = gameFrame.contentWindow; if (w.__G && w.__getStream && w.__castInput) break; } catch (e) {} w = null; }
+    if (!w) throw new Error('game');
+    w.__G.start(); await sleep(400);
+    const stream = w.__getStream(60);
+    call = peer.call('abdcast-' + codeUsed, stream);
+    call.on('close', stopStream);
+    setTimeout(() => { try { call.peerConnection.getSenders().forEach((s) => { if (!s.track || s.track.kind !== 'video') return; const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = 9000000; p.encodings[0].maxFramerate = 60; p.degradationPreference = 'maintain-framerate'; s.setParameters(p).catch(() => {}); }); } catch (e) {} }, 1200);
+    streaming = true; btn.classList.add('on'); btn.textContent = '📡 يبث ✓'; layout = Object.assign({}, w.__castLayout, { native: true }); menu = false; render();
+    $('#state').textContent = '📡 بث فائق: الجوال يشغّل اللعبة 1080p والتلفزيون يعرضها';
+  } catch (e) { $('#state').textContent = '⚠️ ما قدرت أبدأ البث — جرّب مرة ثانية'; stopStream(); }
+  btn.disabled = false;
+}
+function stopStream() {
+  streaming = false; try { call && call.close(); } catch (e) {} call = null;
+  if (gameFrame) { gameFrame.remove(); gameFrame = null; }
+  try { window.__padAudio && window.__padAudio.close(); } catch (e) {}
+  const btn = $('#streamB'); btn.classList.remove('on'); btn.textContent = '📡 بث فائق';
+}
+function fitFrame() { if (gameFrame) gameFrame.style.transform = `scale(${Math.min(innerWidth / 1280, innerHeight / 720)})`; }
+addEventListener('resize', fitFrame);
+$('#streamB').onclick = () => (streaming ? stopStream() : startStream());
 $('#menuB').onclick = () => { menu = !menu; st.h = {}; render(); send(true); };
-$('#homeB').onclick = () => { press('__back'); menu = false; };
+$('#homeB').onclick = () => { if (streaming) { stopStream(); return; } press('__back'); menu = false; };
 $('#pauseB').onclick = () => press('pause');
 
 function connect() {
@@ -105,7 +139,7 @@ function connect() {
   if (peer) try { peer.destroy(); } catch (e) {}
   peer = new Peer({ debug: 0 });
   peer.on('open', () => {
-    conn = peer.connect('abdcast-' + code, { reliable: false, serialization: 'json' });
+    codeUsed = code; conn = peer.connect('abdcast-' + code, { reliable: false, serialization: 'json' });
     const to = setTimeout(() => { if (!conn || !conn.open) fail('ما قدرت أوصل — تأكد من الكود وإن الجهازين على نفس الواي فاي'); }, 12000);
     conn.on('open', () => { clearTimeout(to); $('#join').style.display = 'none'; $('#rot').classList.add('need'); $('#state').textContent = '✅ متصل — ' + code; if (navigator.vibrate) navigator.vibrate(40); render(); });
     conn.on('data', (d) => {
@@ -140,7 +174,10 @@ function send(force) {
   if (!conn || !conn.open) return;
   const o = { x: +st.x.toFixed(3), y: +st.y.toFixed(3), c: st.c, h: st.h, m: menu, dx: Math.round(st.dx), dy: Math.round(st.dy) };
   const s = JSON.stringify(o), now = performance.now();
-  if (!force && s === lastStr && now - lastSend < 120) return;
+  if (!force && s === lastStr && now - lastSend < (streaming ? 16 : 120)) return;
+  if (streaming && gameFrame) { try { const w = gameFrame.contentWindow; w.__castInput(o); st.dx = 0; st.dy = 0; lastStr = s; lastSend = now;
+      const P = w.__G.player; if (P && (now - (send.hudT || 0) > 300)) { send.hudT = now; $('#hearts').hidden = false; $('#hearts').textContent = '❤'.repeat(Math.max(0, P.hp)) + '♡'.repeat(Math.max(0, P.maxHp - P.hp)); }
+      const L2 = w.__castLayout; const ls = JSON.stringify(L2); if (ls !== send.lastL) { send.lastL = ls; layout = Object.assign({}, L2, { native: true }); render(); } } catch (e) {} return; }
   try { conn.send(o); st.dx = 0; st.dy = 0; lastStr = s; lastSend = now; } catch (e) {}
 }
 (function loop() { send(false); requestAnimationFrame(loop); })();

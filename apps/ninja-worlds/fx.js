@@ -181,12 +181,12 @@ const MUSIC = {
 };
 export class Sound {
   constructor() { this.ctx = null; this.on = true; }
-  init() {
+  init(extCtx, toStream) {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    const c = (this.ctx = new AC());
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC && !extCtx) return;
+    const c = (this.ctx = extCtx || new AC()); if (c.state === 'suspended') c.resume();
     this.master = c.createGain(); this.master.gain.value = this.on ? 0.8 : 0;
-    const comp = c.createDynamicsCompressor(); this.master.connect(comp); comp.connect(c.destination);
+    const comp = c.createDynamicsCompressor(); this.master.connect(comp); if (toStream) { this.streamDest = c.createMediaStreamDestination(); comp.connect(this.streamDest); } else comp.connect(c.destination);
     this.sfxBus = c.createGain(); this.sfxBus.gain.value = 0.9; this.sfxBus.connect(this.master);
     this.musBus = c.createGain(); this.musBus.gain.value = 0.42; this.musBus.connect(this.master);
     // generated reverb impulse
