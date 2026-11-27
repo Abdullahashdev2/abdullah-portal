@@ -150,8 +150,8 @@ export class Enemies {
       }
       const z = e.zone; e.pos.x = Math.max(z.x0, Math.min(z.x1, e.pos.x)); e.pos.z = Math.max(z.z0, Math.min(z.z1, e.pos.z));
       // separation
-      for (const o of this.list) { if (o === e || !o.alive || o.st === 'sleep' || o.st === 'dragged' || e.st === 'dragged') continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.boss || o.boss) ? 4 : (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
-      const pr = e.boss ? 2.4 : 0.75; if (e.alive && e.st !== 'sleep' && e.st !== 'dragged' && d < pr && Math.abs(dy) < 1.5) { if (e.boss) { pl.pos.x += (dx / (d || 1)) * (pr - d); pl.pos.z += (dz / (d || 1)) * (pr - d); } else { e.pos.x -= (dx / (d || 1)) * (pr - d); e.pos.z -= (dz / (d || 1)) * (pr - d); } }
+      for (const o of this.list) { if (o === e || !o.alive || o.st === 'sleep' || o.st === 'dragged' || e.st === 'dragged' || o.st === 'held' || e.st === 'held') continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.boss || o.boss) ? 4 : (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
+      const pr = e.boss ? 2.4 : 0.75; if (e.alive && e.st !== 'sleep' && e.st !== 'dragged' && e.st !== 'held' && d < pr && Math.abs(dy) < 1.5) { if (e.boss) { pl.pos.x += (dx / (d || 1)) * (pr - d); pl.pos.z += (dz / (d || 1)) * (pr - d); } else { e.pos.x -= (dx / (d || 1)) * (pr - d); e.pos.z -= (dz / (d || 1)) * (pr - d); } }
       // visuals
       m.g.rotation.y = e.yaw;
       if (e.st !== 'dying' && e.st !== 'rise') m.inner.position.y = Math.sin(e.t * 3 + e.def.x) * 0.06;
@@ -223,7 +223,7 @@ export class Enemies {
   }
   /* ---------- tanker-style stealth (ship world): sleep darts, radio calls, noise, bodies ---------- */
   tranq(e, head) {
-    if (!e.alive || e.st === 'sleep' || e.st === 'dragged' || e.st === 'dying') return false;
+    if (!e.alive || e.st === 'sleep' || e.st === 'dragged' || e.st === 'held' || e.st === 'dying') return false;
     if (head || e.st === 'drowsy') this.sleep(e); else { e.st = 'drowsy'; e.drowsyT = 2.4; e.t = 0; }
     this.g.fx.emit(e.pos.clone().add(new V(0, head ? 1.7 : 1.1, 0)), { color: 0x93c5fd, count: 12, speed: 3, life: 0.4, size: 0.2 });
     return true;
@@ -259,7 +259,7 @@ export class Enemies {
   }
   shipThink(e, dt, pl, d, dy, dx, dz, toYaw) {
     const phase = this.g.level.phase || 'normal';
-    if (e.st === 'dragged') return 'idle';
+    if (e.st === 'dragged' || e.st === 'held') return 'idle';
     if (e.st === 'sleep') { e.sleepT -= dt; if (Math.random() < dt * 0.8) this.g.fx.emit(e.pos.clone().add(new V(0, 0.8, 0)), { color: 0xbfdbfe, count: 1, speed: 0.4, up: 1, life: 1.4, size: 0.18, grav: -0.6 });
       if (e.sleepT <= 0 && !e.hidden) { e.st = 'idle'; e.sus = 0; e.wait = 1.5; this.g.onGuardWoke && this.g.onGuardWoke(e); } return 'idle'; }
     if (e.st === 'drowsy') { e.drowsyT -= dt; e.yaw += Math.sin(e.t * 5) * dt; if (e.drowsyT <= 0) this.sleep(e); return 'stagger'; }
@@ -292,7 +292,9 @@ export class Enemies {
     if (e.st === 'inv' && !walking) { P.headY = Math.sin(t * 1.3) * 0.6; }
     if (e.st === 'radio') { P.shLx = 2.5; P.shLz = 0.35; P.elL = 2.5; P.headY = 0.2; }
     if (anim === 'stagger' || e.st === 'drowsy') { P.spineX = -0.25 + Math.sin(t * 6) * 0.15; P.knL = P.knR = 0.6; P.headX = 0.4; P.shRx = 0.2; P.shLx = 0.2; P.elR = P.elL = 0.4; }
-    if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
+    if (e.st === 'held') { const sq = Math.sin(e.t * 18) * 0.25 * (1 - (e.choke || 0)); P.headX = -0.5; P.spineX = -0.2; P.shLx = 2.2 + sq; P.shRx = 2.0 - sq; P.elL = P.elR = 1.6; P.shLz = P.shRz = 0.3; P.knL = 0.3 + (e.choke || 0) * 0.6; P.knR = 0.2 + (e.choke || 0) * 0.6; P.thLx = 0.2 + sq * 0.5; }
+    else if (e.st === 'thrown') { P.shLz = P.shRz = 2.2; P.thLx = 0.8; P.thRx = -0.6; P.knL = P.knR = 0.4; P.spineX = -0.4; }
+    else if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
     blendPose(h, P, dt, e.st === 'sleep' ? 5 : 12);
   }
   bossThink(e, dt, pl, d, dx, dz, toYaw) {

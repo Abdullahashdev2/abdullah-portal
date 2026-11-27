@@ -21,7 +21,7 @@ export class Stealth {
   }
   get L() { return this.c.level(); }
   setup(level, cfg) {
-    this.on = !!cfg.ship; this.exitAim(); this.drop(); this.leaveLocker(true);
+    this.on = !!cfg.ship; this.exitAim(); this.drop(); this.release(true); this.leaveLocker(true); this.flying = [];
     const d = this.c.upg().darts || 0;
     this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d };
     level.phase = 'normal'; level.phaseT = 0; level.lastSeen = null;
@@ -31,7 +31,13 @@ export class Stealth {
   preInput(inp) {
     if (!this.on) { inp.aimP = false; return; }
     const P = this.c.player;
-    if (inp.aimP && !P.carry && !this.dragging && !P.inLocker) { this.aiming ? this.exitAim() : this.enterAim(); }
+    if (this.holding) { // ماسك حارس من الخلف
+      if (inp.atkP) { inp.atkP = false; this.choke(); }
+      if (inp.actP) { inp.actP = false; if (!this.throwBody(this.holding)) this.c.say('🌊 قرّب من حافة السفينة (السطح المكشوف) عشان ترميه في البحر — أو اضغط ⚔️ عشان تخنقه لين يغمى عليه'); }
+      if (inp.rollP) { inp.rollP = false; this.release(false, true); }
+      inp.jumpP = false; inp.aimP = false; inp.spP = false;
+    }
+    if (inp.aimP && !P.carry && !this.dragging && !this.holding && !P.inLocker) { this.aiming ? this.exitAim() : this.enterAim(); }
     if (this.aiming) {
       if (inp.atkP) { inp.atkP = false; this.shoot(); }
       if (inp.actP) { inp.actP = false; this.weapon = this.weapon === 'pistol' ? 'sniper' : 'pistol'; this.c.sfx.tone(500, 700, 0.08, 'square', 0.05); this.hud(); }
@@ -46,6 +52,7 @@ export class Stealth {
     const P = this.c.player, L = this.L;
     if (P.inLocker) { this.leaveLocker(); return true; }
     if (this.dragging) {
+      if (this.throwBody(this.dragging)) return true;
       const lk = this.nearLocker(1.9);
       if (lk && !lk.body) { const e = this.dragging; lk.body = e; lk.openT = 1; e.hidden = true; e.m.g.visible = false; e.st = 'sleep'; e.sleepT = 1e9; this.dragging = null; P.dragging = false; this.c.sfx.tone(160, 90, 0.4, 'square', 0.12); this.c.say('🗄️ خبّيته بالخزانة — محد بيلقاه.'); this.c.addCoins(5, P.pos); return true; }
       this.drop(); return true;
@@ -55,6 +62,69 @@ export class Stealth {
     const lk = this.nearLocker(1.4);
     if (lk && !lk.body && !lk.player) { this.enterLocker(lk); return true; }
     return false;
+  }
+  /* ---------- القبض من الخلف (CQC): خنق لين يغمى عليه، أو رمي في البحر ---------- */
+  tryGrab() {
+    if (!this.on || this.holding || this.dragging || this.aiming) return false;
+    const P = this.c.player;
+    for (const e of this.c.enemies.list) {
+      if (!e.ship || !e.alive || e.alert || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio', 'drowsy'].includes(e.st)) continue;
+      const dx = P.pos.x - e.pos.x, dz = P.pos.z - e.pos.z, d = Math.hypot(dx, dz);
+      if (d > 1.6 || Math.abs(P.pos.y - e.pos.y) > 1) continue;
+      if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) > -0.25) continue; // لازم تكون وراه
+      this.holding = e; e.st = 'held'; e.heldT = 0; e.choke = 0; P.holding = true; P.yaw = e.yaw;
+      this.c.sfx.tone(200, 120, 0.25, 'triangle', 0.12); this.c.sfx.noise(0.15, 400, 1, 0.12, 'lowpass');
+      if (!this.L._grabTip) { this.L._grabTip = true; this.c.say('🤫 مسكته من الخلف! ⚔️ اضغط بسرعة = خنق لين يغمى عليه • ✋ عند حافة السفينة = ترميه في البحر • 🌀 = تفكّه. لا تطوّل — بيفلت!'); }
+      return true;
+    }
+    return false;
+  }
+  choke() {
+    const e = this.holding; if (!e) return;
+    e.choke = Math.min(1, e.choke + 0.17 + (this.c.upg().dmg || 0) * 0.04); e.flash = 0.08;
+    this.c.sfx.tone(140 + e.choke * 80, 110, 0.12, 'sawtooth', 0.05);
+    if (e.choke >= 1) {
+      const P = this.c.player; this.holding = null; P.holding = false;
+      this.c.enemies.sleep(e, true); e.sleepT = 150; e.choke = 0;
+      this.c.sfx.tone(300, 90, 0.5, 'sine', 0.12); this.c.addCoins(4, e.pos);
+      if (!this.L._chokeTip) { this.L._chokeTip = true; this.c.say('😵 أغمى عليه — بس بيصحى بعد شوي. اسحبه (✋) لخزانة أو ارمه في البحر عشان محد يلقاه.'); }
+    }
+  }
+  release(silent, shove) {
+    const e = this.holding, P = this.c.player; this.holding = null; if (P) P.holding = false; if (!e || silent) return;
+    if (shove) { this.c.enemies.sleep(e, true); e.sleepT = 3.5; this.c.sfx.hit(); } // دفّة قوية: يطيح ثواني
+    else { e.st = 'inv'; e.invPos = P.pos.clone(); e.invT = 0; e.sus = 1; }
+  }
+  seaEdge() {
+    const P = this.c.player, f = this.L.seaEdge; return f ? f(P.pos) : null;
+  }
+  throwBody(e) {
+    const n = this.seaEdge(); if (!n || !e) return false;
+    const P = this.c.player;
+    if (e === this.holding) { this.holding = null; P.holding = false; }
+    if (e === this.dragging) { this.dragging = null; P.dragging = false; }
+    e.st = 'thrown'; e.alive = false; e.thrownT = 0; e.cone && (e.cone.visible = false);
+    const from = e.pos.clone(), to = P.pos.clone().addScaledVector(n, 5.5); to.y = -3.2;
+    this.flying.push({ e, from, to, t: 0, n });
+    this.c.sfx.noise(0.35, 600, 0.8, 0.2, 'bandpass', 0, 200); this.c.sfx.tone(260, 140, 0.3, 'triangle', 0.1);
+    this.L.thrown = (this.L.thrown || 0) + 1; this.c.addCoins(8, P.pos);
+    this.c.say(this.L.thrown === 1 ? '🌊 رميته في البحر! محد بيلقى جثته ولا بيصحى — بس انتبه: الحارس اللي يشوفك ترمي، بيعلن الإنذار.' : '🌊 للبحر! (' + this.L.thrown + ')');
+    return true;
+  }
+  updateThrown(dt) {
+    for (const f of this.flying) {
+      f.t += dt; const k = Math.min(1, f.t / 0.95), e = f.e;
+      e.pos.lerpVectors(f.from, f.to, k); e.pos.y = f.from.y + (f.to.y - f.from.y) * k + Math.sin(k * Math.PI) * 2.6;
+      e.yaw += dt * 6; if (e.m && e.m.inner) e.m.inner.rotation.x = k * 4;
+      if (k >= 1 && !f.done) {
+        f.done = true; const sp = e.pos.clone(); sp.y = -3;
+        this.c.sparks.emit(sp, { color: 0xe0f2fe, count: 40, speed: 6, up: 6, life: 0.9, size: 0.35, grav: 9 });
+        this.c.sparks.emit(sp, { color: 0x7dd3fc, count: 20, speed: 3, up: 3, life: 1.2, size: 0.5, grav: 6 });
+        this.c.sfx.noise(0.6, 300, 0.6, 0.3, 'lowpass'); this.c.sfx.noise(0.4, 1400, 0.8, 0.12, 'bandpass', 0.08);
+        e.m.g.removeFromParent(); e.gone = true;
+      }
+    }
+    this.flying = this.flying.filter((f) => !f.done);
   }
   drop() { if (this.dragging) { this.dragging.st = 'sleep'; this.dragging = null; } if (this.c.player) this.c.player.dragging = false; }
   nearLocker(r) { const P = this.c.player; let best = null, bd = r; for (const lk of this.L.lockers || []) { const d = Math.hypot(lk.front.x - P.pos.x, lk.front.z - P.pos.z); if (d < bd && Math.abs(lk.pos.y - P.pos.y) < 1) { bd = d; best = lk; } } return best; }
@@ -98,6 +168,13 @@ export class Stealth {
     if (!this.on) return;
     const P = this.c.player, L = this.L, E = this.c.enemies;
     if (this.aiming) { P.yaw = this.c.cam.yaw; }
+    this.updateThrown(dt);
+    if (this.holding) {
+      const e = this.holding, fwd = new V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), tgt = P.pos.clone().addScaledVector(fwd, 0.5);
+      e.pos.lerp(tgt, Math.min(1, dt * 14)); e.pos.y = P.pos.y; e.yaw = P.yaw; e.heldT += dt; e.choke = Math.max(0, e.choke - dt * 0.06);
+      if (!e.alive || P.state === 'hurt' || P.state === 'air' || P.inLocker) this.release(true);
+      else if (e.heldT > 6.5 + (this.c.upg().dmg || 0)) { this.c.say('😠 فلت منك!'); this.release(false); this.c.sfx.tone(500, 900, 0.2, 'square', 0.1); }
+    }
     // dragged body follows behind the player
     if (this.dragging) {
       const e = this.dragging, back = new V(-Math.sin(P.yaw), 0, -Math.cos(P.yaw)), tgt = P.pos.clone().addScaledVector(back, 1.15);

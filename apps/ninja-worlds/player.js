@@ -153,12 +153,12 @@ export class Player {
   locomotion(dt, inp) {
     const { v, m } = this.moveInput(inp);
     this.onBeam = this.onGround && this.ground && this.ground.beam;
-    const max = this.carry ? C.carry : this.dragging ? 2.6 : this.aiming ? 2.4 : this.onBeam ? C.beam : C.run;
+    const max = this.carry ? C.carry : this.holding ? 1.5 : this.dragging ? 2.6 : this.aiming ? 2.4 : this.onBeam ? C.beam : C.run;
     this.airLock = Math.max(0, (this.airLock || 0) - dt);
     if (this.onGround) this.airLock = 0;
     if (this.airLock <= 0) this.steer(dt, v.clone().multiplyScalar(max), this.onGround ? C.accel : C.airAccel);
-    if (this.dragging || this.aiming) this.jumpBuf = 0;
-    if (m > 0.1 && this.airLock <= 0 && !this.aiming) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * (this.onGround ? 14 : 5));
+    if (this.dragging || this.aiming || this.holding) this.jumpBuf = 0;
+    if (m > 0.1 && this.airLock <= 0 && !this.aiming && !(this.holding && v.dot(this.fwd) < -0.3)) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * (this.onGround ? 14 : 5));
     this.coyote = Math.max(0, this.coyote - dt);
     if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
       this.jumpBuf = 0; this.coyote = 0;
@@ -176,7 +176,7 @@ export class Player {
       if (this.vel.y < 2 && this.noGrab <= 0) { const L = this.findLedge(); if (L) return this.startHang(L); }
       const bar = this.findBar(); if (bar) return this.startSwing(bar);
     }
-    if (this.onGround && this.g.level.cfg.ship && !this.carry && !this.dragging && !this.aiming && m > 0.45) {
+    if (this.onGround && this.g.level.cfg.ship && !this.carry && !this.dragging && !this.holding && !this.aiming && m > 0.45) {
       const wf = this.wallFace(this.pos, R + 0.18);
       if (wf && v.clone().normalize().dot(wf.n) < -0.8) { this.hugIn = (this.hugIn || 0) + dt; if (this.hugIn > 0.2) return this.startHug(wf); } else this.hugIn = 0;
     } else this.hugIn = 0;
@@ -275,17 +275,19 @@ export class Player {
   }
   /* ---------- combat ---------- */
   startAttack() {
+    if (this.spy && this.g.tryGrab && this.g.tryGrab()) return; // وراه وما انتبه؟ امسكه
     this.combo = this.t - this.lastAtkEnd < 0.45 && this.combo < 3 ? this.combo + 1 : 1;
     this.state = 'attack'; this.st.aT = 0; this.st.hit = false; this.st.queued = false;
     const e = this.g.enemies.nearest(this.pos, 4.5); if (e) this.yaw = Math.atan2(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
-    this.g.sfx.slash(this.combo);
+    if (this.spy) { this.g.sfx.noise(0.08, 500, 1, 0.12, 'bandpass'); } else this.g.sfx.slash(this.combo);
   }
   attackUpd(dt, inp) {
-    this.st.aT += dt; const dur = ATK[this.combo], k = this.st.aT / dur, f = this.fwd, lunge = k < 0.35 ? (this.combo === 3 ? 7 : 5) * (1 - k / 0.35) : 0;
+    this.st.aT += dt; const dur = ATK[this.combo], k = this.st.aT / dur, f = this.fwd, lunge = k < 0.35 ? (this.combo === 3 ? 7 : 5) * (1 - k / 0.35) * (this.spy ? 0.55 : 1) : 0;
     this.vel.x = f.x * lunge; this.vel.z = f.z * lunge; this.phys(dt);
     if (!this.st.hit && k >= 0.38) {
       this.st.hit = true; const big = this.combo === 3;
-      const n = this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
+      // بدلة التجسس: لكمة، لكمة، ركلة دوّارة — مدى أقصر من السيف
+      const n = this.spy ? this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.0 : 1.75, 0.35, big ? 2 : 1, big ? 7 : 2.5) : this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
       if (n) { this.g.hitstop(big ? 0.09 : 0.055); this.g.shake(big ? 0.3 : 0.14); this.g.sfx.hit(); }
     }
     if (inp.atkP) this.st.queued = true;
@@ -403,6 +405,7 @@ export class Player {
     if (st === 'ground' || (st === 'roll' && false)) {
       if (s > 0.06) run(Math.min(1, s * (this.onBeam ? 1.6 : 1)));
       else { P.chestX = Math.sin(t * 2) * 0.03; P.hipY = Math.sin(t * 2) * 0.012 - 0.04; P.knL = P.knR = 0.18; P.thLx = P.thRx = 0.06; P.shRx = 0.65; P.elR = 1.0; P.shRz = 0.25; P.shLz = 0.25; P.elL = 0.5; P.headY = Math.sin(t * 0.5) * 0.2; }
+      if (this.holding) { P.shLx = P.shRx = 1.25; P.elL = P.elR = 1.7; P.shLz = P.shRz = -0.25; P.spineX = 0.18; P.headX = 0.15; } // ذراعين حول رقبة الحارس
       if (this.onBeam) { P.shLz = 1.35; P.shRz = 1.35; P.shLx = 0.1; P.shRx = 0.2; P.elL = P.elR = 0.2; P.rootRoll = Math.sin(t * 2.3) * 0.08; P.spineX = 0.15; }
     } else if (st === 'hug' && this.hug) {
       const H = this.hug, side = this.phase;
@@ -435,7 +438,12 @@ export class Player {
     } else if (st === 'attack') {
       const k = clamp(this.st.aT / ATK[this.combo || 1], 0, 1), w = k < 0.25 ? k / 0.25 : 1, e = easeOut((k - 0.25) / 0.6);
       P.thLx = 0.55; P.knL = 0.55; P.thRx = -0.45; P.knR = 0.35; P.spineX = 0.2; P.shLx = 0.6; P.shLz = 0.5; P.elL = 1.2; P.hipY = -0.08;
-      if (this.combo === 1) { P.shRz = k < 0.25 ? 1.4 * w : 1.4 - 1.9 * e; P.shRx = k < 0.25 ? 0.9 : 0.9 + 0.6 * e; P.elR = 0.25; P.spineY = k < 0.25 ? -0.6 * w : -0.6 + 1.3 * e; }
+      if (this.spy) { // قتال بالأيدي: جاب يمين، هوك يسار، ركلة
+        P.shLz = 0.25; P.shRz = 0.25; P.shLx = 1.1; P.shRx = 1.1; P.elL = 1.9; P.elR = 1.9; P.spineX = 0.12; P.thLx = 0.35; P.knL = 0.4; P.thRx = -0.2; P.knR = 0.3; // حراسة
+        if (this.combo === 1) { P.shRx = 1.1 + 0.45 * e; P.elR = 1.9 - 1.8 * e; P.spineY = -0.45 * e; P.shRz = 0.1; }
+        else if (this.combo === 2) { P.shLx = 1.1 + 0.3 * e; P.elL = 1.9 - 1.2 * e; P.shLz = 0.25 + 0.6 * e; P.spineY = 0.55 * e; }
+        else { P.thRx = k < 0.25 ? 0.6 * w : 0.6 + 1.0 * e; P.knR = k < 0.25 ? 1.6 : 1.6 - 1.5 * e; P.spineX = -0.15 - 0.2 * e; P.spineY = -0.5 * e; P.thLx = 0.05; P.knL = 0.25; }
+      } else if (this.combo === 1) { P.shRz = k < 0.25 ? 1.4 * w : 1.4 - 1.9 * e; P.shRx = k < 0.25 ? 0.9 : 0.9 + 0.6 * e; P.elR = 0.25; P.spineY = k < 0.25 ? -0.6 * w : -0.6 + 1.3 * e; }
       else if (this.combo === 2) { P.shRz = k < 0.25 ? -0.4 : -0.4 + 1.9 * e; P.shRx = k < 0.25 ? 1.6 : 1.6 - 0.7 * e; P.elR = 0.3; P.spineY = k < 0.25 ? 0.7 * w : 0.7 - 1.3 * e; P.thLx = -0.3; P.thRx = 0.5; }
       else { P.shRx = k < 0.25 ? 3.0 : 3.0 - 2.5 * e; P.elR = k < 0.25 ? 0.5 : 0.1; P.spineX = k < 0.25 ? -0.2 : -0.2 + 0.75 * e; P.hipY = k < 0.25 ? 0.05 : -0.25 * e; P.knL = 0.4 + 0.6 * e; P.knR = 0.3 + 0.6 * e; P.shRz = 0.1; }
       rate = 30;
@@ -461,6 +469,6 @@ export class Player {
     if (this.state === 'swim') h.root.position.y += 0.9 * Math.sin(this.rootTilt);
     h.root.rotation.x = this.rootTilt; h.root.rotation.y += this.state === 'spin' ? (this.st.spT / 0.55) * Math.PI * 4 : 0;
     h.root.visible = !(this.inv > 0 && this.hp > 0 && this.state !== 'roll' && Math.floor(this.t * 16) % 2 === 0 && this.inv < 1.15);
-    h.sword.visible = !this.carry;
+    h.sword.visible = !this.carry && !h.spy;
   }
 }

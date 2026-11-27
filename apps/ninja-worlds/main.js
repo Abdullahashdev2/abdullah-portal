@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'sky';
 import { Particles, Sound } from './fx.js';
-import { buildHero, blendPose, BASE, Scarf, Trail } from './hero.js';
+import { buildHero, blendPose, BASE, Scarf, Trail, setSpy } from './hero.js';
 import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
@@ -180,6 +180,7 @@ const G = {
   playerHidden: () => { if (player.inLocker) return 'locker'; if (!level.shadows) return false; const p = player.pos, hs = Math.hypot(player.vel.x, player.vel.z); return hs < 4.8 && level.shadows.some((z) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && Math.abs(p.y - z.y) < 0.6); },
   onAlarm: () => { level.alarms = (level.alarms || 0) + 1; sfx.tone(880, 660, 0.25, 'square', 0.12); sfx.tone(880, 660, 0.25, 'square', 0.12, 0.3); if (level.alarms <= 3) say('🚨 انكشفت! الحارس شافك — حاربه أو اهرب للظل.'); },
   onRadio: (e) => stealth.radioDone(e),
+  tryGrab: () => stealth.tryGrab(),
   onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.12); stealth.spotted(e, search); },
   onBodyFound: () => stealth.bodyFound(),
   onGuardWoke: () => stealth.guardWoke(),
@@ -250,6 +251,7 @@ function loadWorld(id, from) {
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
   // السفينة أثقل عالم: على الجوال نبدأ فيها بجودة «متوسطة» (بدون bloom وMSAA) والتلقائي يرفعها لو الجوال قدر
+  setSpy(hero, !!cfg.ship); player.spy = !!cfg.ship; // في السفينة: بدلة تجسس وقتال بالأيدي
   if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
@@ -400,7 +402,7 @@ applyMirror();
 $('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
 if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -440,6 +442,14 @@ function nearPed() { if (!player.carry) return null; for (const p of level.pedes
 function nearNpc() { return npc && player.pos.distanceTo(npc.root.position) < 3 ? npc : null; }
 /* طَرق على الجدار: صوت معدني يجذب أقرب حارس يفتّش مكان الطرق — تكتيك تسلل */
 let knockCd = 0;
+function canGrab() {
+  for (const e of enemies.list) {
+    if (!e.ship || !e.alive || e.alert || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio', 'drowsy'].includes(e.st)) continue;
+    const dx = player.pos.x - e.pos.x, dz = player.pos.z - e.pos.z, d = Math.hypot(dx, dz);
+    if (d < 1.6 && Math.abs(player.pos.y - e.pos.y) < 1 && (dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < -0.25) return true;
+  }
+  return false;
+}
 function knockWall() {
   if (knockCd > 0) return; knockCd = 0.6;
   const H = player.hug, at = player.pos.clone().addScaledVector(H.n, 0.4); at.y = player.pos.y;
@@ -604,6 +614,14 @@ let __virt = null, gpAwake = false;
 
 /* ---------------- camera ---------------- */
 const ray = new THREE.Raycaster(); let tNow = 0;
+/* المطر ما ينزل داخل السرداب أو الغرف: نفحص فوق الكاميرا لين ٤٠م (كل ربع ثانية) */
+let roofT = 0, roofV = false; const roofRay = new THREE.Raycaster();
+function underRoof() {
+  if (tNow - roofT < 0.25) return roofV; roofT = tNow;
+  roofRay.set(camera.position, new V(0, 1, 0)); roofRay.far = 40; const a = roofRay.intersectObjects(level.camMeshes, false).length > 0;
+  roofRay.set(player.pos.clone().add(new V(0, 1.6, 0)), new V(0, 1, 0)); const b = roofRay.intersectObjects(level.camMeshes, false).length > 0;
+  return (roofV = a || b);
+}
 function updateCamera(dt) {
   if (stealth.camera(dt, cam)) { if (shakeAmt > 0) { camera.position.x += (Math.random() - 0.5) * shakeAmt * 0.3; shakeAmt = Math.max(0, shakeAmt - dt * 1.6); } return; }
   const p = player.pos, tgt = new V(p.x, p.y + 1.5, p.z);
@@ -669,7 +687,7 @@ function worldLogic(dt) {
   for (const C of level.cards || []) if (!C.taken && C.pos.distanceTo(new V(p.x, p.y + 0.8, p.z)) < 1.3) { C.taken = true; C.g.removeFromParent(); level.keys[C.name] = true; sfx.pickup(); say('🗝️ أخذت «' + C.name + '»'); }
   if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.noise(2.2, 90, 0.4, 0.5, 'lowpass', 0, 40), 400 + Math.random() * 900); }
     flash = Math.max(0, flash - dt * 5); hemi.intensity = cfg.hemi[2] * (1 + 4 * flash * (flash > 0.6 || flash < 0.35 ? 1 : 0.3));
-    if (level.rainMesh) { level.rainMesh.position.set(p.x, p.y - 4, p.z); level.rainMesh.visible = !cam.roof; } }
+    if (level.rainMesh) { level.rainMesh.position.set(p.x, p.y - 4, p.z); level.rainMesh.visible = !cam.roof && !underRoof(); } }
   // checkpoints
   for (const c of level.checkpoints) if (!c.on && Math.hypot(c.pos.x - p.x, c.pos.z - p.z) < 1.8 && Math.abs(c.pos.y - p.y) < 2) {
     level.checkpoints.forEach((o) => (o.cur = false)); c.on = true; c.cur = true; checkpoint = { pos: c.pos.clone(), yaw: c.yaw };
@@ -738,11 +756,15 @@ function worldLogic(dt) {
   }
   // prompt
   let label = '';
-  if (player.state === 'hug' && !player.carry) label = player.hug && player.hug.peek > 0.5 ? 'طق 🤜 (أنت تطل 👀)' : 'طق على الجدار 🤜';
+  const edgeN = stealth.on && stealth.seaEdge();
+  if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
+  else if (stealth.dragging && edgeN) label = 'ارمه في البحر 🌊';
+  else if (stealth.on && !stealth.dragging && canGrab()) label = 'امسكه من الخلف ⚔️';
+  else if (player.state === 'hug' && !player.carry) label = player.hug && player.hug.peek > 0.5 ? 'طق 🤜 (أنت تطل 👀)' : 'طق على الجدار 🤜';
   else if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
   else if (nearItem() && player.onGround) label = 'شيل';
   else if (nearNpc()) label = 'كلّمه';
-  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
+  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (/⚔️|🌊/.test(label) ? '' : TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
   // ambience
   if (Math.random() < dt * 18) { const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 14; motes.emit(new V(p.x + Math.cos(a) * r, p.y + Math.random() * 6, p.z + Math.sin(a) * r), { color: cfg.motes, count: 1, speed: 0.3, life: 4, size: 0.12, grav: -0.06, drag: 0.2 }); }
   if (level.petalTrees && Math.random() < dt * 4) { const t = level.petalTrees[Math.floor(Math.random() * level.petalTrees.length)]; dust.emit(t.pos.clone().add(new V((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), { color: t.color, count: 1, speed: 0.6, life: 4.5, size: 0.14, grav: 0.35, drag: 0.6 }); }
@@ -799,7 +821,7 @@ function frame(now) {
     tNow += dt; cam.yaw += dt * 0.08; level.update(dt, player);
   }
   menuPoll(dt); player.animate(dt); animateNpc(dt);
-  if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active);
+  if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active) && !hero.spy;
   if (stealth.aiming || player.inLocker) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
   hero.root.updateMatrixWorld(true);
   const r = new V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));

@@ -438,10 +438,15 @@ export function w7(K, L, S) {
   const sh = (n, x, y, z) => K.shard('w7-' + n, x, y, z, S.shards.includes('w7-' + n));
   const G = (x, y, z, path, zone, extra = {}) => K.enemy({ x, y, z, type: 'guard', path, zone, ...extra });
   const DECK = { x0: -14, x1: 14, z0: 1, z1: 239 }, ENG = { x0: -14, x1: 14, z0: 3, z1: 49 }, HOLD = { x0: -14, x1: 14, z0: 51, z1: 117 };
-  K.ocean({ y: -3, cz: 120 }); K.rain();
+  K.ocean({ y: -3, cz: 120, hole: [-15.6, 15.6, -0.6, 240.6] }); K.rain(); // البحر ما يدخل جسم السفينة
+  // حافة السطح المكشوف: من هنا ترمي الحراس في البحر (السطح الرئيسي y≈0 فقط)
+  L.seaEdge = (p) => { if (p.y < -0.6 || p.y > 1.6) return null; if (p.x > 13.6) return new V(1, 0, 0); if (p.x < -13.6) return new V(-1, 0, 0); if (p.z < 2.4) return new V(0, 0, -1); if (p.z > 237.6) return new V(0, 0, 1); return null; };
   /* ---------- hull ---------- */
   const hullM = new THREE.MeshStandardMaterial({ color: 0x5a1d1d, roughness: 0.7, metalness: 0.3 }); hullM.userData.own = true;
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(31, 4, 241), hullM); hull.position.set(0, -5, 120); L.add(hull);
+  // الهيكل: قاع تحت أرضية السرداب + كسوة حمراء من برّا الجدران (قبل: صندوق كان سقفه يقطع السرداب على ارتفاع ٣م ويغطي الكاميرا)
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(31.4, 2.5, 241.4), hullM); hull.position.set(0, -7.76, 120); L.add(hull);
+  [-1, 1].forEach((sd) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.12, 8, 241.4), hullM); c.position.set(sd * 15.62, -5, 120); L.add(c); });
+  [-0.62, 240.62].forEach((zz) => { const c = new THREE.Mesh(new THREE.BoxGeometry(31.4, 8, 0.12), hullM); c.position.set(0, -5, zz); L.add(c); });
   const bowM = new THREE.Mesh(new THREE.ConeGeometry(15.5, 18, 4, 1), hullM); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.3); bowM.position.set(0, -3.5, 249); L.add(bowM);
   [-1, 1].forEach((sd) => K.wall({ x: sd * 15.25, y: 1.2, z: 120, w: 0.5, d: 240, h: 7.7, m: 'metal', ledge: false }));
   K.wall({ x: 0, y: 1.2, z: -0.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false }); K.wall({ x: 0, y: 1.2, z: 240.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false });

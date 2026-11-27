@@ -515,12 +515,12 @@ export function makeKit(L) {
     return g;
   };
   /* -------- ship world: ocean, storm, containers, lockers, searchlights, ammo -------- */
-  K.ocean = ({ y = -3, size = 900, cz = 40 }) => {
+  K.ocean = ({ y = -3, size = 900, cz = 40, hole = null }) => {
     const geo = new THREE.PlaneGeometry(size, size, 120, 120); geo.rotateX(-Math.PI / 2);
     const um = own(new THREE.ShaderMaterial({
       uniforms: { t: { value: 0 }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 } }, fog: true,
       vertexShader: '#include <fog_pars_vertex>\nuniform float t;varying float h;varying vec3 wp;void main(){vec3 p=position;float a=sin(p.x*.05+t*.9)*1.1+sin(p.z*.07-t*1.2)*.9+sin((p.x+p.z)*.13+t*1.7)*.35;p.y+=a;h=a;vec4 w=modelMatrix*vec4(p,1.);wp=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;\n#include <fog_vertex>\n}',
-      fragmentShader: '#include <fog_pars_fragment>\nuniform float t;varying float h;varying vec3 wp;void main(){float f=smoothstep(1.2,2.3,h+sin(wp.x*.8+t*3.)*.3);vec3 c=mix(vec3(.02,.05,.08),vec3(.07,.15,.2),clamp(h*.3+.5,0.,1.));c=mix(c,vec3(.7,.8,.85),f*.6);gl_FragColor=vec4(c,1.);\n#include <fog_fragment>\n}',
+      fragmentShader: '#include <fog_pars_fragment>\nuniform float t;varying float h;varying vec3 wp;void main(){' + (hole ? `if(wp.x>${hole[0].toFixed(2)}&&wp.x<${hole[1].toFixed(2)}&&wp.z>${hole[2].toFixed(2)}&&wp.z<${hole[3].toFixed(2)})discard;` : '') + 'float f=smoothstep(1.2,2.3,h+sin(wp.x*.8+t*3.)*.3);vec3 c=mix(vec3(.02,.05,.08),vec3(.07,.15,.2),clamp(h*.3+.5,0.,1.));c=mix(c,vec3(.7,.8,.85),f*.6);gl_FragColor=vec4(c,1.);\n#include <fog_fragment>\n}',
     }));
     const m = new THREE.Mesh(geo, um); m.position.set(0, y, cz); L.add(m); L.anim.push((dt, t) => { um.uniforms.t.value = t; });
   };

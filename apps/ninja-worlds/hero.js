@@ -16,7 +16,7 @@ export function buildHero(variant = 'ninja') {
   const root = G(), body = G(); root.add(body); body.position.y = 0.55;
   const hips = G(); hips.position.y = 0.4; body.add(hips);
   const pel = add(hips, cap(0.15, 0.14, suit)); pel.rotation.z = Math.PI / 2; pel.scale.set(1, 1, 0.85);
-  add(hips, new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 18), calm ? suit2 : red), 0, 0.06, 0);
+  const beltM = add(hips, new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 18), calm ? suit2 : red), 0, 0.06, 0);
   const spine = G(); spine.position.y = 0.08; hips.add(spine);
   const torso = add(spine, cap(0.19, 0.26, suit, 14), 0, 0.22, 0); torso.scale.set(1.05, 1, 0.78);
   if (calm) { const coat = add(spine, new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.3, 0.75, 16, 1, true), suit2), 0, -0.05, 0); coat.material.side = THREE.DoubleSide; }
@@ -84,15 +84,16 @@ export function buildHero(variant = 'ninja') {
   };
   const LL = leg(1), RL = leg(-1);
   if (!calm) {
-    const sheath = add(spine, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, 0.07), M(0x111827, 0.5)), 0.08, 0.28, -0.2); sheath.rotation.z = 0.7;
+    var sheath = add(spine, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, 0.07), M(0x111827, 0.5)), 0.08, 0.28, -0.2); sheath.rotation.z = 0.7;
     add(sheath, new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.08, 0.085), gold), 0, 0.45, 0);
     const seam = add(head, new THREE.Mesh(new THREE.TorusGeometry(0.158, 0.005, 6, 40), new THREE.MeshBasicMaterial({ color: 0x7dd3fc })), 0, 0.012, 0); seam.rotation.x = Math.PI / 2; seam.castShadow = false;
     [L.sh, Rr.sh].forEach((s2, i) => { const pad = add(s2, new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0x334155, 0.35, 0.6)), 0, 0.02, 0); pad.scale.set(1.1, 0.7, 1.1); });
   }
   const scarfAnchor = G(); scarfAnchor.position.set(0, 0.07, -0.13); chest.add(scarfAnchor);
-  if (!calm) add(chest, new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 8, 20), red), 0, 0.07, 0).rotation.x = Math.PI / 2;
+  const collar = calm ? null : add(chest, new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 8, 20), red), 0, 0.07, 0); if (collar) collar.rotation.x = Math.PI / 2;
   root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
-  const h = { root, body, hips, spine, chest, neck, head, shL: L.sh, elL: L.el, shR: Rr.sh, elR: Rr.el, handR: Rr.hand, sword, thL: LL.th, knL: LL.kn, ftL: LL.ft, thR: RL.th, knR: RL.kn, ftR: RL.ft, scarfAnchor, cur: { ...BASE } };
+  const h = { root, body, hips, spine, chest, neck, head, shL: L.sh, elL: L.el, shR: Rr.sh, elR: Rr.el, handR: Rr.hand, handL: L.hand, sword, thL: LL.th, knL: LL.kn, ftL: LL.ft, thR: RL.th, knR: RL.kn, ftR: RL.ft, scarfAnchor, cur: { ...BASE } };
+  h.mats = { suit, suit2, trim, red }; h.sheath = calm ? null : sheath; h.collar = collar; h.beltM = beltM;
   return h;
 }
 
@@ -182,6 +183,45 @@ export class Trail {
   }
 }
 
+/* ---------- بدلة التجسس (عالم السفينة): بدون سيف ولا وشاح — بدلة رمادية ضيّقة، سماعة، قفازات، حزام تكتيكي ومسدس على الفخذ ---------- */
+export function setSpy(h, on) {
+  if (!h.mats) return;
+  if (!h.spyGear) {
+    h.spyOrig = {}; for (const k in h.mats) h.spyOrig[k] = { c: h.mats[k].color.getHex(), e: h.mats[k].emissive.getHex(), ei: h.mats[k].emissiveIntensity, r: h.mats[k].roughness, m: h.mats[k].metalness };
+    const g = new THREE.Group(); g.name = 'spyGear'; const parts = [];
+    const M2 = (c, r = 0.6, m = 0.2, e = 0, ei = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, emissive: e, emissiveIntensity: ei });
+    const black = M2(0x0f1115, 0.5, 0.35), strapM = M2(0x22262e, 0.75, 0.1), gunM = M2(0x15171b, 0.35, 0.8), led = new THREE.MeshBasicMaterial({ color: 0x34d399 });
+    const put = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; parent.add(mesh); parts.push(mesh); return mesh; };
+    // سماعة + ميكروفون (على الأذن اليسار)
+    put(h.head, new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.035, 14), black), 0.152, 0.0, 0.0).rotation.z = Math.PI / 2;
+    const boom = put(h.head, new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.14, 6), black), 0.13, -0.06, 0.07); boom.rotation.x = 1.1; boom.rotation.z = 0.35;
+    put(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 6), black), 0.095, -0.085, 0.13);
+    put(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.008, 6, 4), led), 0.172, 0.012, 0.012);
+    // قفازات
+    [h.handR, h.handL].forEach((hd) => put(hd, new THREE.Mesh(new THREE.SphereGeometry(0.066, 12, 10), black), 0, 0, 0).scale.set(1, 1.12, 1.25));
+    // حزام تكتيكي + جيوب
+    put(h.hips, new THREE.Mesh(new THREE.CylinderGeometry(0.207, 0.207, 0.06, 18), strapM), 0, 0.06, 0);
+    [-0.13, 0.13, 0].forEach((x, i) => put(h.hips, new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.05), strapM), x, 0.05, i === 2 ? -0.2 : 0.17));
+    // جراب على الفخذ اليمين + المسدس
+    const hol = put(h.thR, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.1), strapM), -0.09, -0.15, 0.01);
+    put(hol, new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.07, 0.11), gunM), 0, 0.12, 0.0);
+    [0.0, -0.12].forEach((y) => put(h.thR, new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.012, 6, 16), strapM), 0, -0.12 + y, 0).rotation.x = Math.PI / 2);
+    // حمّالة على الظهر (حقيبة صغيرة) + سكين صغيرة على الصدر
+    put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.26, 0.09), strapM), 0, 0.26, -0.17);
+    put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.13, 0.02), black), -0.1, 0.3, 0.16).rotation.z = -0.4;
+    h.spyGear = parts;
+  }
+  const S = h.mats, O = h.spyOrig;
+  if (on) {
+    S.suit.color.setHex(0x3a4250); S.suit.roughness = 0.55; S.suit.metalness = 0.15;
+    S.suit2.color.setHex(0x22272f); S.suit2.roughness = 0.6;
+    S.trim.color.setHex(0x4b5563); S.trim.emissive.setHex(0x0f766e); S.trim.emissiveIntensity = 0.35; S.trim.metalness = 0.4;
+    S.red.color.setHex(0x1f2329); S.red.roughness = 0.8;
+  } else for (const k in S) { const o = O[k]; S[k].color.setHex(o.c); S[k].emissive.setHex(o.e); S[k].emissiveIntensity = o.ei; S[k].roughness = o.r; S[k].metalness = o.m; }
+  h.spyGear.forEach((m) => (m.visible = on));
+  h.sword.visible = !on; if (h.sheath) h.sheath.visible = !on; if (h.collar) h.collar.visible = !on;
+  h.spy = on;
+}
 /* human ship guard: the calm-hero body re-dressed as a soldier (balaclava, cap, vest, rifle) */
 export function buildSoldier(seed = 0) {
   const h = buildHero('calm');
