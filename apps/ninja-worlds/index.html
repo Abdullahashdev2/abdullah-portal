@@ -81,6 +81,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 .card button.main{background:linear-gradient(180deg,#ffe08a,#f59e0b);color:#1a1200;border:0}
 @media (pointer:coarse){.keys{display:none}}
 .thint{display:none;color:#cbd5e1;font-size:14px}@media (pointer:coarse){.thint{display:block}}
+#tv{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(3,4,12,.78);backdrop-filter:blur(8px);padding:20px}#tv.on{display:flex}
+#tv .card{width:min(560px,100%)}#tvCode{font-size:64px;font-weight:900;letter-spacing:.25em;color:#ffd166;text-shadow:0 0 24px rgba(255,209,102,.5);direction:ltr}
+#tvQr{width:220px;height:220px;margin:10px auto;background:#fff;border-radius:16px;padding:8px}#tvQr svg{width:100%;height:100%}
+#tvUrl{font-size:12px;color:#94a3b8;direction:ltr;word-break:break-all}#tvStatus{margin:10px 0;font-weight:800;color:#e2e8f0}
+#tvBadge{position:fixed;z-index:7;top:calc(60px + env(safe-area-inset-top));left:12px;display:none}#tvBadge.on{display:block}
+body.tvmode #touch{display:none!important}
+#titleTV{margin-top:4px;border:1px solid rgba(125,211,252,.5);background:rgba(14,116,144,.25);color:#e0f2fe;border-radius:999px;padding:10px 22px;font-size:15px;font-weight:800;cursor:pointer}
 #help{display:none;text-align:right;font-size:14px;line-height:1.9;color:#cbd5e1;margin-top:6px}#help.on{display:block}
 #doneStats{display:flex;gap:10px;justify-content:center;margin:10px 0}
 #doneStats div{flex:1;background:rgba(255,255,255,.06);border-radius:14px;padding:10px 4px}#doneStats b{display:block;font-size:20px}#doneStats span{font-size:12px;color:#94a3b8}
@@ -96,6 +103,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
   <h1>النينجا المعصوب</h1>
   <p>الظلال أطفأت البوابات وبعثرت الرونات بين العوالم. اركض على الجدران، تسلّق الحواف، امشِ على الممرات الضيقة، وحارب الظلال — وحرّر عالم بعد عالم.</p>
   <button id="startBtn">ابدأ ▶</button>
+  <button id="titleTV">📺 العب على الشاشة الكبيرة والجوال يد تحكم</button>
   <div class="thint">🕹️ العصا يسار للحركة • الأزرار يمين • اسحب بإصبعك يمين الشاشة عشان تلف الكاميرا</div>
   <div class="keys">
     <span>WASD / الأسهم: حركة</span><span>مسافة: قفز</span><span>J أو كليك: ضرب</span><span>K أو Shift: تدحرج</span><span>E: شيل / تفاعل</span><span>اسحب بالماوس: الكاميرا</span><span>🎮 يد تحكم مدعومة</span>
@@ -139,6 +147,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
   <button id="pSound">🔊 الصوت: شغّال</button>
   <button id="pUpg">🎁 الترقيات</button>
   <div id="upgList"></div>
+  <button id="pTV">📺 الشاشة الكبيرة (الجوال يد تحكم)</button>
   <button id="pHQ">🎮 الجودة: تلقائي</button>
   <button id="pHelp">🎮 طريقة اللعب</button>
   <div id="help">
@@ -160,6 +169,17 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
   <div id="doneMsg"></div>
   <button class="main" id="doneBtn">رجوع للساحة 🏛️</button>
 </div></div>
+<div id="tv"><div class="card">
+  <h2>📺 الشاشة الكبيرة</h2>
+  <div style="color:#cbd5e1;line-height:1.7">الجهاز هذا يعرض اللعبة بأعلى جودة — والجوال يصير يد التحكم 🎮</div>
+  <div id="tvQr"></div>
+  <div>الكود</div><div id="tvCode">····</div>
+  <div id="tvUrl"></div>
+  <div id="tvStatus"></div>
+  <div style="font-size:13px;color:#94a3b8">💡 خلّ الجهازين على نفس الواي فاي</div>
+  <button id="tvClose">إغلاق</button>
+</div></div>
+<div id="tvBadge" class="pill">📱 يد التحكم متصلة</div>
 <div id="fade"></div>
 
 <script src="../portal-sdk.js"></script>

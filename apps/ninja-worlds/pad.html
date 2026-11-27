@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b16">
+<title>يد التحكم — النينجا المعصوب</title>
+<style>
+:root{--line:rgba(255,255,255,.18)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#1e1b4b,#07070f 70%);color:#fff;font-family:system-ui,"Segoe UI",Tahoma,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#join{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;text-align:center;z-index:5;background:inherit}
+#join h1{margin:0;font-size:26px}#join p{margin:0;color:#cbd5e1;line-height:1.7}
+#code{font-size:40px;letter-spacing:.3em;text-align:center;width:220px;padding:10px;border-radius:16px;border:2px solid rgba(125,211,252,.5);background:rgba(255,255,255,.06);color:#fff;direction:ltr}
+.btnMain{border:0;border-radius:999px;padding:14px 40px;font-size:20px;font-weight:900;background:linear-gradient(180deg,#ffe08a,#f59e0b);color:#1a1200}
+#msg{min-height:22px;color:#fca5a5;font-weight:700}
+#top{position:fixed;top:calc(8px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:center;gap:10px;align-items:center;z-index:3;pointer-events:none}
+.pill{background:rgba(255,255,255,.08);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-weight:800;font-size:14px}
+#hearts{color:#ff4d6d;letter-spacing:1px}
+#pauseB{pointer-events:auto;width:46px;height:40px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:#fff;font-size:18px}
+#look{position:fixed;inset:0;z-index:1}
+#stickZone{position:fixed;left:0;top:0;bottom:0;width:45%;z-index:2}
+#base{position:fixed;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:radial-gradient(circle,rgba(255,255,255,.08),rgba(255,255,255,.02));display:none;pointer-events:none;z-index:3}
+#knob{position:absolute;left:50%;top:50%;width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.65);transform:translate(-50%,-50%)}
+#hint{position:fixed;left:6%;bottom:16%;color:rgba(255,255,255,.3);font-size:13px;z-index:2;pointer-events:none}
+.pad{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:300px;height:250px;z-index:4}
+.pad button{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(15,23,42,.6);color:#fff;font-size:30px;display:grid;place-items:center;touch-action:none}
+.pad button small{position:absolute;bottom:-18px;font-size:11px;font-weight:800;color:rgba(255,255,255,.7);white-space:nowrap}
+.pad button.down{transform:scale(.9);background:rgba(125,211,252,.4)}
+#bJump{width:104px;height:104px;right:0;bottom:8px;font-size:40px;border-color:rgba(125,211,252,.8)}
+#bAtk{width:86px;height:86px;right:118px;bottom:0;border-color:rgba(255,120,120,.8)}
+#bRoll{width:70px;height:70px;right:134px;bottom:110px}
+#bAct{width:70px;height:70px;right:18px;bottom:130px;border-color:rgba(255,209,102,.7)}
+#bSp{width:66px;height:66px;right:222px;bottom:70px;border-color:rgba(167,139,250,.8)}
+#state{position:fixed;bottom:calc(8px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:12px;color:#94a3b8;z-index:3;pointer-events:none}
+#rot{display:none;position:fixed;inset:0;z-index:9;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
+@media (orientation:portrait){#rot.need{display:flex}}
+</style>
+</head>
+<body>
+<div id="join">
+  <div style="font-size:54px">🎮</div>
+  <h1>يد التحكم</h1>
+  <p>افتح اللعبة على الشاشة الكبيرة ← ⏸ ← «📺 الشاشة الكبيرة»<br>واكتب الكود اللي يطلع لك:</p>
+  <input id="code" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+  <button class="btnMain" id="go">اتصل ▶</button>
+  <div id="msg"></div>
+</div>
+<div id="look"></div>
+<div id="stickZone"></div>
+<div id="base"><div id="knob"></div></div>
+<div id="hint">← حرّك هنا • اسحب بالنص للكاميرا</div>
+<div id="top"><span class="pill" id="hearts"></span><span class="pill" id="shards"></span><button id="pauseB">⏸</button></div>
+<div class="pad">
+  <button id="bJump" data-k="jump">🦘<small>قفز</small></button>
+  <button id="bAtk" data-k="atk">⚔️<small>ضرب</small></button>
+  <button id="bRoll" data-k="roll">🌀<small>تدحرج</small></button>
+  <button id="bAct" data-k="act">✋<small>شيل</small></button>
+  <button id="bSp" data-k="sp">✴️<small>دوّامة</small></button>
+</div>
+<div id="state">غير متصل</div>
+<div id="rot">📱↔️<br>دوّر الجوال بالعرض</div>
+<script src="lib/peerjs.min.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+let peer = null, conn = null;
+const st = { x: 0, y: 0, j: false, r: false, c: { jump: 0, atk: 0, roll: 0, act: 0, sp: 0, pause: 0 }, dx: 0, dy: 0 };
+const q = new URLSearchParams(location.search).get('c'); if (q) $('#code').value = q.replace(/\D/g, '').slice(0, 4);
+function msg(t) { $('#msg').textContent = t; }
+async function goFull() { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch (e) {} try { await screen.orientation.lock('landscape'); } catch (e) {} try { await navigator.wakeLock.request('screen'); } catch (e) {} }
+function connect() {
+  const code = $('#code').value.replace(/\D/g, ''); if (code.length !== 4) return msg('الكود ٤ أرقام');
+  msg(''); $('#go').disabled = true; $('#go').textContent = '⏳ جاري الاتصال…'; goFull();
+  if (peer) try { peer.destroy(); } catch (e) {}
+  peer = new Peer({ debug: 0 });
+  peer.on('open', () => {
+    conn = peer.connect('abdnw-' + code, { reliable: false, serialization: 'json' });
+    const to = setTimeout(() => { if (!conn || !conn.open) fail('ما قدرت أوصل — تأكد إن الكود صح وإن الجهازين على نفس الواي فاي'); }, 12000);
+    conn.on('open', () => { clearTimeout(to); $('#join').style.display = 'none'; $('#rot').classList.add('need'); $('#state').textContent = '✅ متصل — الكود ' + code; if (navigator.vibrate) navigator.vibrate(40); });
+    conn.on('data', (d) => {
+      if (!d) return;
+      if (d.vib && navigator.vibrate) navigator.vibrate(d.vib);
+      if (d.hp != null) $('#hearts').textContent = '❤'.repeat(Math.max(0, d.hp)) + '♡'.repeat(Math.max(0, (d.max || 5) - d.hp));
+      if (d.sh) $('#shards').textContent = d.sh;
+      if (d.sp != null) $('#bSp').style.display = d.sp ? '' : 'none';
+    });
+    conn.on('close', () => { $('#state').textContent = '⚠️ انقطع الاتصال'; $('#join').style.display = ''; $('#go').disabled = false; $('#go').textContent = 'اتصل مرة ثانية ▶'; });
+  });
+  peer.on('error', (e) => fail(e.type === 'peer-unavailable' ? 'الكود غلط أو اللعبة مو مفتوحة على الشاشة' : 'صار خطأ بالاتصال (' + e.type + ')'));
+}
+function fail(t) { msg(t); $('#go').disabled = false; $('#go').textContent = 'اتصل ▶'; }
+$('#go').onclick = connect;
+$('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+// joystick
+let joy = null, look = null;
+const base = $('#base'), knob = $('#knob');
+$('#stickZone').addEventListener('pointerdown', (e) => { joy = { id: e.pointerId, x: e.clientX, y: e.clientY }; base.style.left = e.clientX + 'px'; base.style.top = e.clientY + 'px'; base.style.display = 'block'; e.target.setPointerCapture(e.pointerId); });
+$('#stickZone').addEventListener('pointermove', (e) => { if (!joy || e.pointerId !== joy.id) return; let dx = e.clientX - joy.x, dy = e.clientY - joy.y; const l = Math.hypot(dx, dy), m = 62; if (l > m) { dx = dx / l * m; dy = dy / l * m; } st.x = dx / m; st.y = -dy / m; knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; });
+const endJoy = (e) => { if (joy && e.pointerId === joy.id) { joy = null; st.x = st.y = 0; base.style.display = 'none'; knob.style.transform = 'translate(-50%,-50%)'; } };
+$('#stickZone').addEventListener('pointerup', endJoy); $('#stickZone').addEventListener('pointercancel', endJoy);
+// camera look
+$('#look').addEventListener('pointerdown', (e) => { look = { id: e.pointerId, x: e.clientX, y: e.clientY }; e.target.setPointerCapture(e.pointerId); });
+$('#look').addEventListener('pointermove', (e) => { if (!look || e.pointerId !== look.id) return; st.dx += (e.clientX - look.x) * 1.6; st.dy += (e.clientY - look.y) * 1.6; look.x = e.clientX; look.y = e.clientY; });
+const endLook = (e) => { if (look && e.pointerId === look.id) look = null; };
+$('#look').addEventListener('pointerup', endLook); $('#look').addEventListener('pointercancel', endLook);
+// buttons
+document.querySelectorAll('.pad button').forEach((b) => {
+  const k = b.dataset.k;
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); st.c[k]++; if (k === 'jump') st.j = true; if (k === 'roll') st.r = true; b.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
+  const up = () => { if (k === 'jump') st.j = false; if (k === 'roll') st.r = false; b.classList.remove('down'); };
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
+});
+$('#pauseB').onclick = () => { st.c.pause++; send(true); };
+// stream input ~60 times a second (inputs are cumulative, so a lost packet never loses a press)
+let lastSend = 0, lastStr = '';
+function send(force) {
+  if (!conn || !conn.open) return;
+  const o = { x: +st.x.toFixed(3), y: +st.y.toFixed(3), j: st.j, r: st.r, c: st.c, dx: Math.round(st.dx), dy: Math.round(st.dy) };
+  const s = JSON.stringify(o), now = performance.now();
+  if (!force && s === lastStr && now - lastSend < 120) return;
+  try { conn.send(o); st.dx = 0; st.dy = 0; lastStr = s; lastSend = now; } catch (e) {}
+}
+(function loop() { send(false); requestAnimationFrame(loop); })();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) try { navigator.wakeLock.request('screen'); } catch (e) {} });
+</script>
+</body>
+</html>

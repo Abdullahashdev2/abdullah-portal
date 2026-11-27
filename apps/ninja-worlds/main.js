@@ -6,6 +6,7 @@ import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
+import { remote, openTV, closeTV, sendTV } from './tv.js';
 const V = THREE.Vector3, $ = (s) => document.querySelector(s);
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
@@ -121,7 +122,7 @@ const G = {
   shake: (a) => { shakeAmt = Math.max(shakeAmt, a); if (a > 0.25 && navigator.vibrate) try { navigator.vibrate(30); } catch (e) {} },
   hitstop: (t) => { stopT = Math.max(stopT, t); },
   dust: (p, n) => dust.emit(new V(p.x, p.y + 0.1, p.z), { color: 0xd9c8aa, count: n, speed: 2.2, life: 0.6, size: 0.55, grav: -0.8, drag: 3, spread: 0.5, up: 0.4 }),
-  flashHurt: () => { const f = $('#hurt'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
+  flashHurt: () => { sendTV({ vib: [70, 40, 70] }); const f = $('#hurt'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
   hud: () => hudUpdate(),
   onFall: () => respawn('fall'),
   onDeath: () => respawn('death'),
@@ -218,6 +219,23 @@ $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); fadeTo(() => loadWorld('hub', null)); };
 $('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
 $('#pHelp').onclick = () => $('#help').classList.toggle('on');
+/* ---------- big-screen mode: this device renders, a phone is the controller ---------- */
+const tvHooks = {
+  press: (k, n) => {
+    if (!started) { $('#startBtn').click(); return; }
+    if ($('#done').classList.contains('on')) { if (k === 'jump' || k === 'act') $('#doneBtn').click(); return; }
+    if (k === 'pause') { togglePause(); return; }
+    if (paused) { if (k === 'jump') togglePause(false); return; }
+    vin[k] = (vin[k] || 0) + n; if (k === 'jump') held.jump = remote.jumpH;
+  },
+  look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
+  onConnect: () => { document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
+  onDisconnect: () => { $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
+};
+const openBig = () => { sfx.init(); openTV(tvHooks); };
+$('#pTV').onclick = () => { togglePause(false); openBig(); };
+$('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
+$('#tvClose').onclick = () => closeTV();
 $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
 $('#pUpg').onclick = () => { const n = SAVE.shards.length; $('#upgList').innerHTML = UPG.map((u) => `<div class="${n >= u.n ? 'u on' : 'u'}"><b>${n >= u.n ? '✅' : '🔒'} ${u.name}</b><span>${n >= u.n ? u.desc : 'تنفتح عند ' + u.n + ' 💎 (عندك ' + n + ')'}</span></div>`).join(''); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
@@ -313,6 +331,7 @@ function readInput() {
   ix += virt.mx; iy += virt.my;
   let gj = false, ga = false, gr = false, gx = false, gs = false;
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g) : null;
+  if (remote.on) { ix += remote.mx; iy += remote.my; }
   if (gp) {
     const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
     ix += dz(gp.axes[0]); iy -= dz(gp.axes[1]); cam.dx += dz(gp.axes[2] || 0) * 14; cam.dy += dz(gp.axes[3] || 0) * 10;
@@ -330,8 +349,8 @@ function readInput() {
     rollP: edge('roll', !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC)) || edge('gr', gr) || vin.roll > 0,
     actP: edge('act', !!(keys.KeyE || keys.KeyF)) || edge('gx', gx) || vin.act > 0,
     spP: edge('sp', !!(keys.KeyL || keys.KeyQ)) || edge('gs', gs) || vin.sp > 0,
-    jumpH: !!keys.Space || held.jump || gj || !!(__virt && __virt.jumpH),
-    rollH: !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC) || held.roll || gr || !!(__virt && __virt.rollH),
+    jumpH: !!keys.Space || held.jump || gj || remote.jumpH || !!(__virt && __virt.jumpH),
+    rollH: !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC) || held.roll || gr || remote.rollH || !!(__virt && __virt.rollH),
   };
   vin.jump = vin.atk = vin.roll = vin.act = vin.sp = 0;
   return inp;
@@ -381,7 +400,7 @@ function worldLogic(dt) {
   }
   // shards
   for (const s of level.shards) if (!s.taken && Math.hypot(s.g.position.x - p.x, s.g.position.z - p.z) < 1.1 && Math.abs(s.g.position.y - (p.y + 0.9)) < 1.3) {
-    s.taken = true; s.g.removeFromParent(); const before = SAVE.shards.length; if (!SAVE.shards.includes(s.id)) SAVE.shards.push(s.id); persist(); sfx.shard(); unlockCheck(before);
+    s.taken = true; s.g.removeFromParent(); const before = SAVE.shards.length; if (!SAVE.shards.includes(s.id)) SAVE.shards.push(s.id); persist(); sfx.shard(); sendTV({ vib: [20, 30, 20] }); unlockCheck(before);
     sparks.emit(s.g.position, { color: 0xffd166, count: 36, speed: 5, life: 0.7, size: 0.3 }); hudUpdate();
     const n = SAVE.shards.filter((x) => x.startsWith(cfg.id + '-')).length; if (n === cfg.shardTotal) say('جمعت كل شظايا هالعالم! 💎🌟');
   }
@@ -476,7 +495,7 @@ function animateNpc(dt) {
 }
 
 /* ---------------- main loop ---------------- */
-let last = performance.now(), acc = 0, manual = false; const STEP = 1 / 120;
+let last = performance.now(), acc = 0, manual = false, tvSendT = 0; const STEP = 1 / 120;
 function simulate(dt) {
   if (stopT > 0) { stopT -= dt; dt *= 0.06; }
   tNow += dt;
@@ -508,6 +527,7 @@ function frame(now) {
   if (hero.sword.visible) { const b = hero.sword.localToWorld(tmpA.set(0, 0, 0.2)), t = hero.sword.localToWorld(tmpB.set(0, 0, 1.05)); trail.update(b, t, player.state === 'attack' || player.state === 'slam', dt); } else trail.update(tmpA, tmpA, false, dt);
   sparks.update(dt); dust.update(dt); motes.update(dt);
   updateCamera(dt);
+  if (remote.on && (tvSendT -= dt) <= 0) { tvSendT = 0.35; sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); }
   sun.position.copy(player.pos).addScaledVector(lightDir, 60); sun.target.position.copy(player.pos);
   sky.position.copy(camera.position);
   // underwater look
