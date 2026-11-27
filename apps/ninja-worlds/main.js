@@ -261,10 +261,11 @@ function tuneEnv() { const k = (cfg && cfg.env) ?? 0.35; scene.traverse((o) => {
 let toastT = 0, bannerT = 0, started = false, paused = false;
 /* ---------- 📡 stream mode: this device (the phone) renders, the TV only plays it as live video ---------- */
 const STREAM = new URLSearchParams(location.search).has('stream');
-let streamCv = null, streamG = null, bannerShowT = 0;
+let streamCv = null, streamG = null, bannerShowT = 0, streamFps = 30, streamLast = 0;
 if (STREAM) {
-  streamCv = document.createElement('canvas'); streamCv.width = 1920; streamCv.height = 1080; streamG = streamCv.getContext('2d');
-  window.__getStream = (fps = 60) => { const ms = streamCv.captureStream(fps); if (sfx.streamDest) sfx.streamDest.stream.getAudioTracks().forEach((t) => ms.addTrack(t)); return ms; };
+  streamCv = document.createElement('canvas'); streamCv.width = 1280; streamCv.height = 720; streamG = streamCv.getContext('2d');
+  window.__getStream = () => { const ms = streamCv.captureStream(); if (sfx.streamDest) sfx.streamDest.stream.getAudioTracks().forEach((t) => ms.addTrack(t)); return ms; };
+  window.__setStream = (w, h, fps) => { if (streamCv.width !== w) { streamCv.width = w; streamCv.height = h; } streamFps = fps; };
 }
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function wrap(g, text, maxW) { const words = String(text).split(' '), lines = []; let cur = ''; for (const w of words) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; } if (cur) lines.push(cur); return lines; }
@@ -737,7 +738,7 @@ function frame(now) {
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
   scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw);
   renderFrame();
-  if (STREAM) streamDraw();
+  if (STREAM && now - streamLast >= 1000 / streamFps - 4) { streamLast = now; streamDraw(); }
 }
 requestAnimationFrame(frame);
 

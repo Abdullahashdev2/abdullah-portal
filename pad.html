@@ -119,15 +119,22 @@ function tvAck(s) {
 $('#mStream').onclick = () => { $('#modeSel').classList.remove('on'); startStream(); };
 $('#mPad').onclick = () => { $('#modeSel').classList.remove('on'); hint('🎮 وضع يد التحكم — تقدر تشغّل البث بأي وقت من زر «📡 بث فائق» فوق'); };
 // prefer H.264 so the TV decodes the video in hardware (smooth even on old TVs)
-(function preferH264() {
-  if (!window.RTCPeerConnection || !window.RTCRtpSender || !RTCRtpSender.getCapabilities) return;
-  const orig = RTCPeerConnection.prototype.createOffer;
-  RTCPeerConnection.prototype.createOffer = function (...a) {
-    try { const caps = RTCRtpSender.getCapabilities('video').codecs, h = caps.filter((c) => /h264/i.test(c.mimeType)), rest = caps.filter((c) => !/h264/i.test(c.mimeType));
-      if (h.length) for (const t of this.getTransceivers()) if (t.sender && t.sender.track && t.sender.track.kind === 'video' && t.setCodecPreferences) t.setCodecPreferences([...h, ...rest]); } catch (e) {}
-    return orig.apply(this, a);
-  };
-})();
+/* adaptive stream ladder — the TV reports how many frames it really shows; we step quality down/up */
+const LADDER = [{ w: 1920, h: 1080, fps: 30, br: 7e6, n: '1080p' }, { w: 1280, h: 720, fps: 30, br: 3.5e6, n: '720p' }, { w: 960, h: 540, fps: 30, br: 2e6, n: '540p' }, { w: 854, h: 480, fps: 24, br: 1.3e6, n: '480p' }, { w: 640, h: 360, fps: 24, br: 0.8e6, n: '360p' }];
+let lvl = 1, goodRuns = 0, badRuns = 0;
+function applyLevel(i) {
+  lvl = Math.max(0, Math.min(LADDER.length - 1, i)); const L = LADDER[lvl];
+  try { gameFrame.contentWindow.__setStream(L.w, L.h, L.fps); } catch (e) {}
+  try { call.peerConnection.getSenders().forEach((s) => { if (!s.track || s.track.kind !== 'video') return; const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = L.br; p.encodings[0].maxFramerate = L.fps; p.degradationPreference = 'balanced'; s.setParameters(p).catch(() => {}); }); } catch (e) {}
+  goodRuns = badRuns = 0;
+}
+function onStats(st2) {
+  const L = LADDER[lvl], ratio = st2.fps / L.fps;
+  $('#state').textContent = `📡 بث ${L.n} · التلفزيون يعرض ${Math.round(st2.fps)} إطار/ث${st2.w ? ` · ${st2.w}×${st2.h}` : ''}`;
+  if (ratio < 0.6) { badRuns++; goodRuns = 0; if (badRuns >= 2 && lvl < LADDER.length - 1) { applyLevel(lvl + 1); hint('📉 خففت جودة البث عشان تكون أنعم: ' + LADDER[lvl].n, 4000); } }
+  else if (ratio > 0.9) { goodRuns++; badRuns = 0; if (goodRuns >= 5 && lvl > 0) { applyLevel(lvl - 1); hint('📈 البث سلس — رفعت الجودة: ' + LADDER[lvl].n, 4000); } }
+  else { goodRuns = badRuns = 0; }
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function startStream() {
   if (!conn || !conn.open) return;
@@ -142,10 +149,10 @@ async function startStream() {
     let w = null; for (let i = 0; i < 150; i++) { await sleep(100); try { w = gameFrame.contentWindow; if (w.__G && w.__getStream && w.__castInput) break; } catch (e) {} w = null; }
     if (!w) throw new Error('game');
     w.__G.start(); await sleep(400);
-    const stream = w.__getStream(60);
+    const stream = w.__getStream();
     call = peer.call('abdcast-' + codeUsed, stream);
     call.on('close', stopStream);
-    setTimeout(() => { try { call.peerConnection.getSenders().forEach((s) => { if (!s.track || s.track.kind !== 'video') return; const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = 9000000; p.encodings[0].maxFramerate = 60; p.degradationPreference = 'maintain-framerate'; s.setParameters(p).catch(() => {}); }); } catch (e) {} }, 1200);
+    setTimeout(() => applyLevel(1), 800);
     ackTimer = setTimeout(() => tvAck('error'), 12000);
     streaming = true; btn.classList.add('on'); btn.textContent = '📡 يبث ✓'; layout = Object.assign({}, w.__castLayout, { native: true }); menu = false; render();
     $('#state').textContent = '📡 بث فائق: الجوال يشغّل اللعبة 1080p والتلفزيون يعرضها';
@@ -178,7 +185,7 @@ function connect() {
       if (!d) return;
       if (d.layout) { layout = d.layout; if (layout.native || !layout.menuOnly) menu = false; $('#hearts').hidden = $('#shards').hidden = true; render(); }
       if (d.hello) tvInfo = d.hello;
-      if (d.tv) tvAck(d.tv);
+      if (d.tv === 'stats') onStats(d); else if (d.tv) tvAck(d.tv);
       if (d.vib && navigator.vibrate) navigator.vibrate(d.vib);
       if (d.hp != null) { $('#hearts').hidden = false; $('#hearts').textContent = '❤'.repeat(Math.max(0, d.hp)) + '♡'.repeat(Math.max(0, (d.max || 5) - d.hp)); }
       if (d.sh) { $('#shards').hidden = false; $('#shards').textContent = d.sh; }

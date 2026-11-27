@@ -161,13 +161,26 @@
     btn.onclick = () => { v.muted = false; v.play().catch(() => {}); btn.hidden = true; };
     vbox.append(v, tip, btn); document.body.appendChild(vbox);
     const ack = (s2) => send({ tv: s2 });
+    // diagnostics + real frame-rate reports so the phone can adapt the stream
+    const diag = document.createElement('div'); diag.style.cssText = 'position:absolute;top:10px;left:10px;background:rgba(0,0,0,.55);color:#a7f3d0;padding:6px 10px;border-radius:10px;font:700 13px monospace;direction:ltr';
+    vbox.appendChild(diag);
+    const frames = () => { try { const q = v.getVideoPlaybackQuality && v.getVideoPlaybackQuality(); if (q) return q.totalVideoFrames - q.droppedVideoFrames; } catch (e) {} return v.webkitDecodedFrameCount || 0; };
+    let lastF = frames(), lastT = performance.now(), shown = 0;
+    vbox.statsTimer = setInterval(() => {
+      const f = frames(), t = performance.now(), fps = ((f - lastF) * 1000) / Math.max(1, t - lastT); lastF = f; lastT = t; shown += 2;
+      send({ tv: 'stats', fps, w: v.videoWidth, h: v.videoHeight });
+      diag.textContent = `${v.videoWidth}x${v.videoHeight} · ${fps.toFixed(0)} fps${v.muted ? ' · 🔇' : ''}`;
+      diag.style.opacity = shown < 30 || fps < 15 ? '1' : '0';
+    }, 2000);
+    const unmute = () => { if (v.muted) { v.muted = false; v.play().catch(() => {}); btn.hidden = true; } };
+    vbox.keyH = unmute; document.addEventListener('keydown', unmute); vbox.addEventListener('click', unmute);
     v.addEventListener('playing', () => ack('playing'), { once: true });
     v.play().catch(() => { v.muted = true; v.play().catch(() => ack('error')); btn.hidden = false; btn.focus(); ack('muted'); });
     setTimeout(() => (tip.style.opacity = '0'), 5000);
     try { vbox.requestFullscreen && vbox.requestFullscreen().catch(() => {}); } catch (e) {}
     window.KeepAwake && window.KeepAwake.on();
   }
-  function hideVideo() { if (vbox) { try { const v = vbox.querySelector('video'); v.srcObject = null; } catch (e) {} vbox.remove(); vbox = null; try { document.fullscreenElement && document.exitFullscreen(); } catch (e) {} } }
+  function hideVideo() { if (vbox) { clearInterval(vbox.statsTimer); document.removeEventListener('keydown', vbox.keyH); try { const v = vbox.querySelector('video'); v.srcObject = null; } catch (e) {} vbox.remove(); vbox = null; try { document.fullscreenElement && document.exitFullscreen(); } catch (e) {} } }
   /* ---------- hooks for the portal ---------- */
   window.PortalCast = {
     open, send: (o) => send(o),
