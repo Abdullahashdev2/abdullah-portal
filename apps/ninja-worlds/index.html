@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0b0b16">
+<meta name="theme-color" content="#05070d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>النينجا المعصوب: بوابات العوالم</title>
 <style>
 :root{--glass:rgba(12,14,30,.55);--line:rgba(255,255,255,.16);--gold:#ffd166;--cyan:#7dd3fc}
@@ -105,6 +111,9 @@ body.shipmode .btns button small{border-radius:4px;font-family:ui-monospace,Menl
 #tvUrl{font-size:12px;color:#94a3b8;direction:ltr;word-break:break-all}#tvStatus{margin:10px 0;font-weight:800;color:#e2e8f0}
 #tvBadge{position:fixed;z-index:7;top:calc(60px + env(safe-area-inset-top));left:12px;display:none}#tvBadge.on{display:block}
 body.tvmode #touch{display:none!important}
+#installBtn{margin-top:2px;border:1px solid rgba(250,204,21,.6);background:linear-gradient(180deg,rgba(250,204,21,.22),rgba(180,83,9,.25));color:#fef3c7;border-radius:999px;padding:10px 22px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 0 18px rgba(250,204,21,.25)}
+#installSheet{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;background:rgba(3,4,12,.7);padding:16px}#installSheet.on{display:flex}#installSheet .card2{width:min(460px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;touch-action:pan-y;background:linear-gradient(180deg,#141a33,#0d1024);border:1px solid var(--line);border-radius:22px;padding:18px;text-align:right;line-height:1.8;font-size:15px}#installSheet h3{margin:0 0 8px;text-align:center}#installSheet ol{margin:6px 0 12px;padding-inline-start:22px}#installSheet button{display:block;width:100%;margin-top:8px;padding:12px;border-radius:12px;border:0;font-weight:900;font-size:16px;background:#f59e0b;color:#1a1200}
+@media (max-height:540px){#title{gap:6px;padding:10px 18px;justify-content:center;overflow-y:auto}#title .k{font-size:11px}#title h1{font-size:clamp(30px,12vh,62px)}#title p{font-size:13px;line-height:1.45;max-width:620px}#startBtn{margin-top:4px;padding:10px 36px;font-size:19px}#titleTV,#installBtn{padding:7px 16px;font-size:13px}}
 #titleTV{margin-top:4px;border:1px solid rgba(125,211,252,.5);background:rgba(14,116,144,.25);color:#e0f2fe;border-radius:999px;padding:10px 22px;font-size:15px;font-weight:800;cursor:pointer}
 button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shadow:0 0 22px rgba(255,209,102,.75)!important;transform:scale(1.03)}
 #coins{color:#ffd23f}#coins.pop{animation:cp .35s}@keyframes cp{50%{transform:scale(1.25)}}
@@ -137,6 +146,7 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
   <p>الظلال أطفأت البوابات وبعثرت الرونات بين العوالم. اركض على الجدران، تسلّق الحواف، امشِ على الممرات الضيقة، وحارب الظلال — وحرّر عالم بعد عالم.</p>
   <button id="startBtn">ابدأ ▶</button>
   <button id="titleTV">📺 العب على الشاشة الكبيرة والجوال يد تحكم</button>
+  <button id="installBtn" hidden>📲 ثبّتها كتطبيق على جوالك (ملء الشاشة)</button>
   <div class="thint">🕹️ العصا يسار للحركة • الأزرار يمين • اسحب بإصبعك يمين الشاشة عشان تلف الكاميرا</div>
   <div class="keys">
     <span>WASD / الأسهم: حركة</span><span>مسافة: قفز</span><span>J أو كليك: ضرب</span><span>K أو Shift: تدحرج</span><span>E: شيل / تفاعل</span><span>اسحب بالماوس: الكاميرا</span><span>R أو كليك يمين: تصويب (عالم السفينة)</span><span>🎮 يد تحكم مدعومة</span>
@@ -237,6 +247,7 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
 </div></div>
 <div id="tvBadge" class="pill">📱 يد التحكم متصلة</div>
 <div id="fade"></div>
+<div id="installSheet"><div class="card2"><h3>📲 ثبّت النينجا كتطبيق</h3><div id="installSteps"></div><button id="installGo">تمام 👍</button></div></div>
 <div id="loader" class="on boot"><canvas id="ldArt"></canvas><div class="ldShade"></div>
   <div class="ldBox"><div class="ldKick" id="ldSub">بوابات العوالم</div><div class="ldTitle" id="ldTitle">🥷 النينجا المعصوب</div><div class="ldTease" id="ldTease">جاري تجهيز اللعبة…</div>
   <div class="ldBar"><i id="ldFill"></i></div><div class="ldRow"><span class="ldSpin"></span><span id="ldPct">تحميل…</span></div></div>

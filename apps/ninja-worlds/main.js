@@ -651,6 +651,24 @@ canvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { i
 canvas.addEventListener('pointercancel', touchUp);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 try { $('#zIn').innerHTML = icon('zin'); $('#zOut').innerHTML = icon('zout'); $('#zBreath').innerHTML = icon('breath') + '<small>مطوّل</small>'; } catch (e) {}
+/* ---------- 📲 تثبيت كتطبيق (ملء الشاشة، بالعرض، أيقونة) ---------- */
+const IN_FRAME = window.parent !== window, IS_APP = matchMedia('(display-mode: fullscreen)').matches || matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+try { if ('serviceWorker' in navigator && !IN_FRAME) navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
+let installEvt = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; $('#installBtn').hidden = false; if (new URLSearchParams(location.search).get('install')) showInstall(); });
+addEventListener('appinstalled', () => { $('#installBtn').hidden = true; say('📲 تم التثبيت! افتح «النينجا المعصوب» من الشاشة الرئيسية — بيفتح ملء الشاشة 🎮'); });
+if (!IS_APP && !STREAM && /Android|iPhone|iPad/i.test(navigator.userAgent)) $('#installBtn').hidden = false;
+function showInstall() {
+  if (IN_FRAME) { try { window.top.location.href = new URL('./?install=1', location.href).href; } catch (e) { location.href = './?install=1'; } return; } // التثبيت لازم يكون من صفحة اللعبة نفسها
+  if (installEvt) { $('#installSteps').innerHTML = '<div style="text-align:center">🥷 أيقونة على الشاشة الرئيسية • ملء الشاشة • بالعرض • التحديثات تنزل تلقائياً</div>'; $('#installGo').textContent = '📲 ثبّت الآن'; $('#installSheet').classList.add('on'); return; }
+  const ios = /iPhone|iPad/i.test(navigator.userAgent);
+  $('#installSteps').innerHTML = ios ? '<ol><li>اضغط زر المشاركة ⬆️ تحت في سفاري</li><li>اختر «إضافة إلى الشاشة الرئيسية»</li><li>افتح «النينجا المعصوب» من الأيقونة 🥷</li></ol>'
+    : '<ol><li>اضغط ⋮ (الثلاث نقاط) فوق في كروم</li><li>اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية»</li><li>افتح «النينجا المعصوب» من الأيقونة 🥷 — تفتح ملء الشاشة وبالعرض</li></ol><div>💡 التحديثات توصلك تلقائياً، ما تحتاج تنزّل شي من جديد.</div>';
+  $('#installSheet').classList.add('on');
+}
+$('#installBtn').onclick = (e) => { e.stopPropagation(); showInstall(); };
+$('#installGo').onclick = () => { $('#installSheet').classList.remove('on'); if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; }); } $('#installGo').textContent = 'تمام 👍'; };
+if (IS_APP) document.body.classList.add('isApp');
 document.querySelectorAll('#radio .rcmd').forEach((b) => (b.onclick = () => stealth.command(b.dataset.cmd))); $('#rClose').onclick = () => stealth.closeRadio();
 // قرص بإصبعين على الشاشة وقت التصويب = تكبير/تصغير
 { let pd = 0; const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
