@@ -236,6 +236,7 @@ function menuPoll(dt) {
   const m = activeMenu(); if (!m) { document.querySelectorAll('.navfocus').forEach((b) => b.classList.remove('navfocus')); return; }
   let y = remote.on ? remote.my : 0;
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g) : null;
+  if (gp && !gpAwake) { gpAwake = true; window.KeepAwake && window.KeepAwake.on(); }
   if (gp) {
     const B = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed), ed = (k, v) => { const p = gpPrev[k]; gpPrev[k] = v; return v && !p; };
     if (Math.abs(gp.axes[1]) > 0.5) y = -gp.axes[1]; if (B(12)) y = 1; if (B(13)) y = -1;
@@ -259,8 +260,8 @@ const tvHooks = {
     vin[k] = (vin[k] || 0) + n;
   },
   look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
-  onConnect: () => { document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
-  onDisconnect: () => { $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
+  onConnect: () => { window.KeepAwake && window.KeepAwake.on(); document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
+  onDisconnect: () => { window.KeepAwake && window.KeepAwake.off(); $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
 };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
 attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: '✋ شيل' }].concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
@@ -404,7 +405,7 @@ function readInput() {
   vin.jump = vin.atk = vin.roll = vin.act = vin.sp = 0;
   return inp;
 }
-let __virt = null;
+let __virt = null, gpAwake = false;
 
 /* ---------------- camera ---------------- */
 const ray = new THREE.Raycaster(); let tNow = 0;

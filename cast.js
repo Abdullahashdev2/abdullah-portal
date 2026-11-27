@@ -38,9 +38,9 @@
     peer.on('connection', (c) => {
       if (conn) try { conn.close(); } catch (e) {}
       conn = c; last = {}; gotFirst = false; held = {}; dirs = {}; layoutStr = '';
-      c.on('open', () => { status('✅ الجوال متصل! 🎮'); $('#castBtn').classList.add('on'); $('#castViewerBtn').classList.add('on'); setTimeout(() => ($('#castSheet').hidden = true), 1200); pushLayout(true); });
+      c.on('open', () => { window.KeepAwake && window.KeepAwake.on(); status('✅ الجوال متصل! 🎮'); $('#castBtn').classList.add('on'); $('#castViewerBtn').classList.add('on'); setTimeout(() => ($('#castSheet').hidden = true), 1200); pushLayout(true); });
       c.on('data', onData);
-      c.on('close', () => { if (conn !== c) return; conn = null; releaseAll(); $('#castBtn').classList.remove('on'); $('#castViewerBtn').classList.remove('on'); clearFocus(); try { const w = gameWin(); w && w.__castLeave && w.__castLeave(); } catch (e) {} });
+      c.on('close', () => { if (conn !== c) return; conn = null; window.KeepAwake && window.KeepAwake.off(); releaseAll(); $('#castBtn').classList.remove('on'); $('#castViewerBtn').classList.remove('on'); clearFocus(); try { const w = gameWin(); w && w.__castLeave && w.__castLeave(); } catch (e) {} });
     });
   }
   const send = (o) => { if (conn && conn.open) try { conn.send(o); } catch (e) {} };
