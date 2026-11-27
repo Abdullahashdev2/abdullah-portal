@@ -425,69 +425,143 @@ export function w6(K, L, S) {
   return cfg;
 }
 
-/* ===================== WORLD 7 — the storm ship (stealth & sniping) ===================== */
+/* ===================== WORLD 7 — the storm ship (big multi-deck stealth level) =====================
+   Route: stern deck → stairs down → ENGINE ROOM (sabotage 3 panels) → CARGO HOLD (office: command card)
+          → stairs up → ACCOMMODATION BLOCK (3 floors, captain's cabin: bridge card) → roof → BRIDGE (compass)
+          → BOW helideck (extraction). Coordinates: deck top y=0, lower deck floor y=-6, ship x∈[-15,15], z∈[0,240]. */
 export function w7(K, L, S) {
   const cfg = {
-    id: 'w7', name: 'سفينة العاصفة', sub: 'عالم التسلّل', music: 'w7', killY: -3.4, motes: 0x9fb8c9, shardTotal: 10, ship: true, storm: true,
-    sky: { elev: 2, azim: 200, turb: 20, ray: 0.3, mie: 0.02, mieG: 0.9 }, exposure: 0.5, env: 0.25, fog: [0x0b1218, 0.02], sun: [0x9fb8d0, 1.1], hemi: [0x3a4a5c, 0x05080a, 0.75],
-    spawn: { pos: new V(-3, 0, -3.5), yaw: 0 },
+    id: 'w7', name: 'سفينة العاصفة', sub: 'عالم التسلّل', music: 'w7', killY: -11, motes: 0x9fb8c9, shardTotal: 10, ship: true, storm: true,
+    sky: { elev: 2, azim: 200, turb: 20, ray: 0.3, mie: 0.02, mieG: 0.9 }, exposure: 0.62, env: 0.45, fog: [0x0b1218, 0.014], sun: [0x9fb8d0, 1.3], hemi: [0x7d8fa3, 0x2a2f36, 1.55],
+    spawn: { pos: new V(-8, 0, 4), yaw: 0 },
   };
   const sh = (n, x, y, z) => K.shard('w7-' + n, x, y, z, S.shards.includes('w7-' + n));
-  const deckZ = { x0: -7.5, x1: 7.5, z0: -5.5, z1: 85.5 };
-  K.ocean({ y: -3 }); K.rain();
-  // hull + deck
-  K.plat({ x: 0, y: 0, z: 40, w: 16, d: 92, h: 6, m: 'dark', rock: false, ledge: false });
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(16.6, 3.2, 93), new THREE.MeshStandardMaterial({ color: 0x5a1d1d, roughness: 0.7, metalness: 0.3 })); hull.position.set(0, -4.4, 40); hull.material.userData.own = true; L.add(hull);
-  const bowM = new THREE.Mesh(new THREE.ConeGeometry(8.3, 10, 4, 1), hull.material); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.45); bowM.position.set(0, -3.3, 91); L.add(bowM);
-  K.railing({ x0: -8, x1: -8, z0: -6, z1: 86 }); K.railing({ x0: 8, x1: 8, z0: -6, z1: 86 }); K.railing({ x0: -8, x1: 8, z0: -6, z1: -6 }); K.railing({ x0: -8, x1: 8, z0: 86, z1: 86 });
-  // stern: winches, crates
-  [[-4, 0], [4, 1.5]].forEach(([x, z]) => { K.plat({ x, y: 1.2, z, w: 1.6, d: 1.6, h: 1.2, rock: false, m: 'dark' }); const d = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.7, 16), new THREE.MeshStandardMaterial({ color: 0x8a6d1e, metalness: 0.6, roughness: 0.4 })); d.rotation.z = Math.PI / 2; d.position.set(x, 0.9, z); d.material.userData.own = true; L.add(d); });
-  K.plat({ x: -6.6, y: 1.2, z: 4, w: 1.2, d: 1.2, h: 1.2, rock: false, m: 'wood' }); K.plat({ x: 1.5, y: 1, z: 7, w: 1.4, d: 1.4, h: 1, rock: false, m: 'wood' });
-  K.checkpoint(-3, 0, -3.5, 0).on = true;
-  K.trigger({ x: -3, z: -3, r: 3, text: '🌧️ سفينة العاصفة — تسلّل بدون ما يشوفك أحد. 🔫 تصويب (R / زر الجوال): مسدس تخدير — بالراس ينام على طول. اسحب النايمين (✋) وخبّهم بالخزائن 🗄️.' });
-  K.trigger({ x: 2, z: 9, r: 3, text: '📻 إذا شافك حارس يرفع الراديو يطلب دعم — نوّمه قبل يكمّل! والجري يطلّع صوت… امشِ بهدوء.' });
-  K.ammo('a1', -7, 0.5, 9, 'pistol');
-  sh(1, 6.8, 0.8, -4.8); sh(2, -6.6, 2, 4);
-  K.locker({ x: -7.3, z: 11, rot: Math.PI / 2 }); K.locker({ x: 7.3, z: 6, rot: -Math.PI / 2 });
-  K.enemy({ x: 5, y: 0, z: 4, type: 'guard', path: [[5, 4], [5, 12], [-1, 12], [-1, 9]], zone: deckZ });
-  // container yard
-  K.container({ x: -5, z: 17 }); K.container({ x: -5, z: 25, stack: 2 }); K.container({ x: 0, z: 20 }); K.container({ x: 0, z: 30, stack: 2 });
-  K.container({ x: 5, z: 16 }); K.container({ x: 5, z: 27 }); K.container({ x: -5, z: 36 }); K.container({ x: 5, z: 38, stack: 2 }); K.container({ x: 0, z: 42 });
-  K.plat({ x: 0, y: 1.3, z: 26.3, w: 1.4, d: 1.4, h: 1.3, rock: false, m: 'wood' });
-  K.ammo('s1', 0, 5.8, 31, 'sniper'); sh(3, 0, 6, 33);
-  K.trigger({ x: 0, z: 25, r: 2, text: '🎯 فوق الحاويات = مكان قنص ممتاز. بدّل للقنّاصة (✋/E وأنت مصوّب) — المنظار يهتز، اصبر وصوّب بالراس.' });
-  K.enemy({ x: -2.5, y: 0, z: 15, type: 'guard', path: [[-2.5, 15], [-2.5, 45]], zone: deckZ });
-  K.enemy({ x: 2.5, y: 0, z: 45, type: 'guard', path: [[2.5, 45], [2.5, 15]], zone: deckZ });
-  K.enemy({ x: -7, y: 0, z: 44, type: 'guard', path: [[-7, 44], [-7, 14]], zone: deckZ });
-  K.checkpoint(-7, 0, 13.5, 0);
-  K.locker({ x: 7.3, z: 22, rot: -Math.PI / 2 }); K.locker({ x: -7.3, z: 31, rot: Math.PI / 2 }); K.locker({ x: 7.3, z: 44, rot: -Math.PI / 2 });
-  K.ammo('a2', 7, 0.5, 33, 'pistol'); sh(4, -2.5, 0.8, 30); sh(5, 7, 0.8, 41.5); sh(6, -5, 5.8, 25);
-  // superstructure (lower deck house + bridge on top)
-  K.plat({ x: 0, y: 4, z: 63, w: 12, d: 18, h: 4, m: 'dark', rock: false, run: true, runFaces: ['-z'] });
-  K.plat({ x: 0, y: 8, z: 66, w: 9, d: 10, h: 4, m: 'dark', rock: false, run: true, runFaces: ['-z'] });
-  K.funnel({ x: 0, y: 8, z: 69.5, r: 1.3, h: 5 });
-  for (let i = -1; i <= 1; i += 2) for (let k = 0; k < 3; k++) { const w = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.8), new THREE.MeshBasicMaterial({ color: 0xfde68a })); w.position.set(i * 2.6 + (k - 1) * 0.8 * i, 2.3, 53.98); w.rotation.y = Math.PI; L.add(w); }
-  K.checkpoint(7, 0, 50, 0);
-  K.trigger({ x: 0, z: 51, r: 3, text: '⬆️ واجه جدار المبنى واقفز تطلع عليه. فوق: الكشاف يلف — لا يلمسك ضوءه!' });
-  K.searchlight({ x: 5, y: 4, z: 55, from: Math.PI - 0.9, to: Math.PI + 0.6, speed: 0.45, range: 24, tilt: 0.32 });
-  K.searchlight({ x: -3.5, y: 12, z: 70.5, from: -0.7, to: 0.7, speed: 0.6, range: 18, tilt: 0.55 });
-  K.enemy({ x: -5, y: 4, z: 56, type: 'guard', path: [[-5, 56], [5, 56]], zone: { x0: -5.6, x1: 5.6, z0: 54.6, z1: 60.4 } });
-  K.enemy({ x: -3, y: 8, z: 62.5, type: 'guard', path: [[-3, 62.5], [3, 62.5]], zone: { x0: -4, x1: 4, z0: 61.5, z1: 70 } });
-  K.checkpoint(-5, 4, 59, 0); K.ammo('s2', 5, 4.6, 59, 'sniper'); sh(7, 5.4, 4.8, 54.6);
-  // objective on the bridge roof
-  const relic = K.relic({ x: 0, y: 8, z: 66, color: 0x38bdf8 });
-  const exit = K.portal({ x: 0, y: 0, z: 82.5, rot: Math.PI, to: 'hub', label: 'نقطة الهروب', color: 0x38bdf8, active: false });
-  K.trigger({ x: 0, z: 66, y: 8, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.complete = true; exit.setActive(true); L.sfx('win'); }, text: '🧭 أخذت «بوصلة الظل»! نقطة الهروب انفتحت عند مقدمة السفينة — بس فيه حرّاس جدد هناك. انزل بهدوء.' });
-  // bow
-  K.enemy({ x: -5, y: 0, z: 77, type: 'guard', path: [[-5, 77], [5, 77], [5, 81], [-5, 81]], zone: deckZ });
-  K.enemy({ x: 4, y: 0, z: 74, type: 'guard', path: [[4, 74], [4, 84]], zone: deckZ, group: 'bow' });
-  K.enemy({ x: -4, y: 0, z: 84, type: 'guard', path: [[-4, 84], [-4, 74]], zone: deckZ, group: 'bow' });
-  K.locker({ x: -7.3, z: 75, rot: Math.PI / 2 }); K.locker({ x: 7.3, z: 79, rot: -Math.PI / 2 });
-  K.ammo('a3', -7, 0.5, 52, 'pistol'); sh(8, 7, 0.8, 85); sh(9, -7, 0.8, 84.5);
-  L.reinforce = [{ y: 0, zone: deckZ, points: [[-1.5, 52.5], [1.5, 52.5]] }, { y: 0, zone: deckZ, points: [[0, 74], [2, 75]] }];
-  // deck lamps
-  [[-7.6, 10], [7.6, 24], [-7.6, 38], [7.6, 52], [-7.6, 70]].forEach(([x, z]) => { const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0x86efac })); s2.position.set(x, 2.2, z); L.add(s2); });
-  K.crystal({ x: 7.2, y: 0, z: 10, color: 0x22c55e, s: 0.3, light: true, n: 1 }); K.crystal({ x: -7.2, y: 0, z: 48, color: 0x22c55e, s: 0.3, light: true, n: 1 });
+  const G = (x, y, z, path, zone, extra = {}) => K.enemy({ x, y, z, type: 'guard', path, zone, ...extra });
+  const DECK = { x0: -14, x1: 14, z0: 1, z1: 239 }, ENG = { x0: -14, x1: 14, z0: 3, z1: 49 }, HOLD = { x0: -14, x1: 14, z0: 51, z1: 117 };
+  K.ocean({ y: -3, cz: 120 }); K.rain();
+  /* ---------- hull ---------- */
+  const hullM = new THREE.MeshStandardMaterial({ color: 0x5a1d1d, roughness: 0.7, metalness: 0.3 }); hullM.userData.own = true;
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(31, 4, 241), hullM); hull.position.set(0, -5, 120); L.add(hull);
+  const bowM = new THREE.Mesh(new THREE.ConeGeometry(15.5, 18, 4, 1), hullM); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.3); bowM.position.set(0, -3.5, 249); L.add(bowM);
+  [-1, 1].forEach((sd) => K.wall({ x: sd * 15.25, y: 1.2, z: 120, w: 0.5, d: 240, h: 7.7, m: 'metal', ledge: false }));
+  K.wall({ x: 0, y: 1.2, z: -0.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false }); K.wall({ x: 0, y: 1.2, z: 240.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false });
+  K.slab({ x0: -15, x1: 15, z0: 0, z1: 118, y: -6, h: 0.5 }); // lower deck floor
+  // main deck with two stairwell holes (H1 stern: x 9.2..12.8, z 21.6..30 ; H2 cargo: x -12.8..-9.2, z 100..108.4)
+  const deck = (x0, x1, z0, z1, h = 0.5) => K.slab({ x0, x1, z0, z1, y: 0, h, m: 'deck' });
+  deck(-15, 15, 0, 21.6); deck(-15, 9.2, 21.6, 30); deck(12.8, 15, 21.6, 30); deck(-15, 15, 30, 100); deck(-15, -12.8, 100, 108.4); deck(-9.2, 15, 100, 108.4); deck(-15, 15, 108.4, 118); deck(-15, 15, 118, 240, 6);
+  K.railing({ x0: 9.2, x1: 9.2, z0: 21.6, z1: 30 }); K.railing({ x0: 9.2, x1: 12.8, z0: 30, z1: 30 }); K.railing({ x0: 12.8, x1: 12.8, z0: 21.6, z1: 30 });
+  K.railing({ x0: -9.2, x1: -9.2, z0: 100, z1: 108.4 }); K.railing({ x0: -12.8, x1: -9.2, z0: 100, z1: 100 }); K.railing({ x0: -12.8, x1: -12.8, z0: 100, z1: 108.4 });
+  K.stairs({ x: 11, z: 30, w: 3.6, y0: -6, y1: 0, dir: '-z' });
+  K.stairs({ x: -11, z: 100, w: 3.6, y0: -6, y1: 0, dir: '+z' });
+  /* ---------- A: stern deck ---------- */
+  K.checkpoint(-8, 0, 2.5, 0).on = true;
+  K.trigger({ x: -8, z: 4, r: 3, text: '🌧️ سفينة العاصفة — مهمة طويلة: ١) عطّل المحركات تحت ٢) خذ بطاقة القيادة من مكتب المخزن ٣) اطلع لغرفة القبطان ثم الجسر وخذ «بوصلة الظل» ٤) اهرب من مهبط المقدمة. الدرج النازل يمين وراك ↘️' });
+  K.trigger({ x: 6, z: 14, r: 3, text: '📻 الجنود يطلبون دعم بالراديو إذا شافوك — نوّمهم قبل يكمّلون. 🔫 R / زر تصويب. نوّم بالراس، اسحب (✋) وخبّ بالخزانة 🗄️ وتسكّر عليهم.' });
+  [[-4, 6], [4, 8]].forEach(([x, z]) => { K.plat({ x, y: 1.2, z, w: 1.6, d: 1.6, h: 1.2, rock: false, m: 'dark' }); const dr = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.7, 16), new THREE.MeshStandardMaterial({ color: 0x8a6d1e, metalness: 0.6, roughness: 0.4 })); dr.material.userData.own = true; dr.rotation.z = Math.PI / 2; dr.position.set(x, 0.9, z); L.add(dr); });
+  K.crates({ x: -12, z: 12, n: 4 }); K.crates({ x: 2, z: 16, n: 3 });
+  [-1, 1].forEach((sd) => { const b = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 5, 4, 12), new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.6 })); b.material.userData.own = true; b.rotation.x = Math.PI / 2; b.position.set(sd * 13.4, 3.2, 12); L.add(b); });
+  K.locker({ x: -14.3, z: 18, rot: Math.PI / 2 }); K.locker({ x: 14.3, z: 6, rot: -Math.PI / 2 });
+  G(5, 0, 4, [[5, 4], [5, 17], [-2, 17], [-2, 9]], DECK); G(-10, 0, 25, [[-10, 25], [-10, 14], [-3, 14]], DECK);
+  K.ammo('a1', -13, 0.5, 9, 'pistol'); sh(1, 13.5, 0.8, 1.5); sh(2, -12, 3.2, 12.6);
+  /* ---------- B: container deck ---------- */
+  const lanes = [-10.5, -5.5, 0, 5.5, 10.5];
+  [[0, 36, 1], [1, 36, 2], [3, 36, 1], [4, 36, 3], [0, 46, 2], [2, 44, 1], [3, 47, 2], [1, 56, 1], [2, 58, 3], [4, 55, 1], [0, 64, 3], [3, 66, 1], [1, 72, 2], [4, 74, 2], [0, 82, 1], [2, 80, 1], [3, 86, 3], [1, 90, 1], [4, 92, 1], [2, 94, 2]].forEach(([li, z, st]) => K.container({ x: lanes[li], z, stack: st }));
+  K.crates({ x: -3.2, z: 33, n: 2 }); K.crates({ x: 8, z: 61, n: 2 }); K.crates({ x: -8, z: 79, n: 2 }); K.crates({ x: 13, z: 88, n: 2 });
+  K.checkpoint(-13, 0, 32, 0);
+  K.searchlight({ x: 0, y: 13, z: 62, from: -0.9, to: 0.9, speed: 0.4, range: 26, tilt: 0.42 });
+  const crane = new THREE.Mesh(new THREE.BoxGeometry(1.2, 13, 1.2), new THREE.MeshStandardMaterial({ color: 0xca8a04, roughness: 0.5, metalness: 0.5 })); crane.material.userData.own = true; crane.position.set(0, 6.5, 62); L.add(crane);
+  K.plat({ x: 0, y: 13, z: 62, w: 1.2, d: 1.2, h: 13, rock: false, hidden: true }).active = true;
+  G(-8, 0, 40, [[-8, 40], [-8, 95]], DECK); G(8, 0, 95, [[8, 95], [8, 40]], DECK); G(-3, 0, 52, [[-3, 52], [3, 52], [3, 70], [-3, 70]], DECK); G(13, 0, 50, [[13, 50], [13, 98]], DECK); G(-13, 0, 70, [[-13, 70], [-13, 96]], DECK);
+  K.locker({ x: -14.3, z: 44, rot: Math.PI / 2 }); K.locker({ x: 14.3, z: 66, rot: -Math.PI / 2 }); K.locker({ x: -14.3, z: 88, rot: Math.PI / 2 });
+  K.ammo('s1', 5.5, 8.4, 58, 'sniper'); K.ammo('a2', 13.5, 0.5, 76, 'pistol'); sh(3, 10.5, 8.4, 86); sh(4, -10.5, 8.4, 64); sh(5, 0, 0.8, 99);
+  /* ---------- C: engine room (lower deck, stern) ---------- */
+  K.wallLine({ axis: 'x', at: 50, from: -15, to: 15, y: -6, h: 5.5, doors: [{ c: 0, lock: 'تعطيل المحركات' }] });
+  K.checkpoint(11, -6, 32.5, Math.PI);
+  K.trigger({ x: 11, z: 32, y: -6, r: 3, text: '⚙️ غرفة المحركات — عطّل ٣ لوحات التحكم (✋ جنبها). البخار الحار يحرق، والممرات العلوية تطلّ على كل شي.' });
+  K.machine({ x: -7, y: -6, z: 14, w: 5, d: 9 }); K.machine({ x: 3, y: -6, z: 14, w: 5, d: 9, color: 0x44403c }); K.machine({ x: -7, y: -6, z: 36, w: 5, d: 9, color: 0x1e3a5f }); K.machine({ x: 3, y: -6, z: 38, w: 4, d: 6 });
+  K.slab({ x0: -14.5, x1: -11, z0: 4, z1: 40.9, y: -2.6, h: 0.25 }); K.stairs({ x: -12.75, z: 46, w: 3, y0: -6, y1: -2.6, dir: '-z' });
+  K.steam({ x: -1.8, y: -6, z: 22 }); K.steam({ x: 6.8, y: -6, z: 26, phase: 1.1 }); K.steam({ x: -1.8, y: -6, z: 31, phase: 2 });
+  K.panel({ x: -7, y: -6, z: 8.2, rot: Math.PI, group: 'engine', label: 'لوحة المولّد ١' });
+  K.panel({ x: 12.6, y: -6, z: 14, rot: -Math.PI / 2, group: 'engine', label: 'لوحة الضغط ٢' });
+  K.panel({ x: -12.75, y: -2.6, z: 10, rot: Math.PI / 2, group: 'engine', label: 'لوحة الوقود ٣ (فوق الممر)' });
+  L.onPanels = { engine: () => { L.keys['تعطيل المحركات'] = true; L.say('⚙️ المحركات تعطّلت! 🔓 باب المخزن انفتح (قدّام). '); L.sfx('gate'); L.shake(0.35); } };
+  for (let z = 6; z < 48; z += 8) { K.lamp({ x: -4, y: -0.9, z, light: z === 22 || z === 38 }); K.lamp({ x: 6, y: -0.9, z: z + 4, light: z === 6 }); }
+  G(-1.5, -6, 8, [[-1.5, 8], [-1.5, 44], [9, 44], [9, 8]], ENG); G(9, -6, 26, [[9, 26], [-1, 26]], ENG); G(-10, -6, 30, [[-10, 30], [-10, 6]], ENG); G(-12.75, -2.6, 40, [[-12.75, 40], [-12.75, 6]], { x0: -14.4, x1: -11.1, z0: 4.5, z1: 40.5 }); G(6, -6, 46, [[6, 46], [-4, 46]], ENG);
+  K.locker({ x: 14.3, z: 40, y: -6, rot: -Math.PI / 2 }); K.locker({ x: -9.5, z: 4.6, y: -6, rot: 0 }); K.locker({ x: 9.5, z: 4.6, y: -6, rot: 0 });
+  K.ammo('a3', 13, -5.5, 44, 'pistol'); sh(6, -13, -1.8, 44);
+  /* ---------- D: cargo hold (lower deck) ---------- */
+  K.checkpoint(-2.5, -6, 52.5, 0);
+  K.trigger({ x: 0, z: 53, y: -6, r: 3, text: '📦 مخزن الشحن الضخم — مكتب المشرف في آخره (يمين) وفيه «بطاقة القيادة». الدرج الطالع للسطح يسار آخر المخزن.' });
+  [[-9, 60, 2], [-3, 64, 1], [4, 58, 2], [10, 66, 1], [-10, 76, 1], [-2, 80, 2], [5, 74, 1], [10, 84, 2], [-6, 92, 1], [2, 94, 2], [9, 98, 1]].forEach(([x, z, st]) => K.container({ x, y: -6, z, stack: st }));
+  K.crates({ x: -12.5, z: 68, y: -6, n: 4 }); K.crates({ x: 0.5, z: 70, y: -6, n: 3 }); K.crates({ x: 12.5, z: 92, y: -6, n: 2 });
+  for (let z = 56; z < 116; z += 9) { K.lamp({ x: -6, y: -0.9, z, light: z === 65 || z === 101 }); K.lamp({ x: 6, y: -0.9, z: z + 4, light: z === 83 }); }
+  K.wallLine({ axis: 'z', at: 4.5, from: 108, to: 118, y: -6, h: 5.5, doors: [{ c: 111 }] }); K.wallLine({ axis: 'x', at: 108, from: 4.5, to: 15, y: -6, h: 5.5 });
+  K.keycard({ x: 11, y: -6, z: 115, name: 'بطاقة القيادة' }); K.lamp({ x: 9.5, y: -0.9, z: 113, color: 0xa7f3d0 }); sh(7, 13.5, -5.2, 109.5);
+  K.plat({ x: 8, y: -5, z: 116.5, w: 3, d: 1.2, h: 1, rock: false, m: 'wood' });
+  G(-6, -6, 56, [[-6, 56], [-6, 100]], HOLD); G(7, -6, 100, [[7, 100], [7, 56]], HOLD); G(0, -6, 86, [[0, 86], [-12, 86], [-12, 70]], HOLD); G(13, -6, 60, [[13, 60], [13, 104]], HOLD);
+  G(8, -6, 112, [[8, 112], [13, 112], [13, 116]], { x0: 5, x1: 14, z0: 108.6, z1: 117 });
+  K.locker({ x: -14.3, z: 82, y: -6, rot: Math.PI / 2 }); K.locker({ x: 14.3, z: 78, y: -6, rot: -Math.PI / 2 }); K.locker({ x: 5.3, z: 116.5, y: -6, rot: Math.PI / 2 });
+  K.ammo('s2', -10, -2.2, 76.5, 'sniper'); K.ammo('a4', -13.5, -5.5, 104, 'pistol');
+  /* ---------- E: accommodation block (3 floors + roof bridge) ---------- */
+  const BX0 = -12, BX1 = 12, BZ0 = 120, BZ1 = 150;
+  K.wall({ x: 13.5, y: 3.5, z: 120, w: 3, d: 0.4, h: 3.5, m: 'metal', ledge: false }); K.wall({ x: -13.5, y: 3.5, z: 120, w: 3, d: 0.4, h: 3.5, m: 'metal', ledge: false });
+  K.checkpoint(0, 0, 112, 0);
+  K.trigger({ x: -11, z: 110, r: 3, text: '🏢 مبنى الطاقم: ٣ أدوار. الباب الأمامي يحتاج «بطاقة القيادة». الدرج للأدوار العليا من الخلف — وغرفة القبطان بالدور الثالث.' });
+  for (let f = 0; f < 3; f++) {
+    const y = f * 4, h = 3.6;
+    if (f > 0) K.slab({ x0: BX0, x1: BX1, z0: BZ0, z1: BZ1, y, h: 0.4 });
+    K.wallLine({ axis: 'x', at: BZ0, from: BX0, to: BX1, y, h, doors: f === 0 ? [{ c: 0, lock: 'بطاقة القيادة' }] : [] });
+    K.wallLine({ axis: 'x', at: BZ1, from: BX0, to: BX1, y, h, doors: f === 0 ? [{ c: 0 }] : f === 1 ? [{ c: -2.5 }] : [{ c: 6.5 }] });
+    K.wallLine({ axis: 'z', at: BX0, from: BZ0, to: BZ1, y, h }); K.wallLine({ axis: 'z', at: BX1, from: BZ0, to: BZ1, y, h });
+    K.wallLine({ axis: 'z', at: -1.6, from: BZ0, to: BZ1, y, h, t: 0.2, doors: [{ c: 125 }, { c: 135 }, { c: 145 }] });
+    K.wallLine({ axis: 'z', at: 1.6, from: BZ0, to: BZ1, y, h, t: 0.2, doors: [{ c: 125 }, { c: 135 }, { c: 145 }] });
+    for (const zz of [130, 140]) { K.wallLine({ axis: 'x', at: zz, from: BX0, to: -1.6, y, h, t: 0.2 }); K.wallLine({ axis: 'x', at: zz, from: 1.6, to: BX1, y, h, t: 0.2 }); }
+    for (let z = 123; z < 150; z += 6) K.lamp({ x: 0, y: y + 3.35, z, light: z === 135 && f !== 1 });
+    [[-7, 125], [7, 135], [-7, 145], [7, 125]].forEach(([x, z], i) => { if ((i + f) % 2) { K.plat({ x: x + (x < 0 ? -2.5 : 2.5), y: y + 0.7, z: z - 2.6, w: 2, d: 1, h: 0.7, m: 'wood', rock: false }); K.lamp({ x, y: y + 3.35, z, color: 0xfde68a }); } });
+  }
+  K.slab({ x0: BX0, x1: BX1, z0: BZ0, z1: BZ1, y: 12, h: 0.4, m: 'deck' });
+  K.locker({ x: -11.3, z: 133, rot: Math.PI / 2 }); K.locker({ x: 11.3, z: 143, y: 4, rot: -Math.PI / 2 }); K.locker({ x: -11.3, z: 136, y: 8, rot: Math.PI / 2 }); K.locker({ x: 11.3, z: 127, y: 4, rot: -Math.PI / 2 });
+  const corr = (y) => ({ x0: -1.4, x1: 1.4, z0: 120.5, z1: 149.5, y });
+  G(0, 0, 122, [[0, 122], [0, 148]], corr(0)); G(-6, 0, 145, [[-6, 145], [-6, 143]], { x0: -11.5, x1: -2, z0: 140.5, z1: 149.5 });
+  G(0, 4, 148, [[0, 148], [0, 122]], corr(4)); G(6, 4, 125, [[6, 125], [9, 125]], { x0: 2, x1: 11.5, z0: 120.5, z1: 129.5 });
+  G(0, 8, 130, [[0, 122], [0, 148]], corr(8)); G(-6, 8, 127, [[-9, 124], [-4, 128]], { x0: -11.5, x1: -2, z0: 120.5, z1: 129.5 });
+  K.keycard({ x: -10, y: 8, z: 122, name: 'بطاقة الجسر' }); sh(8, -10.5, 8.8, 128.5); K.ammo('a5', 10, 4.5, 146, 'pistol');
+  K.trigger({ x: -7, z: 125, y: 8, r: 2.5, text: '🧑‍✈️ غرفة القبطان! «بطاقة الجسر» على المكتب — بعدها اطلع للسطح من الدرج الخلفي.' });
+  // exterior stairs at the back of the block
+  K.stairs({ x: -10, z: 152, w: 2.4, y0: 0, y1: 4, dir: '+x' }); K.slab({ x0: -4.12, x1: -1, z0: 150.8, z1: 153.2, y: 4, h: 0.3 });
+  K.stairs({ x: -1, z: 152, w: 2.4, y0: 4, y1: 8, dir: '+x' }); K.slab({ x0: 4.88, x1: 10.5, z0: 150.8, z1: 153.2, y: 8, h: 0.3 }); K.slab({ x0: 8.5, x1: 10.5, z0: 153.2, z1: 155.8, y: 8, h: 0.3 });
+  K.stairs({ x: 8.5, z: 154.6, w: 2.4, y0: 8, y1: 12, dir: '-x' }); K.slab({ x0: -1, x1: 2.62, z0: 150, z1: 155.8, y: 12, h: 0.3 });
+  K.slab({ x0: -3.4, x1: -1.6, z0: 150, z1: 150.8, y: 4, h: 0.3 }); K.slab({ x0: 5.6, x1: 7.4, z0: 150, z1: 150.8, y: 8, h: 0.3 });
+  K.checkpoint(-9, 0, 155, 0);
+  // roof + bridge house
+  K.wallLine({ axis: 'x', at: 124, from: -8, to: 8, y: 12, h: 3.4 }); K.wallLine({ axis: 'x', at: 136, from: -8, to: 8, y: 12, h: 3.4, doors: [{ c: 0, lock: 'بطاقة الجسر' }] });
+  K.wallLine({ axis: 'z', at: -8, from: 124, to: 136, y: 12, h: 3.4 }); K.wallLine({ axis: 'z', at: 8, from: 124, to: 136, y: 12, h: 3.4 });
+  K.slab({ x0: -8.2, x1: 8.2, z0: 123.8, z1: 136.2, y: 15.8, h: 0.4 });
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(14, 1.4), new THREE.MeshStandardMaterial({ color: 0x7dd3fc, emissive: 0x0e7490, emissiveIntensity: 0.6, transparent: true, opacity: 0.5 })); glass.material.userData.own = true; glass.position.set(0, 14.3, 123.7); glass.rotation.y = Math.PI; L.add(glass);
+  [[-5, 127], [0, 127], [5, 127]].forEach(([x, z]) => K.plat({ x, y: 13.1, z, w: 2.4, d: 0.8, h: 1.1, m: 'metal', rock: false }));
+  K.lamp({ x: 0, y: 15.4, z: 130, color: 0x7dd3fc });
+  K.searchlight({ x: 10, y: 12, z: 148, from: Math.PI - 0.2, to: Math.PI + 1.0, speed: 0.5, range: 18, tilt: 0.5 });
+  G(-9, 12, 140, [[-9, 140], [9, 140], [9, 148]], { x0: -11.5, x1: 11.5, z0: 136.5, z1: 149.5 });
+  K.checkpoint(4, 12, 146, Math.PI);
+  const relic = K.relic({ x: 0, y: 12, z: 131, color: 0x38bdf8 });
+  const exit = K.portal({ x: 0, y: 0, z: 228, rot: Math.PI, to: 'hub', label: 'مهبط الهروب', color: 0x38bdf8, active: false });
+  K.trigger({ x: 0, z: 131, y: 12, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.complete = true; exit.setActive(true); L.sfx('win'); }, text: '🧭 «بوصلة الظل» معك! المروحية تنتظرك عند مهبط المقدمة 🚁 — انزل من الدرج الخلفي واعبر مقدمة السفينة. انتبه: تعزيزات جديدة هناك.' });
+  sh(9, 6.5, 12.8, 125);
+  /* ---------- F: bow + helideck ---------- */
+  [[-9, 175, 1], [8, 182, 2], [-4, 195, 1], [10, 200, 1], [-11, 206, 2]].forEach(([x, z, st]) => K.container({ x, z, stack: st }));
+  K.crates({ x: 2, z: 186, n: 3 }); K.crates({ x: -7, z: 214, n: 2 });
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(8, 40), new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 })); pad.material.userData.own = true; pad.rotation.x = -Math.PI / 2; pad.position.set(0, 0.02, 226); L.add(pad);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(6.6, 7.2, 40), new THREE.MeshBasicMaterial({ color: 0xfacc15 })); ring.rotation.x = -Math.PI / 2; ring.position.set(0, 0.04, 226); L.add(ring);
+  K.searchlight({ x: -13, y: 6, z: 192, from: 0.3, to: 1.8, speed: 0.55, range: 22, tilt: 0.38 });
+  K.wall({ x: -13, y: 6, z: 192, w: 1, d: 1, h: 6, m: 'metal', ledge: false });
+  G(-2, 0, 170, [[-2, 170], [-2, 210], [6, 210], [6, 170]], DECK); G(12, 0, 165, [[12, 165], [12, 215]], DECK); G(-12, 0, 215, [[-12, 215], [-12, 168]], DECK);
+  G(4, 0, 220, [[4, 220], [-4, 220]], DECK, { group: 'bow' }); G(-6, 0, 232, [[-6, 232], [6, 232]], DECK, { group: 'bow' });
+  K.locker({ x: 14.3, z: 190, rot: -Math.PI / 2 }); K.locker({ x: -14.3, z: 200, rot: Math.PI / 2 }); K.locker({ x: 14.3, z: 218, rot: -Math.PI / 2 });
+  K.ammo('a6', 13.5, 0.5, 172, 'pistol'); K.ammo('s3', -11, 5.8, 206, 'sniper');
+  K.checkpoint(9, 0, 162, 0);
+  L.reinforce = [{ y: 0, zone: DECK, points: [[-3, 104], [3, 104]] }, { y: -6, zone: HOLD, points: [[0, 52], [2, 53]] }, { y: 0, zone: DECK, points: [[0, 168], [3, 168]] }, { y: 0, zone: DECK, points: [[-4, 212], [4, 212]] }];
+  // deck lamps along the bulwarks
+  for (let z = 10; z < 235; z += 16) { [-14.6, 14.6].forEach((x) => { const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0x86efac })); s2.position.set(x, 1.9, z); L.add(s2); }); }
   return cfg;
 }
 

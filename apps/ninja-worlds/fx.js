@@ -19,6 +19,8 @@ const SURF = {
   marble: { c: [220, 220, 234], tiles: 2, vein: [150, 138, 196] },
   gold: { c: [186, 146, 76], tiles: 4, vein: [246, 210, 120] },
   wood: { c: [120, 78, 44], wood: true },
+  metal: { c: [92, 100, 108], tiles: 2, vein: [70, 76, 84] },
+  deck: { c: [70, 82, 74], tiles: 4, vein: [58, 66, 60] },
 };
 const texCache = {};
 export function surface(kind) {

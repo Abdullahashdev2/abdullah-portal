@@ -47,7 +47,7 @@ export class Stealth {
     if (P.inLocker) { this.leaveLocker(); return true; }
     if (this.dragging) {
       const lk = this.nearLocker(1.9);
-      if (lk && !lk.body) { const e = this.dragging; lk.body = e; e.hidden = true; e.m.g.visible = false; e.st = 'sleep'; e.sleepT = 1e9; this.dragging = null; P.dragging = false; this.c.sfx.tone(160, 90, 0.4, 'square', 0.12); this.c.say('🗄️ خبّيته بالخزانة — محد بيلقاه.'); this.c.addCoins(5, P.pos); return true; }
+      if (lk && !lk.body) { const e = this.dragging; lk.body = e; lk.openT = 1; e.hidden = true; e.m.g.visible = false; e.st = 'sleep'; e.sleepT = 1e9; this.dragging = null; P.dragging = false; this.c.sfx.tone(160, 90, 0.4, 'square', 0.12); this.c.say('🗄️ خبّيته بالخزانة — محد بيلقاه.'); this.c.addCoins(5, P.pos); return true; }
       this.drop(); return true;
     }
     const e = this.c.enemies.list.find((x) => x.ship && x.alive && x.st === 'sleep' && !x.hidden && x.pos.distanceTo(P.pos) < 1.8);
@@ -58,8 +58,8 @@ export class Stealth {
   }
   drop() { if (this.dragging) { this.dragging.st = 'sleep'; this.dragging = null; } if (this.c.player) this.c.player.dragging = false; }
   nearLocker(r) { const P = this.c.player; let best = null, bd = r; for (const lk of this.L.lockers || []) { const d = Math.hypot(lk.front.x - P.pos.x, lk.front.z - P.pos.z); if (d < bd && Math.abs(lk.pos.y - P.pos.y) < 1) { bd = d; best = lk; } } return best; }
-  enterLocker(lk) { const P = this.c.player; this.exitAim(); P.inLocker = lk; lk.player = true; P.vel.set(0, 0, 0); P.lockerBack = P.pos.clone(); P.pos.copy(lk.front); this.c.sfx.tone(140, 110, 0.25, 'square', 0.1); this.c.say('🗄️ مختبئ بالخزانة — الحرّاس ما يشوفونك. اضغط ✋ تطلع.'); }
-  leaveLocker(silent) { const P = this.c.player; if (!P || !P.inLocker) return; P.inLocker.player = false; P.inLocker = null; if (!silent) this.c.sfx.tone(140, 180, 0.2, 'square', 0.08); }
+  enterLocker(lk) { const P = this.c.player; this.exitAim(); lk.openT = 1; P.inLocker = lk; lk.player = true; P.vel.set(0, 0, 0); P.lockerBack = P.pos.clone(); P.pos.copy(lk.front); this.c.sfx.tone(140, 110, 0.25, 'square', 0.1); this.c.say('🗄️ مختبئ بالخزانة — الحرّاس ما يشوفونك. اضغط ✋ تطلع.'); }
+  leaveLocker(silent) { const P = this.c.player; if (!P || !P.inLocker) return; P.inLocker.openT = 1; P.inLocker.player = false; P.inLocker = null; if (!silent) this.c.sfx.tone(140, 180, 0.2, 'square', 0.08); }
   /* ---------- shooting ---------- */
   shoot() {
     const w = this.weapon;
@@ -125,7 +125,7 @@ export class Stealth {
     this.radarT -= dt; if (this.radarT <= 0) { this.radarT = 0.05; this.radar(); }
     this.phaseHud();
   }
-  clear(a, b) { const n = Math.ceil(a.distanceTo(b) / 0.6); for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of this.L.boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return false; } return true; }
+  clear(a, b) { const n = Math.ceil(a.distanceTo(b) / 0.6), BX = this.L.segBoxes(a, b); for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of BX) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return false; } return true; }
   setPhase(ph) {
     const L = this.L, prev = L.phase; L.phase = ph; L.phaseT = PHASE[ph].time || 0;
     if (ph === 'alert' && prev !== 'alert') {
@@ -176,7 +176,7 @@ export class Stealth {
     const toR = (x, z) => { const dx = x - P.pos.x, dz = z - P.pos.z, c = Math.cos(-yaw), s = Math.sin(-yaw); const rx = dx * c + dz * s, rz = -dx * s + dz * c; return [R - rx * sc, R - rz * sc]; };
     g.strokeStyle = 'rgba(74,222,128,.18)'; for (let r = 1; r <= 3; r++) { g.beginPath(); g.arc(R, R, (R / 3) * r, 0, Math.PI * 2); g.stroke(); }
     g.fillStyle = 'rgba(148,163,184,.35)';
-    for (const b of L.boxes) { if (!b.active || b.max.y - b.min.y < 1 || b.max.y < P.pos.y + 0.4 || b.min.y > P.pos.y + 2) continue; const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2; if (Math.hypot(cx - P.pos.x, cz - P.pos.z) > 30) continue; const c = [toR(b.min.x, b.min.z), toR(b.max.x, b.min.z), toR(b.max.x, b.max.z), toR(b.min.x, b.max.z)]; g.beginPath(); g.moveTo(...c[0]); c.slice(1).forEach((p) => g.lineTo(...p)); g.closePath(); g.fill(); }
+    for (const b of L.nearR(P.pos.x, P.pos.z, 30)) { if (!b.active || b.max.y - b.min.y < 1 || b.max.y < P.pos.y + 0.4 || b.min.y > P.pos.y + 2) continue; const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2; if (Math.hypot(cx - P.pos.x, cz - P.pos.z) > 30) continue; const c = [toR(b.min.x, b.min.z), toR(b.max.x, b.min.z), toR(b.max.x, b.max.z), toR(b.min.x, b.max.z)]; g.beginPath(); g.moveTo(...c[0]); c.slice(1).forEach((p) => g.lineTo(...p)); g.closePath(); g.fill(); }
     for (const e of this.c.enemies.list) {
       if (!e.alive || e.hidden || Math.abs(e.pos.y - P.pos.y) > 4) continue; const [x, y] = toR(e.pos.x, e.pos.z);
       if (e.st !== 'sleep' && e.st !== 'dragged' && e.guard) { const a = Math.atan2(...(() => { const f = toR(e.pos.x + Math.sin(e.yaw), e.pos.z + Math.cos(e.yaw)); return [f[1] - y, f[0] - x]; })()); g.fillStyle = e.st === 'inv' ? 'rgba(250,204,21,.35)' : 'rgba(255,255,255,.18)'; g.beginPath(); g.moveTo(x, y); g.arc(x, y, 11 * sc, a - 0.6, a + 0.6); g.closePath(); g.fill(); }

@@ -40,6 +40,26 @@ export class Level {
     const pulse = 0.55 + 0.45 * Math.sin(this.t * 2.4);
     for (const m of this.runeMats) m.opacity = 0.35 + pulse * 0.6;
   }
+  /* spatial grid so physics and line-of-sight only test nearby boxes */
+  buildGrid(cell = 6) {
+    this.cell = cell; this.grid = new Map(); this.dynAll = this.boxes.filter((b) => this.dyn.includes(b) || b.door);
+    for (const b of this.boxes) {
+      if (this.dynAll.includes(b)) continue;
+      const x0 = Math.floor(b.min.x / cell), x1 = Math.floor(b.max.x / cell), z0 = Math.floor(b.min.z / cell), z1 = Math.floor(b.max.z / cell);
+      for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 100003 + z; let a = this.grid.get(k); if (!a) this.grid.set(k, (a = [])); a.push(b); }
+    }
+    this._q = 0;
+  }
+  near(x0, z0, x1, z1) {
+    if (!this.grid) return this.boxes;
+    const c = this.cell, out = this.dynAll.slice(), q = ++this._q;
+    for (let x = Math.floor(Math.min(x0, x1) / c); x <= Math.floor(Math.max(x0, x1) / c); x++) for (let z = Math.floor(Math.min(z0, z1) / c); z <= Math.floor(Math.max(z0, z1) / c); z++) {
+      const a = this.grid.get(x * 100003 + z); if (!a) continue; for (const b of a) if (b._q !== q) { b._q = q; out.push(b); }
+    }
+    return out;
+  }
+  nearR(x, z, r) { return this.near(x - r, z - r, x + r, z + r); }
+  segBoxes(a, b) { return this.near(Math.min(a.x, b.x) - 0.5, Math.min(a.z, b.z) - 0.5, Math.max(a.x, b.x) + 0.5, Math.max(a.z, b.z) + 0.5); }
   dispose() {
     this.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.own) o.material.dispose(); });
     this.group.removeFromParent();
@@ -480,7 +500,10 @@ export function makeKit(L) {
     const lab = textSprite('خزانة', { size: 40, scale: 0.35, glow: '#94a3b8' }); lab.position.y = 2.5; g.add(lab);
     const fwd = new V(Math.sin(rot), 0, Math.cos(rot));
     const b = K.plat({ x, y: y + 2.1, z, w: rot % Math.PI ? 0.8 : 1.1, d: rot % Math.PI ? 1.1 : 0.8, h: 2.1, rock: false, hidden: true }); b.active = true;
-    const Lk = { pos: new V(x, y, z), front: new V(x, y, z).addScaledVector(fwd, 0.95), yaw: rot, body: null, g };
+    const hinge = new THREE.Group(); hinge.position.set(-0.55, 0, 0.41); g.add(hinge); hinge.userData.dyn = true;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.08, 2.05, 0.04), own(new THREE.MeshStandardMaterial({ color: 0x6b7c8c, roughness: 0.45, metalness: 0.65 }))); door.position.set(0.54, 1.05, 0); hinge.add(door);
+    const Lk = { pos: new V(x, y, z), front: new V(x, y, z).addScaledVector(fwd, 0.95), yaw: rot, body: null, g, openT: 0, hinge };
+    L.anim.push((dt) => { Lk.openT = Math.max(0, Lk.openT - dt * 1.4); hinge.rotation.y = -Math.min(1, Lk.openT * 2) * 1.7; });
     L.lockers.push(Lk); return Lk;
   };
   K.searchlight = ({ x, y, z, from = -1, to = 1, speed = 0.5, range = 16, tilt = 0.45 }) => {
@@ -508,6 +531,68 @@ export function makeKit(L) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, 0.9, 20), own(new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.5 }))); band.position.set(x, y + h * 0.7, z); L.add(band);
     K.plat({ x, y: y + h, z, w: r * 1.6, d: r * 1.6, h, rock: false, hidden: true }).active = true;
   };
+  /* -------- interiors: walls with doors, slabs, stairs, machines, consoles, keycards -------- */
+  K.slab = ({ x0, x1, z0, z1, y, h = 0.4, m = 'metal', hidden = false }) => K.plat({ x: (x0 + x1) / 2, y, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, h, m, rock: false, hidden, ledge: false, tile: 3 });
+  K.door = ({ x, y, z, axis, w = 1.7, h = 2.5, lock = null, color = 0x64748b }) => {
+    L.doors = L.doors || [];
+    const b = K.plat({ x, y: y + h, z, w: axis === 'x' ? w : 0.22, d: axis === 'x' ? 0.22 : w, h, rock: false, ledge: false, m: own(new THREE.MeshStandardMaterial({ color: lock ? 0x7f1d1d : color, roughness: 0.4, metalness: 0.7 })) });
+    b.door = true; b.mesh.userData.dyn = true;
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(axis === 'x' ? w * 0.9 : 0.24, 0.12, axis === 'x' ? 0.24 : w * 0.9), own(new THREE.MeshBasicMaterial({ color: lock ? 0xff4d4d : 0xfacc15 }))); stripe.position.y = 0.2; b.mesh.add(stripe);
+    if (lock) { const s2 = textSprite('🔒 ' + lock, { size: 38, scale: 0.4, glow: '#ff4d4d' }); s2.position.y = h / 2 + 0.35; b.mesh.add(s2); }
+    const D = { b, base: b.mesh.position.y, h, open: 0, lock, pos: new V(x, y, z), stripe }; L.doors.push(D); return D;
+  };
+  K.wallLine = ({ axis, at, from, to, y = 0, h = 3, t = 0.3, doors = [], m = 'metal' }) => {
+    // axis 'x': wall runs along x at z = at ; axis 'z': runs along z at x = at
+    const cuts = doors.map((d) => ({ c: d.c, w: d.w || 1.7 })).sort((a, b) => a.c - b.c); let cur = from;
+    const seg = (a, b2) => { if (b2 - a < 0.05) return; const c = (a + b2) / 2, len = b2 - a; K.plat(axis === 'x' ? { x: c, y: y + h, z: at, w: len, d: t, h, m, rock: false, ledge: false } : { x: at, y: y + h, z: c, w: t, d: len, h, m, rock: false, ledge: false }); };
+    for (const c of cuts) { seg(cur, c.c - c.w / 2); cur = c.c + c.w / 2; }
+    seg(cur, to);
+    for (const d of doors) { const dh = Math.min(2.5, h - 0.2); if (h - dh > 0.05) K.plat(axis === 'x' ? { x: d.c, y: y + h, z: at, w: d.w || 1.7, d: t, h: h - dh, m, rock: false, ledge: false } : { x: at, y: y + h, z: d.c, w: t, d: d.w || 1.7, h: h - dh, m, rock: false, ledge: false });
+      if (!d.open) K.door({ x: axis === 'x' ? d.c : at, y, z: axis === 'x' ? at : d.c, axis, w: (d.w || 1.7) - 0.05, h: dh, lock: d.lock }); }
+  };
+  K.stairs = ({ x, z, w = 2.4, y0, y1, dir = '+z', run = 0.42 }) => {
+    const n = Math.ceil((y1 - y0) / 0.3), rise = (y1 - y0) / n, sx = dir === '+x' ? 1 : dir === '-x' ? -1 : 0, sz = dir === '+z' ? 1 : dir === '-z' ? -1 : 0;
+    for (let i = 0; i < n; i++) { const top = y0 + rise * (i + 1), cx = x + sx * (i + 0.5) * run, cz = z + sz * (i + 0.5) * run; K.plat({ x: cx, y: top, z: cz, w: sx ? run : w, d: sz ? run : w, h: top - y0 + 0.05, m: 'metal', rock: false, ledge: false, tile: 1 }); }
+    return { endX: x + sx * n * run, endZ: z + sz * n * run };
+  };
+  K.lamp = ({ x, y, z, color = 0xfff1c1, light = false }) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.3), own(new THREE.MeshBasicMaterial({ color }))); m.position.set(x, y, z); L.add(m);
+    const g = glowSprite(color, 3.4, 0.45); g.position.set(x, y - 0.2, z); L.add(g);
+    if (light && L.lights < 8) { const pl = new THREE.PointLight(color, 14, 14, 1.6); pl.position.set(x, y - 0.4, z); L.add(pl); L.lights++; }
+  };
+  K.machine = ({ x, y = 0, z, w = 3, d = 5, h = 2.6, color = 0x3b4a5a }) => {
+    K.plat({ x, y: y + h, z, w, d, h, rock: false, m: own(new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.7 })) });
+    const pm = mat('dark', { metalness: 0.8, roughness: 0.35 });
+    for (let i = 0; i < 3; i++) { const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, h + 1.6, 10), pm); p2.position.set(x - w / 2 + 0.4 + i * (w - 0.8) / 2, y + (h + 1.6) / 2, z + d / 2 - 0.3); L.add(p2); }
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(Math.min(w, h) * 0.42, Math.min(w, h) * 0.42, d * 0.9, 18), own(new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.35, metalness: 0.85 }))); cyl.rotation.x = Math.PI / 2; cyl.position.set(x, y + h + 0.05, z); L.add(cyl);
+    const led = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.15, 0.05), own(new THREE.MeshBasicMaterial({ color: 0x22c55e }))); led.position.set(x, y + h * 0.6, z - d / 2 - 0.03); L.add(led);
+  };
+  K.steam = ({ x, y, z, period = 3.2, phase = 0 }) => {
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.2, 10), mat('metal')); vent.position.y = 0.1; g.add(vent);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.9, 3.2, 12, 1, true), own(new THREE.MeshBasicMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide }))); col.position.y = 1.6; col.userData.dyn = true; g.add(col);
+    const hz = { kind: 'geyser', x, y, z, on: false, soft: true }; L.hazards.push(hz);
+    L.anim.push((dt, t) => { const ph = ((t + phase) % period + period) % period; hz.on = ph < 1.0; col.visible = hz.on; col.scale.set(1, 1 + Math.sin(t * 20) * 0.05, 1); if (hz.on && L.emit && Math.random() < 0.5) L.emit(new V(x, y + 0.4, z), { color: 0xffffff, count: 2, speed: 2, up: 2.5, life: 0.9, size: 0.5, grav: -2 }); });
+  };
+  K.panel = ({ x, y, z, rot = 0, group, label = 'لوحة' }) => {
+    L.panels = L.panels || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; L.add(g);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.5, 0.4), own(new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4, metalness: 0.6 }))); box.position.y = 0.75; g.add(box);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), own(new THREE.MeshBasicMaterial({ color: 0x22d3ee }))); scr.position.set(0, 1.05, 0.21); g.add(scr);
+    const gl = glowSprite(0x22d3ee, 1.6, 0.5); gl.position.set(0, 1.05, 0.4); g.add(gl);
+    const P = { pos: new V(x, y, z), front: new V(x + Math.sin(rot) * 0.9, y, z + Math.cos(rot) * 0.9), done: false, group, label, scr, gl };
+    L.panels.push(P); return P;
+  };
+  K.keycard = ({ x, y, z, id, name }) => {
+    L.cards = L.cards || [];
+    const g = new THREE.Group(); g.position.set(x, y + 0.7, z); L.add(g); g.userData.dyn = true;
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.03), own(new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.8, metalness: 0.5, roughness: 0.3 }))); g.add(c);
+    g.add(glowSprite(0xfacc15, 1.5, 0.6));
+    const C = { id, name, g, pos: new V(x, y + 0.7, z), taken: false }; L.cards.push(C);
+    L.anim.push((dt, t) => { g.rotation.y += dt * 2; g.position.y = y + 0.7 + Math.sin(t * 2.5) * 0.08; });
+  };
+  K.crates = ({ x, y = 0, z, n = 3, s = 1.2 }) => { for (let i = 0; i < n; i++) { const ox = (i % 2) * s * 1.05 - s * 0.5, oz = Math.floor(i / 2) * s * 1.05, lvl = i >= 4 ? 1 : 0; K.plat({ x: x + ox, y: y + s * (lvl + 1), z: z + oz, w: s, d: s, h: s, m: 'wood', rock: false, tile: 1.2 }); } };
   K.trigger = (o) => { L.triggers.push({ r: 3, dy: 4, once: true, fired: false, ...o, pos: new V(o.x, o.y ?? 0, o.z) }); };
   K.enemy = (o) => { L.enemyDefs.push(o); };
   return K;

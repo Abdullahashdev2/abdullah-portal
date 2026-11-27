@@ -74,7 +74,7 @@ function qTick(dt) {
   if (fpsAvg < 50 && qLevel < QL.length - 1 && since > 2500) { qBlock[qLevel - 1] = performance.now(); applyQuality(qLevel + 1); }
   else if (fpsAvg > 58 && qLevel > 0 && since > 7000 && !(performance.now() - (qBlock[qLevel - 1] || -1e9) < 30000)) applyQuality(qLevel - 1);
 }
-function freezeStatic(root) { root.traverse((o) => { if (o.userData.dyn) return; o.updateMatrix(); o.matrixAutoUpdate = false; }); }
+function freezeStatic(root) { root.traverse((o) => { if (o.userData.dyn) return; o.updateMatrix(); o.matrixAutoUpdate = false; }); root.updateMatrixWorld(true); }
 function makePost() {
   if (post) { post.rt.dispose(); post.lv.forEach((l) => l.forEach((r) => r.dispose())); post = null; }
   if (!HQ) return;
@@ -217,7 +217,7 @@ function loadWorld(id, from) {
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
-  freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
+  level.buildGrid(); level.keys = {}; freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
@@ -332,6 +332,12 @@ function nearItem() { let best = null, bd = 1.7; for (const it of level.items) {
 function nearPed() { if (!player.carry) return null; for (const p of level.pedestals) { if (p.filled >= p.need || p.accept !== player.carry.kind) continue; if (Math.hypot(p.pos.x - player.pos.x, p.pos.z - player.pos.z) < 2.6 && Math.abs(p.pos.y - player.pos.y) < 1.5) return p; } return null; }
 function nearNpc() { return npc && player.pos.distanceTo(npc.root.position) < 3 ? npc : null; }
 function interact() {
+  for (const P of level.panels || []) if (!P.done && Math.hypot(P.front.x - player.pos.x, P.front.z - player.pos.z) < 1.5 && Math.abs(P.pos.y - player.pos.y) < 1.2) {
+    P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.tone(600, 200, 0.4, 'sawtooth', 0.1); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
+    const all = level.panels.filter((x) => x.group === P.group), left = all.filter((x) => !x.done).length;
+    say(left ? `⚙️ ${P.label} — باقي ${left}` : `⚙️ ${P.label} — خلصت الكل!`); if (!left && level.onPanels && level.onPanels[P.group]) level.onPanels[P.group]();
+    return;
+  }
   if (stealth.interact()) return;
   if (player.carry) { const p = nearPed(); if (p) placeItem(p); else dropItem(false); return; }
   const it = nearItem(); if (it && player.onGround) { it.carried = true; it.follow = null; player.carry = it; sfx.pickup(); sparks.emit(it.pos, { color: it.color, count: 20, speed: 3, life: 0.5 }); if (it.onPick) it.onPick(); return; }
@@ -464,7 +470,10 @@ function updateCamera(dt) {
     const d = angDiff(cam.yaw, player.yaw), k = player.state === 'wallrun' ? 3 : 1.4;
     if (Math.abs(d) < 2.3) cam.yaw += d * Math.min(1, dt * k * Math.min(1, hs / 5));
   }
-  if (tNow - cam.lastManual > 2) cam.pitch += (0.32 - cam.pitch) * Math.min(1, dt * 0.8);
+  // indoors: drop to shoulder height under low ceilings so the view is not just the floor
+  ray.set(cam.target, new V(0, 1, 0)); ray.far = 3.2; const roof = ray.intersectObjects(level.camMeshes, false).length > 0;
+  const restP = roof ? 0.1 : 0.32; cam.roof = roof;
+  if (tNow - cam.lastManual > 2 || roof) cam.pitch += (restP - cam.pitch) * Math.min(1, dt * (roof ? 2.5 : 0.8));
   cam.want = innerWidth < innerHeight ? 7.6 : 6.4;
   const dir = new V(-Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch));
   ray.set(cam.target, dir); ray.far = cam.want + 0.4;
@@ -481,9 +490,24 @@ let promptKind = '';
 function worldLogic(dt) {
   const p = player.pos;
   stealth.update(dt);
+  // automatic sliding doors (locked ones need the right keycard)
+  for (const D of level.doors || []) {
+    const dp = Math.hypot(D.pos.x - p.x, D.pos.z - p.z), near = dp < 2.4 && Math.abs(D.pos.y - p.y) < 2;
+    const ok = !D.lock || level.keys[D.lock];
+    let want = near && ok && !player.inLocker;
+    if (!want) for (const e of enemies.list) if (e.alive && e.st !== 'sleep' && e.st !== 'dragged' && Math.abs(e.pos.y - D.pos.y) < 2 && Math.hypot(D.pos.x - e.pos.x, D.pos.z - e.pos.z) < 2.1) { want = true; break; }
+    if (near && !ok && !D.warned) { D.warned = true; say('🔒 الباب مقفول — يحتاج «' + D.lock + '»'); sfx.tone(220, 180, 0.15, 'square', 0.08); }
+    if (!near) D.warned = false;
+    const was = D.open; D.open += ((want ? 1 : 0) - D.open) * Math.min(1, dt * 7);
+    if ((was < 0.05 && D.open >= 0.05) || (was > 0.95 && D.open <= 0.95 && !want)) sfx.noise(0.35, 500, 0.8, 0.08, 'bandpass', 0, 1400);
+    D.b.mesh.position.y = D.base + D.open * (D.h - 0.15); D.b.active = D.open < 0.55;
+    if (ok && D.lock) D.stripe.material.color.setHex(0x4ade80);
+  }
+  // keycards
+  for (const C of level.cards || []) if (!C.taken && C.pos.distanceTo(new V(p.x, p.y + 0.8, p.z)) < 1.3) { C.taken = true; C.g.removeFromParent(); level.keys[C.name] = true; sfx.pickup(); say('🗝️ أخذت «' + C.name + '»'); }
   if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.noise(2.2, 90, 0.4, 0.5, 'lowpass', 0, 40), 400 + Math.random() * 900); }
     flash = Math.max(0, flash - dt * 5); hemi.intensity = cfg.hemi[2] * (1 + 4 * flash * (flash > 0.6 || flash < 0.35 ? 1 : 0.3));
-    if (level.rainMesh) level.rainMesh.position.set(p.x, p.y - 4, p.z); }
+    if (level.rainMesh) { level.rainMesh.position.set(p.x, p.y - 4, p.z); level.rainMesh.visible = !cam.roof; } }
   // checkpoints
   for (const c of level.checkpoints) if (!c.on && Math.hypot(c.pos.x - p.x, c.pos.z - p.z) < 1.8 && Math.abs(c.pos.y - p.y) < 2) {
     level.checkpoints.forEach((o) => (o.cur = false)); c.on = true; c.cur = true; checkpoint = { pos: c.pos.clone(), yaw: c.yaw };
@@ -518,7 +542,7 @@ function worldLogic(dt) {
     for (const hz of level.hazards) {
       if (hz.kind === 'blade') { if (hz.tip.distanceTo(chest) < 0.95 || hz.mid.distanceTo(chest) < 0.8) { if (player.damage(1, new V(p.x + Math.sin(player.yaw) * 0.8, p.y, p.z + Math.cos(player.yaw) * 0.8))) sparks.emit(chest, { color: 0xffffff, count: 14, speed: 6, life: 0.3 }); } }
       else if (hz.kind === 'orb') { if (hz.tip.distanceTo(chest) < hz.r) player.damage(1, hz.tip); }
-      else if (hz.kind === 'geyser') { if (hz.on && Math.hypot(p.x - hz.x, p.z - hz.z) < 1.0 && p.y - hz.y < 5 && p.y - hz.y > -0.5) { if (player.damage(1, new V(hz.x, p.y, hz.z + 0.01))) player.vel.y = 13; } }
+      else if (hz.kind === 'geyser') { if (hz.on && Math.hypot(p.x - hz.x, p.z - hz.z) < 1.0 && p.y - hz.y < 5 && p.y - hz.y > -0.5) { if (player.damage(1, new V(hz.x, p.y, hz.z + 0.01)) && !hz.soft) player.vel.y = 13; } }
       else if (hz.kind === 'spikes' && hz.up && p.x > hz.x0 && p.x < hz.x1 && p.z > hz.z0 && p.z < hz.z1 && p.y - hz.y < 0.6) player.damage(1, new V(p.x - player.vel.x, p.y, p.z - player.vel.z - 0.01));
     }
   }
@@ -613,6 +637,7 @@ function frame(now) {
   }
   menuPoll(dt); player.animate(dt); animateNpc(dt);
   if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active);
+  if (stealth.aiming || player.inLocker) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
   hero.root.updateMatrixWorld(true);
   const r = new V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   scarf.update(Math.min(dt, 1 / 30), hero.scarfAnchor.getWorldPosition(tmpA), r, player.vel, tNow);

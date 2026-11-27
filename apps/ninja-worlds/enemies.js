@@ -1,9 +1,18 @@
 // Shadow creatures: telegraphed attacks (eyes flare + raised claws), stagger, knockback, dissolve on death
 import * as THREE from 'three';
 import { glowSprite, textSprite } from './fx.js';
+import { buildSoldier, blendPose, BASE } from './hero.js';
 const V = THREE.Vector3;
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
+function buildHumanGuard(seed) {
+  const h = buildSoldier(seed), g = new THREE.Group(); g.add(h.root);
+  const geo = new THREE.ConeGeometry(Math.tan(0.62) * 11, 11, 28, 1, true); geo.translate(0, -5.5, 0); geo.rotateX(-Math.PI / 2);
+  const cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.045, depthWrite: false, side: THREE.FrontSide, blending: THREE.AdditiveBlending }));
+  cone.position.set(0, 1.62, 0.2); cone.rotation.x = 0.1; g.add(cone);
+  const d = () => new THREE.Object3D();
+  return { g, inner: h.root, body: h.root, head: h.head, arms: [d(), d()], eyes: [], bodyM: h.suitMat, aura: d(), cone, human: true, h, ph: 0 };
+}
 function buildShade(big, archer, guard, boss) {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
   const bodyM = new THREE.MeshStandardMaterial({ color: big ? 0x2a1012 : 0x1c1433, roughness: 0.35, metalness: 0.25, emissive: big ? 0x6b0f0f : 0x3b0d66, emissiveIntensity: 0.55, flatShading: true });
@@ -39,7 +48,8 @@ export class Enemies {
   constructor(game) { this.g = game; this.list = []; this.pickups = []; this.shots = []; }
   clear() { for (const e of this.list) e.m.g.removeFromParent(); for (const p of this.pickups) p.s.removeFromParent(); for (const b of this.shots) b.m.removeFromParent(); this.list = []; this.pickups = []; this.shots = []; }
   spawn(def, rise = false) {
-    const boss = def.type === 'boss', big = def.type === 'brute' || boss, archer = def.type === 'archer', guard = def.type === 'guard', m = buildShade(big, archer, guard, boss);
+    const boss = def.type === 'boss', big = def.type === 'brute' || boss, archer = def.type === 'archer', guard = def.type === 'guard';
+    const m = guard && this.g.level.cfg && this.g.level.cfg.ship ? buildHumanGuard(this.list.length) : buildShade(big, archer, guard, boss);
     m.g.position.set(def.x, def.y, def.z); this.g.scene.add(m.g);
     const zone = def.zone || { x0: def.x - 5, x1: def.x + 5, z0: def.z - 5, z1: def.z + 5 };
     const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() + (archer ? 1 : 0), archer };
@@ -63,6 +73,7 @@ export class Enemies {
       if ((dx0 * fx + dz0 * fz) / l0 < 0.35) { if (e.ship && e.st !== 'sleep') { this.sleep(e, true); this.g.onTakedown && this.g.onTakedown(e); return true; } dmg = 99; this.g.onTakedown && this.g.onTakedown(e); } else if (!e.ship) this.alarm(e);
     }
     e.hp -= dmg; e.flash = 0.18;
+    if (e.m.human && e.hp <= 0) { e.hp = e.maxHp; this.sleep(e); e.sleepT = 90; this.g.sfx.hit(); this.g.fx.emit(e.pos.clone().add(new V(0, 1.2, 0)), { color: 0xffffff, count: 16, speed: 5, life: 0.3 }); return true; }
     const dx = e.pos.x - from.x, dz = e.pos.z - from.z, l = Math.hypot(dx, dz) || 1;
     const kr = e.boss ? 10 : e.big ? 2.2 : 1; e.kb.set((dx / l) * knock / kr, 0, (dz / l) * knock / kr);
     const hitP = e.pos.clone(); hitP.y += e.big ? 1.6 : 1.1;
@@ -155,7 +166,8 @@ export class Enemies {
       const flare = e.st === 'windup' ? 1.6 + Math.sin(e.t * 40) * 0.4 : 0.6;
       m.eyes.forEach((s) => s.scale.setScalar(flare));
       if (m.cone) { m.cone.visible = e.alive && !e.alert && !lying && e.st !== 'drowsy'; m.cone.material.color.setRGB(1, 0.88 - e.sus * 0.7, 0.54 - e.sus * 0.5); m.cone.material.opacity = 0.045 + e.sus * 0.1; }
-      e.flash = Math.max(0, e.flash - dt); m.bodyM.emissive.setHex(e.flash > 0 ? 0xffffff : e.big ? 0x6b0f0f : 0x3b0d66); m.bodyM.emissiveIntensity = e.flash > 0 ? 1.2 : e.st === 'windup' ? 1.0 : 0.55;
+      if (m.human) { m.inner.rotation.x = 0; m.inner.position.y = 0; this.humanPose(e, anim, dt); }
+      e.flash = Math.max(0, e.flash - dt); if (m.human) { m.bodyM.emissive.setHex(e.flash > 0 ? 0x777777 : 0x000000); m.bodyM.emissiveIntensity = 1; } else m.bodyM.emissive.setHex(e.flash > 0 ? 0xffffff : e.big ? 0x6b0f0f : 0x3b0d66); m.bodyM.emissiveIntensity = e.flash > 0 ? 1.2 : e.st === 'windup' ? 1.0 : 0.55;
     }
     this.list = this.list.filter((e) => !e.gone);
     this.updateShots(dt, pl);
@@ -186,8 +198,8 @@ export class Enemies {
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
     if (d > range || Math.abs(dy) > 3.5) return 0;
     if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
-    const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5);
-    for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of this.g.level.boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return 0; }
+    const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5), BX = this.g.level.segBoxes(a, b);
+    for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of BX) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return 0; }
     return 1 + (9 - d) / 9;
   }
   patrol(e, dt, pl, d, dy, dx, dz) {
@@ -234,8 +246,8 @@ export class Enemies {
     for (const e of this.list) {
       if (!e.ship || !e.alive || !e.alert || e.st === 'sleep' || e.st === 'drowsy' || e.st === 'dragged') continue;
       const d = e.pos.distanceTo(pl.pos); if (d > 16) continue;
-      const a = e.pos.clone().add(new V(0, 1.6, 0)), n = Math.ceil(a.distanceTo(chest) / 0.5); let blocked = false;
-      for (let i = 1; i < n && !blocked; i++) { const p = a.clone().lerp(chest, i / n); for (const x of this.g.level.boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { blocked = true; break; } }
+      const a = e.pos.clone().add(new V(0, 1.6, 0)), n = Math.ceil(a.distanceTo(chest) / 0.5), BX = this.g.level.segBoxes(a, chest); let blocked = false;
+      for (let i = 1; i < n && !blocked; i++) { const p = a.clone().lerp(chest, i / n); for (const x of BX) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { blocked = true; break; } }
       if (!blocked) return true;
     }
     return false;
@@ -266,6 +278,18 @@ export class Enemies {
     }
     return null;
   }
+  humanPose(e, anim, dt) {
+    const h = e.m.h, P = { ...BASE }, t = e.t, walking = anim === 'walk';
+    e.m.ph += dt * (walking ? (e.alert ? 9 : 6.5) : 0);
+    Object.assign(P, { shRx: 0.95, elR: 1.25, shRz: 0.1, shLx: 1.0, shLz: -0.25, elL: 1.45, spineX: 0.06, chestX: Math.sin(t * 1.8) * 0.02 });
+    if (walking) { const ph = e.m.ph, A = e.alert ? 0.85 : 0.6; P.thLx = Math.sin(ph) * A; P.thRx = -Math.sin(ph) * A; P.knL = 0.15 + A * 1.1 * Math.max(0, Math.cos(ph)); P.knR = 0.15 + A * 1.1 * Math.max(0, -Math.cos(ph)); P.hipY = Math.abs(Math.cos(ph)) * 0.04 - 0.02; P.spineX = e.alert ? 0.2 : 0.06; }
+    if ((anim === 'windup' && e.st !== 'radio') || (e.alert && !walking)) { P.shRx = 1.45; P.elR = 0.25; P.shLx = 1.55; P.elL = 0.35; P.shLz = -0.1; P.headX = 0.05; P.knL = P.knR = 0.25; }
+    if (e.st === 'inv' && !walking) { P.headY = Math.sin(t * 1.3) * 0.6; }
+    if (e.st === 'radio') { P.shLx = 2.5; P.shLz = 0.35; P.elL = 2.5; P.headY = 0.2; }
+    if (anim === 'stagger' || e.st === 'drowsy') { P.spineX = -0.25 + Math.sin(t * 6) * 0.15; P.knL = P.knR = 0.6; P.headX = 0.4; P.shRx = 0.2; P.shLx = 0.2; P.elR = P.elL = 0.4; }
+    if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
+    blendPose(h, P, dt, e.st === 'sleep' ? 5 : 12);
+  }
   bossThink(e, dt, pl, d, dx, dz, toYaw) {
     const phase = e.hp > 26 ? 1 : e.hp > 13 ? 2 : 3; let anim = 'idle';
     if (phase !== e.phase) { e.phase = phase; if (phase > 1) { this.g.onBossPhase && this.g.onBossPhase(phase); e.cd = 1.2; } }
@@ -279,7 +303,7 @@ export class Enemies {
     return anim;
   }
   updateShots(dt, pl) {
-    const chest = pl.pos.clone().add(new V(0, 1.1, 0)), boxes = this.g.level.boxes;
+    const chest = pl.pos.clone().add(new V(0, 1.1, 0));
     for (const b of this.shots) {
       b.life -= dt; b.m.position.addScaledVector(b.vel, dt);
       if (Math.random() < 0.5) this.g.fx.emit(b.m.position, { color: b.mine ? 0xffd166 : 0x22d3ee, count: 1, speed: 0.4, life: 0.3, size: 0.2, grav: 0 });
@@ -292,7 +316,7 @@ export class Enemies {
         }
         if (p.distanceTo(chest) < 0.6) { pl.damage(1, p); b.life = 0; }
       } else for (const e of this.list) if (e.alive && e.pos.clone().add(new V(0, e.boss ? 3 : 1.1, 0)).distanceTo(p) < (e.boss ? 2.6 : 1.0)) { this.hurt(e, 2, p, 5); b.life = 0; break; }
-      for (const x of boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { b.life = 0; break; }
+      for (const x of this.g.level.nearR(p.x, p.z, 1)) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { b.life = 0; break; }
       if (b.life <= 0) { this.g.fx.emit(p, { color: 0x22d3ee, count: 10, speed: 3, life: 0.3 }); b.m.removeFromParent(); }
     }
     this.shots = this.shots.filter((b) => b.life > 0);

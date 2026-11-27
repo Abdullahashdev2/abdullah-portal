@@ -20,7 +20,7 @@ export class Player {
   spawn(p, yaw) { this.pos.copy(p); this.vel.set(0, 0, 0); this.yaw = yaw; this.camYawHint = yaw; this.state = 'air'; this.onGround = false; this.ground = null; this.lastWall = null; this.flip = 0; this.inv = 0; }
 
   /* ---------- collision ---------- */
-  boxes() { return this.g.level.boxes; }
+  boxes() { const L = this.g.level; return L.nearR ? L.nearR(this.pos.x, this.pos.z, 4) : L.boxes; }
   moveH(ax, d) {
     if (!d) return; const p = this.pos; p[ax] += d;
     for (const b of this.boxes()) {

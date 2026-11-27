@@ -180,3 +180,40 @@ export class Trail {
     this.geo.attributes.position.needsUpdate = this.geo.attributes.color.needsUpdate = true; this.mesh.visible = this.strength > 0.02;
   }
 }
+
+/* human ship guard: the calm-hero body re-dressed as a soldier (balaclava, cap, vest, rifle) */
+export function buildSoldier(seed = 0) {
+  const h = buildHero('calm');
+  const olive = [0x4b5340, 0x3f4a5a, 0x50483a][seed % 3];
+  const recol = { 0x16161c: olive, 0x0c0c10: 0x23262b, 0x111114: 0x0d0d0f, 0x9ca3af: 0x2d3436 };
+  const mats = [];
+  h.root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = o.material.clone(); mats.push(o.material);
+    const hx = o.material.color.getHex(); if (recol[hx] != null) o.material.color.setHex(recol[hx]);
+    if (o.material.metalness > 0.7 && o.geometry.type === 'TorusGeometry') o.visible = false; // earrings
+  });
+  const M = (c, r = 0.7, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+  const add = (p, m, x = 0, y = 0, z = 0) => { m.position.set(x, y, z); m.castShadow = true; p.add(m); return m; };
+  // balaclava + eye slit + cap
+  const bala = add(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.163, 20, 16), M(0x111214)), 0, 0, 0); bala.scale.set(0.97, 1.06, 1.02);
+  const slit = add(h.head, new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.045, 0.05), M(0xe0b89a, 0.6)), 0, 0.02, 0.145);
+  add(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 6), M(0x111111, 0.3)), -0.045, 0.022, 0.172); add(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.017, 8, 6), M(0x111111, 0.3)), 0.045, 0.022, 0.172);
+  const cap = add(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.45), M(olive)), 0, 0.03, 0);
+  add(cap, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.015, 0.12), M(olive)), 0, 0.02, 0.15);
+  // vest, radio, belt pouches
+  const vest = add(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.3), M(0x2f3a2b, 0.8)), 0, 0.26, 0.01);
+  for (let i = -1; i <= 1; i++) add(vest, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.06), M(0x26301f)), i * 0.12, -0.08, 0.16);
+  const radio = add(h.chest, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.04), M(0x111111, 0.4, 0.3)), -0.17, 0.02, 0.15);
+  add(radio, new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.12, 6), M(0x111111)), 0.02, 0.1, 0);
+  // rifle in the right hand
+  const rifle = new THREE.Group(); h.handR.add(rifle); rifle.position.set(0, -0.03, 0.05);
+  const gm = M(0x1b1d1f, 0.45, 0.6);
+  add(rifle, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.62), gm), 0, 0.02, 0.18);
+  add(rifle, new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.32, 8), gm), 0, 0.04, 0.62).rotation.x = Math.PI / 2;
+  add(rifle, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.07), gm), 0, -0.09, 0.26).rotation.x = 0.25;
+  add(rifle, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.2), M(0x3b2a1a, 0.8)), 0, -0.01, -0.18);
+  h.rifle = rifle; h.flashMats = mats; h.suitMat = mats.find((m) => m.color.getHex() === olive) || mats[0];
+  h.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return h;
+}
