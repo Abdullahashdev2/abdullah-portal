@@ -1,6 +1,8 @@
 // Level container + builder kit (colliders are axis-aligned boxes; visuals are free-form)
 import * as THREE from 'three';
 import { mat, glowSprite, runeTex, cloudTex, textSprite } from './fx.js';
+import { mergeGeometries } from '../saeq-albatal/lib/utils/BufferGeometryUtils.js';
+const HIDDEN = new THREE.MeshBasicMaterial({ visible: false });
 const V = THREE.Vector3;
 
 export class Level {
@@ -60,8 +62,63 @@ export class Level {
   }
   nearR(x, z, r) { return this.near(x - r, z - r, x + r, z + r); }
   segBoxes(a, b) { return this.near(Math.min(a.x, b.x) - 0.5, Math.min(a.z, b.z) - 0.5, Math.max(a.x, b.x) + 0.5, Math.max(a.z, b.z) + 0.5); }
+  /* دمج القطع الثابتة (نفس نوع الخامة + نفس المنطقة) في قطعة وحدة — يقلّل أوامر الرسم من آلاف لعشرات.
+     الأمان: نأخذ بس القطع المباشرة تحت المرحلة (وأبناءها من القطع)، ونتجنّب أي شي يتحرك/يختفي/خامته خاصة. */
+  batch(cell = 24) {
+    const OK = (m) => m && (m.isMeshStandardMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial || m.isMeshPhongMaterial) && !m.isShaderMaterial;
+    const cand = [];
+    const walk = (o) => {
+      for (const c of o.children) {
+        if (!c.isMesh || c.isSkinnedMesh || c.isInstancedMesh || c.userData.dyn || c.userData.nobatch || !c.visible) continue; // groups/sprites/lights are skipped entirely
+        if (!Array.isArray(c.material) && OK(c.material) && c.geometry && c.geometry.attributes.position && !c.morphTargetInfluences) cand.push(c);
+        walk(c);
+      }
+    };
+    walk(this.group);
+    if (cand.length < 50) return 0;
+    this.group.updateMatrixWorld(true);
+    const groups = new Map(), _v = new THREE.Vector3();
+    for (const o of cand) {
+      const m = o.material; o.geometry.computeBoundingSphere(); _v.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld);
+      const key = [m.type, m.map ? m.map.uuid : '', m.emissive ? m.emissive.getHex() : '', m.emissiveIntensity, m.roughness, m.metalness, m.flatShading, m.side, m.transparent, m.opacity, m.depthWrite, m.blending, m.vertexColors, m.fog, o.castShadow, o.receiveShadow, Math.floor(_v.x / cell), Math.floor(_v.z / cell), Math.floor(_v.y / (cell * 2))].join('|');
+      let g = groups.get(key); if (!g) groups.set(key, (g = [])); g.push(o);
+    }
+    let merged = 0;
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      const geos = [];
+      for (const o of list) {
+        const g = o.geometry.clone();
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+        const n = g.attributes.position.count;
+        if (!g.attributes.normal) g.computeVertexNormals();
+        if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+        if (!g.index) { const idx = new (n > 65535 ? Uint32Array : Uint16Array)(n); for (let i = 0; i < n; i++) idx[i] = i; g.setIndex(new THREE.BufferAttribute(idx, 1)); }
+        g.morphAttributes = {}; g.clearGroups();
+        g.applyMatrix4(o.matrixWorld);
+        const c = o.material.color || new THREE.Color(1, 1, 1), col = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        geos.push(g);
+      }
+      const big = mergeGeometries(geos, false); geos.forEach((g) => g.dispose());
+      if (!big) continue;
+      const m0 = list[0].material, bm = m0.clone(); if (bm.color) bm.color.setRGB(1, 1, 1); bm.vertexColors = true; bm.userData.own = true;
+      const mesh = new THREE.Mesh(big, bm); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; mesh.userData.batched = true;
+      this.group.add(mesh);
+      // القطع الأصلية تنشال من الرسم بس تبقى للفيزياء/الكاميرا (مصفوفاتها مثبتة)
+      for (const o of list) { o.material = HIDDEN; o.castShadow = o.receiveShadow = false; o.userData.batchedInto = mesh; o.userData.batchedOut = true; }
+      merged += list.length;
+    }
+    // القطع المخفية اللي كل أبنائها مدموجين: نشيلها من شجرة الرسم كلياً (تبقى للكاميرا والتصويب بمصفوفاتها الثابتة)
+    const allOut = (o) => o.userData.batchedOut && o.children.every(allOut);
+    this.detached = this.detached || [];
+    for (const o of cand) if (o.parent === this.group && allOut(o)) { o.removeFromParent(); this.detached.push(o); }
+    return merged;
+  }
   dispose() {
     this.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.userData.own) o.material.dispose(); });
+    (this.detached || []).forEach((d) => d.traverse((o) => { if (o.geometry) o.geometry.dispose(); }));
     this.group.removeFromParent();
   }
 }

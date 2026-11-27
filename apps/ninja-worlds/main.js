@@ -31,6 +31,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, LOW ? 1.3 : 1.6));
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
+/* لو الجوال طيّح الرسم (WebGL context lost) — كانت تطلع شاشة سوداء والصوت شغال: نعيد التحميل بجودة أخف ونرجّعه لنفس العالم */
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  try { localStorage.setItem('nw_safe', '1'); if (typeof worldId === 'string') localStorage.setItem('nw_resume', worldId); } catch (er) {}
+  try { sfx && sfx.music && sfx.music(null); } catch (er) {}
+  const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#0b0b16;color:#fff;font:700 20px system-ui;text-align:center;padding:20px';
+  d.textContent = '⚙️ الجوال تعب من الرسم… نعيد التحميل بجودة أخف'; document.body.appendChild(d);
+  setTimeout(() => location.reload(), 1200);
+}, false);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 6000);
 const sky = new Sky(); sky.scale.setScalar(4500); scene.add(sky);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); scene.add(hemi);
@@ -49,7 +58,7 @@ const LITE_W = [960, 800, 680, 560, 440]; let liteLvl = 1, lock30 = false, skipF
 const liteCache = new Map();
 function liteMat(m) {
   if (!m || !m.isMeshStandardMaterial) return m; let l = liteCache.get(m); if (l) return l;
-  l = new THREE.MeshLambertMaterial({ color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent, opacity: m.opacity, side: m.side, flatShading: m.flatShading, depthWrite: m.depthWrite });
+  l = new THREE.MeshLambertMaterial({ color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent, opacity: m.opacity, side: m.side, flatShading: m.flatShading, depthWrite: m.depthWrite, vertexColors: m.vertexColors });
   liteCache.set(m, l); return l;
 }
 function liteify(root) {
@@ -66,6 +75,7 @@ const QL = [
 ];
 let qMode = 'auto', qLevel = LOW ? 2 : 1, qChanged = 0, qBlock = {}, fpsAvg = 60, ftAcc = 0, ftN = 0;
 try { const m = localStorage.getItem('nw_q'); if (m != null && m !== 'auto') { qMode = +m; qLevel = +m; } } catch (e) {}
+let RESUME = null; try { if (localStorage.getItem('nw_safe') === '1') { localStorage.removeItem('nw_safe'); if (qMode === 'auto') qLevel = Math.max(qLevel, 3); RESUME = localStorage.getItem('nw_resume'); localStorage.removeItem('nw_resume'); } } catch (e) {}
 function applyLite() {
   document.body.classList.toggle('lite', LITE);
   if (!LITE) return;
@@ -239,9 +249,11 @@ function loadWorld(id, from) {
   level = new Level(scene); worldId = id; SAVE._from = from; $('#timer').classList.remove('on');
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
+  // السفينة أثقل عالم: على الجوال نبدأ فيها بجودة «متوسطة» (بدون bloom وMSAA) والتلقائي يرفعها لو الجوال قدر
+  if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
-  for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
+  enemies.cullR = cfg.ship ? 55 : 0; for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
   for (const it of level.items) it.origin = it.home.clone();
   applyAtmo(cfg);
   if (level.npcDef) { const d = level.npcDef; npc = buildHero('calm'); npc.root.position.set(d.x, d.y, d.z); npc.root.rotation.y = d.yaw; scene.add(npc.root); npc.line = 0; }
@@ -251,7 +263,7 @@ function loadWorld(id, from) {
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
-  level.buildGrid(); level.keys = {}; liteify(level.group); freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
+  level.buildGrid(); level.keys = {}; liteify(level.group); if (cfg.ship || cfg.batch) { try { level.batch(); } catch (e) { console.warn('batch failed', e); } } freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
@@ -418,6 +430,7 @@ $('#startBtn').onclick = () => {
   if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
   sfx.music(cfg.music); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
   try { if (TOUCH && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
+  if (RESUME && RESUME !== worldId) { const r = RESUME; RESUME = null; setTimeout(() => fadeTo(() => loadWorld(r, null)), 300); }
   setTimeout(() => { const t = level.triggers.find((t) => !t.fired && Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z) < t.r); if (t) { t.fired = true; say(t.text); } }, 900);
 };
 
@@ -762,7 +775,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = {
+window.__G = { scene, renderer,
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },

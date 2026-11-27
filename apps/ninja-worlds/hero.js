@@ -1,5 +1,6 @@
 // The blindfolded ninja (and the calm hero NPC): jointed procedural body + pose blending, physics scarf, sword trail
 import * as THREE from 'three';
+import { mergeGeometries } from '../saeq-albatal/lib/utils/BufferGeometryUtils.js';
 
 const M = (c, r = 0.6, m = 0, e, ei = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m, ...(e != null ? { emissive: e, emissiveIntensity: ei } : {}) });
 
@@ -213,7 +214,43 @@ export function buildSoldier(seed = 0) {
   add(rifle, new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.32, 8), gm), 0, 0.04, 0.62).rotation.x = Math.PI / 2;
   add(rifle, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.07), gm), 0, -0.09, 0.26).rotation.x = 0.25;
   add(rifle, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.2), M(0x3b2a1a, 0.8)), 0, -0.01, -0.18);
-  h.rifle = rifle; h.flashMats = mats; h.suitMat = mats.find((m) => m.color.getHex() === olive) || mats[0];
+  h.rifle = rifle; h.suitMat = mats.find((m) => m.color.getHex() === olive) || mats[0];
   h.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  compactRig(h.root); // ~50 قطعة ← ~15: كل عضو يصير قطعة وحدة (أخف بكثير على الجوال)
+  h.flashMats = []; h.root.traverse((o) => { if (o.isMesh && o.visible && !h.flashMats.includes(o.material)) h.flashMats.push(o.material); });
   return h;
+}
+
+/* دمج القطع الصلبة داخل كل مفصل: القطع "الورقية" (بدون أبناء) تحت نفس المفصل وبنفس نوع الخامة تصير قطعة وحدة،
+   ولون كل قطعة ينحفظ داخل الرؤوس (vertex colors). المفاصل نفسها ما تتغير، فالحركة تبقى كما هي. */
+export function compactRig(root) {
+  const nodes = []; root.traverse((o) => nodes.push(o));
+  for (const node of nodes) {
+    const groups = new Map();
+    for (const c of node.children) {
+      if (!c.isMesh || c.children.length || c.isSkinnedMesh || Array.isArray(c.material) || !c.material.isMeshStandardMaterial) continue;
+      if (!c.visible) { node.remove(c); continue; }
+      const m = c.material, key = [m.map ? m.map.uuid : '', m.emissive.getHex(), m.emissiveIntensity, m.metalness > 0.5 ? 1 : 0, m.flatShading, m.side, m.transparent, m.opacity, c.castShadow].join('|'); // الخشونة تتقارب: فرقها ما يبين على جندي صغير
+      let g = groups.get(key); if (!g) groups.set(key, (g = [])); g.push(c);
+    }
+    for (const list of groups.values()) {
+      if (list.length < 2) continue;
+      const geos = list.map((c) => {
+        c.updateMatrix(); const g = c.geometry.clone();
+        for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k);
+        const n = g.attributes.position.count;
+        if (!g.attributes.normal) g.computeVertexNormals();
+        if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+        if (!g.index) { const idx = new Uint32Array(n); for (let i = 0; i < n; i++) idx[i] = i; g.setIndex(new THREE.BufferAttribute(idx, 1)); }
+        g.clearGroups(); g.applyMatrix4(c.matrix);
+        const col = new Float32Array(n * 3), cc = c.material.color; for (let i = 0; i < n; i++) { col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b; }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3)); return g;
+      });
+      const big = mergeGeometries(geos, false); geos.forEach((g) => g.dispose());
+      if (!big) continue;
+      const bm = list[0].material.clone(); bm.color.setRGB(1, 1, 1); bm.vertexColors = true;
+      const mesh = new THREE.Mesh(big, bm); mesh.castShadow = list[0].castShadow; mesh.receiveShadow = list[0].receiveShadow; node.add(mesh);
+      list.forEach((c) => node.remove(c));
+    }
+  }
 }

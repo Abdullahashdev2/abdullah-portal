@@ -100,6 +100,9 @@ export class Enemies {
     for (const e of this.list) {
       e.t += dt; e.cd -= dt;
       const m = e.m, dx = pl.pos.x - e.pos.x, dz = pl.pos.z - e.pos.z, d = Math.hypot(dx, dz), dy = pl.pos.y - e.pos.y;
+      // الجندي البعيد ما ينرسم (يوفّر عشرات أوامر الرسم لكل جندي) — المنطق يكمّل عادي
+      if (!e.hidden) { const far = this.cullR || 1e9; e.m.g.visible = d < far || e.st === 'alert' && d < far * 1.6; }
+      if (this.cullR) { const sh = d < 22; if (e._sh !== sh) { e._sh = sh; e.m.g.traverse((o) => { if (o.isMesh && o !== e.m.cone) o.castShadow = sh; }); } } // ظل الجنود البعيدين ما يبين — نوفّره
       const seen = d < 15 && Math.abs(dy) < 2.6 && pl.hp > 0, toYaw = Math.atan2(dx, dz);
       // knockback + zone clamp
       e.pos.x += e.kb.x * dt; e.pos.z += e.kb.z * dt; e.kb.multiplyScalar(Math.exp(-7 * dt));
