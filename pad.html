@@ -32,6 +32,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 #pad button small{position:absolute;bottom:-18px;font-size:11px;font-weight:800;color:rgba(255,255,255,.75);white-space:nowrap}
 #pad button.down{transform:scale(.9);background:rgba(125,211,252,.4)}
 #state{position:fixed;bottom:calc(6px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:12px;color:#94a3b8;z-index:3;pointer-events:none}
+#modeSel{position:fixed;inset:0;z-index:8;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center;background:rgba(7,7,15,.96)}#modeSel.on{display:flex}#modeSel h2{margin:0}#modeSel p{margin:0;color:#cbd5e1}#modeSel button{width:min(520px,92vw);padding:14px;border-radius:18px;border:2px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:#fff;font:900 20px system-ui}#modeSel #mStream{background:linear-gradient(180deg,#22c55e,#15803d);border-color:#86efac}#modeSel small{display:block;font:600 13px system-ui;opacity:.85;margin-top:4px}
+#hintBar{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:7;max-width:92vw;background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 14px;font:800 14px system-ui;display:none;text-align:center}#hintBar.on{display:block}
 #rot{display:none;position:fixed;inset:0;z-index:10;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
 @media (orientation:portrait){#rot.need{display:flex}}
 </style>
@@ -60,6 +62,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 </div>
 <div id="pad"></div>
 <div id="state">غير متصل</div>
+<div id="modeSel">
+  <h2>✅ اتصلت بالتلفزيون!</h2>
+  <p>كيف تبغى تلعب؟</p>
+  <button id="mStream">📡 العب على التلفزيون<small>الجوال يشغّل اللعبة بأعلى جودة والتلفزيون يعرضها مع الصوت — الأفضل والأنعم</small></button>
+  <button id="mPad">🎮 يد تحكم بس<small>التلفزيون يشغّل اللعبة بنفسه (لأجهزة الكمبيوتر واللابتوب)</small></button>
+</div>
+<div id="hintBar"></div>
 <div id="rot">📱↔️<br>دوّر الجوال بالعرض</div>
 <script src="lib/peerjs.min.js"></script>
 <script>
@@ -99,10 +108,32 @@ function render() {
   });
 }
 /* ---------- 📡 super stream: this phone runs the game in 1080p and streams it to the TV as live video ---------- */
-let gameFrame = null, call = null, streaming = false, codeUsed = '';
+let gameFrame = null, call = null, streaming = false, codeUsed = '', tvInfo = null, ackTimer = 0;
+const hint = (t, ms = 7000) => { const h = $('#hintBar'); h.textContent = t; h.classList.add('on'); clearTimeout(hint.t); if (ms) hint.t = setTimeout(() => h.classList.remove('on'), ms); };
+function tvAck(s) {
+  clearTimeout(ackTimer);
+  if (s === 'playing') { hint('✅ التلفزيون يعرض اللعبة الحين — ناظر الشاشة الكبيرة 📺'); $('#gameFrame') && ($('#gameFrame').style.opacity = '0.12'); }
+  else if (s === 'muted') hint('🔇 الصورة طلعت بس التلفزيون منع الصوت — اضغط OK بالريموت على زر «تشغيل الصوت»', 12000);
+  else hint('⚠️ التلفزيون ما قدر يشغّل الفيديو — حدّث صفحة البوابة بالتلفزيون وجرّب مرة ثانية', 0);
+}
+$('#mStream').onclick = () => { $('#modeSel').classList.remove('on'); startStream(); };
+$('#mPad').onclick = () => { $('#modeSel').classList.remove('on'); hint('🎮 وضع يد التحكم — تقدر تشغّل البث بأي وقت من زر «📡 بث فائق» فوق'); };
+// prefer H.264 so the TV decodes the video in hardware (smooth even on old TVs)
+(function preferH264() {
+  if (!window.RTCPeerConnection || !window.RTCRtpSender || !RTCRtpSender.getCapabilities) return;
+  const orig = RTCPeerConnection.prototype.createOffer;
+  RTCPeerConnection.prototype.createOffer = function (...a) {
+    try { const caps = RTCRtpSender.getCapabilities('video').codecs, h = caps.filter((c) => /h264/i.test(c.mimeType)), rest = caps.filter((c) => !/h264/i.test(c.mimeType));
+      if (h.length) for (const t of this.getTransceivers()) if (t.sender && t.sender.track && t.sender.track.kind === 'video' && t.setCodecPreferences) t.setCodecPreferences([...h, ...rest]); } catch (e) {}
+    return orig.apply(this, a);
+  };
+})();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function startStream() {
   if (!conn || !conn.open) return;
+  if (!tvInfo || !tvInfo.stream) { hint('⚠️ التلفزيون عليه نسخة قديمة من البوابة — بالتلفزيون حدّث الصفحة (أو سكّر المتصفح وافتحه)، واضغط 📺 من جديد، وبعدين امسح الرمز', 0); return; }
+  try { conn.send({ streamStart: true }); } catch (e) {}
+  hint('⏳ أجهّز اللعبة وأبثها للتلفزيون…', 0);
   const btn = $('#streamB'); btn.textContent = '⏳ تجهيز…'; btn.disabled = true;
   try {
     const AC = window.AudioContext || window.webkitAudioContext; window.__padAudio = new AC(); await window.__padAudio.resume();
@@ -115,6 +146,7 @@ async function startStream() {
     call = peer.call('abdcast-' + codeUsed, stream);
     call.on('close', stopStream);
     setTimeout(() => { try { call.peerConnection.getSenders().forEach((s) => { if (!s.track || s.track.kind !== 'video') return; const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = 9000000; p.encodings[0].maxFramerate = 60; p.degradationPreference = 'maintain-framerate'; s.setParameters(p).catch(() => {}); }); } catch (e) {} }, 1200);
+    ackTimer = setTimeout(() => tvAck('error'), 12000);
     streaming = true; btn.classList.add('on'); btn.textContent = '📡 يبث ✓'; layout = Object.assign({}, w.__castLayout, { native: true }); menu = false; render();
     $('#state').textContent = '📡 بث فائق: الجوال يشغّل اللعبة 1080p والتلفزيون يعرضها';
   } catch (e) { $('#state').textContent = '⚠️ ما قدرت أبدأ البث — جرّب مرة ثانية'; stopStream(); }
@@ -141,10 +173,12 @@ function connect() {
   peer.on('open', () => {
     codeUsed = code; conn = peer.connect('abdcast-' + code, { reliable: false, serialization: 'json' });
     const to = setTimeout(() => { if (!conn || !conn.open) fail('ما قدرت أوصل — تأكد من الكود وإن الجهازين على نفس الواي فاي'); }, 12000);
-    conn.on('open', () => { clearTimeout(to); $('#join').style.display = 'none'; $('#rot').classList.add('need'); $('#state').textContent = '✅ متصل — ' + code; if (navigator.vibrate) navigator.vibrate(40); render(); });
+    conn.on('open', () => { clearTimeout(to); $('#modeSel').classList.add('on'); $('#join').style.display = 'none'; $('#rot').classList.add('need'); $('#state').textContent = '✅ متصل — ' + code; if (navigator.vibrate) navigator.vibrate(40); render(); });
     conn.on('data', (d) => {
       if (!d) return;
       if (d.layout) { layout = d.layout; if (layout.native || !layout.menuOnly) menu = false; $('#hearts').hidden = $('#shards').hidden = true; render(); }
+      if (d.hello) tvInfo = d.hello;
+      if (d.tv) tvAck(d.tv);
       if (d.vib && navigator.vibrate) navigator.vibrate(d.vib);
       if (d.hp != null) { $('#hearts').hidden = false; $('#hearts').textContent = '❤'.repeat(Math.max(0, d.hp)) + '♡'.repeat(Math.max(0, (d.max || 5) - d.hp)); }
       if (d.sh) { $('#shards').hidden = false; $('#shards').textContent = d.sh; }

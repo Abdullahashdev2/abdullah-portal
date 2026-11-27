@@ -40,7 +40,7 @@
     peer.on('connection', (c) => {
       if (conn) try { conn.close(); } catch (e) {}
       conn = c; last = {}; gotFirst = false; held = {}; dirs = {}; layoutStr = '';
-      c.on('open', () => { window.KeepAwake && window.KeepAwake.on(); status('✅ الجوال متصل! 🎮'); $('#castBtn').classList.add('on'); $('#castViewerBtn').classList.add('on'); setTimeout(() => ($('#castSheet').hidden = true), 1200); pushLayout(true); });
+      c.on('open', () => { try { c.send({ hello: { v: 3, stream: true } }); } catch (e) {} window.KeepAwake && window.KeepAwake.on(); status('✅ الجوال متصل! 🎮'); $('#castBtn').classList.add('on'); $('#castViewerBtn').classList.add('on'); setTimeout(() => ($('#castSheet').hidden = true), 1200); pushLayout(true); });
       c.on('data', onData);
       c.on('close', () => { if (conn !== c) return; conn = null; window.KeepAwake && window.KeepAwake.off(); releaseAll(); $('#castBtn').classList.remove('on'); $('#castViewerBtn').classList.remove('on'); clearFocus(); try { const w = gameWin(); w && w.__castLeave && w.__castLeave(); } catch (e) {} });
     });
@@ -81,6 +81,7 @@
 
   function onData(d) {
     if (!d || typeof d !== 'object') return;
+    if (d.streamStart) { $('#castSheet').hidden = false; status('📡 الجوال يجهّز البث… ثواني'); return; }
     lastPacket = d;
     const L = currentLayout();
     if (typeof d.m === 'boolean' && !L.menuOnly) { if (d.m !== menuMode) { menuMode = d.m; if (!menuMode) clearFocus(); else releaseAll(); } }
@@ -159,7 +160,9 @@
     btn.style.cssText = 'position:absolute;top:20px;left:50%;transform:translateX(-50%);padding:14px 22px;border-radius:14px;border:0;background:#f59e0b;color:#1a1200;font:900 18px system-ui;cursor:pointer';
     btn.onclick = () => { v.muted = false; v.play().catch(() => {}); btn.hidden = true; };
     vbox.append(v, tip, btn); document.body.appendChild(vbox);
-    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); btn.hidden = false; btn.focus(); });
+    const ack = (s2) => send({ tv: s2 });
+    v.addEventListener('playing', () => ack('playing'), { once: true });
+    v.play().catch(() => { v.muted = true; v.play().catch(() => ack('error')); btn.hidden = false; btn.focus(); ack('muted'); });
     setTimeout(() => (tip.style.opacity = '0'), 5000);
     try { vbox.requestFullscreen && vbox.requestFullscreen().catch(() => {}); } catch (e) {}
     window.KeepAwake && window.KeepAwake.on();
