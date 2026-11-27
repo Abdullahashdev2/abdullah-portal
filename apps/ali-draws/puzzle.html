@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b1020">
+<title>مغامرة الألغاز</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1020;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;cursor:pointer}
+.screen{position:fixed;inset:0;display:none}.screen.on{display:block}
+/* ---------- map ---------- */
+#map{overflow-y:auto;background:radial-gradient(120% 70% at 50% 0%,#312e81,#0b1020 70%);padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 24px)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ib{width:46px;height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.22);background:rgba(15,23,42,.6);backdrop-filter:blur(6px);color:#fff;font-size:20px;display:grid;place-items:center;flex:none}
+h1{margin:10px 0 4px;text-align:center;font-size:30px;line-height:1.4;background:linear-gradient(90deg,#fde68a,#f9a8d4,#a5b4fc);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{text-align:center;color:#c7d2fe;margin:0 auto 14px;max-width:440px;line-height:1.7;font-size:14px}
+.duo{display:flex;justify-content:center;gap:18px;margin:4px 0 14px}
+.duo figure{margin:0;text-align:center;font-size:12px;color:#c7d2fe}.duo img{height:120px;filter:drop-shadow(0 8px 14px rgba(0,0,0,.5))}
+.scene{position:relative;display:block;width:min(100%,560px);margin:0 auto 16px;border:0;padding:0;border-radius:22px;overflow:hidden;text-align:right;color:#fff;box-shadow:0 12px 30px rgba(0,0,0,.5);background:#111}
+.scene img{display:block;width:100%;aspect-ratio:16/8;object-fit:cover}
+.scene .cap{position:absolute;inset:auto 0 0 0;padding:28px 14px 12px;background:linear-gradient(0deg,rgba(2,6,23,.92),transparent)}
+.scene .cap b{font-size:19px}.scene .cap small{display:block;color:#cbd5e1;margin-top:2px}
+.lv{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.lv button{min-width:58px;border:1px solid rgba(255,255,255,.3);background:rgba(15,23,42,.7);color:#fff;border-radius:12px;padding:7px 8px;font-weight:900;font-size:14px}
+.lv button.done{background:linear-gradient(135deg,#16a34a,#0d9488);border-color:transparent}
+.lv button:disabled{opacity:.45}
+.lv button small{display:block;font-size:10px;font-weight:700;letter-spacing:1px}
+/* ---------- play ---------- */
+#play{background:#000}
+#bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:saturate(1.1)}
+#bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,23,.55),rgba(2,6,23,.25) 40%,rgba(2,6,23,.75))}
+#hud{position:absolute;z-index:3;top:calc(env(safe-area-inset-top) + 8px);left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+#title{flex:1;text-align:center;font-weight:900;font-size:15px;text-shadow:0 2px 6px #000;line-height:1.4}
+#title small{display:block;font-weight:700;color:#fde68a;font-size:12px}
+#board{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top) + 64px);bottom:200px;display:flex;align-items:center;justify-content:center}
+/* gears */
+.gears{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:0}
+.gwrap{position:relative;display:flex;flex-direction:column;align-items:center}
+.ref{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:24px;font-weight:900;margin-bottom:6px;background:radial-gradient(circle,rgba(253,230,138,.35),rgba(15,23,42,.85));border:2px solid #fde68a;box-shadow:0 0 16px rgba(253,230,138,.6);transition:all .3s}
+.ref.ok{border-color:#4ade80;box-shadow:0 0 22px rgba(74,222,128,.9)}
+.pin{width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;border-top:14px solid #fde68a;margin-bottom:-4px;z-index:2;filter:drop-shadow(0 0 6px #fde68a)}
+.gear{position:relative;border:0;background:none;padding:0;touch-action:manipulation;outline:none}
+.gear svg{display:block;transition:transform .45s cubic-bezier(.3,1.4,.5,1)}
+.gear.focus svg{filter:drop-shadow(0 0 10px #22d3ee)}
+.gear.hint{animation:hint 1s ease-in-out infinite}
+@keyframes hint{50%{filter:drop-shadow(0 0 18px #facc15);transform:scale(1.06)}}
+.gate{position:absolute;inset:-40px -24px -24px;pointer-events:none;border-radius:20px;opacity:0;transition:opacity .6s}
+.gate.open{opacity:1;background:radial-gradient(circle,rgba(253,230,138,.9),rgba(253,230,138,0) 70%)}
+/* bridge */
+.bridge{position:relative;width:min(92vw,460px);height:100%;perspective:700px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.disc{position:absolute;top:0;left:50%;transform:translateX(-50%);display:flex;gap:6px;align-items:center;padding:10px 14px;border-radius:999px;background:radial-gradient(circle,rgba(34,211,238,.25),rgba(15,23,42,.88));border:2px solid #67e8f9;box-shadow:0 0 22px rgba(34,211,238,.55);z-index:3;max-width:96%;flex-wrap:wrap;justify-content:center;animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translate(-50%,-6px)}}
+.disc span{min-width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:20px;font-weight:900;background:rgba(255,255,255,.08)}
+.disc span.q{background:rgba(250,204,21,.25);border:2px dashed #facc15;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{transform:scale(1.12)}}
+.deck{width:100%;transform:rotateX(52deg);transform-origin:50% 100%;display:flex;flex-direction:column-reverse;gap:10px;padding-bottom:6px}
+.row{display:flex;gap:10px;justify-content:center;transition:opacity .4s,transform .4s}
+.row.past{opacity:.35}.row.future{opacity:.55}
+.tile{width:86px;height:64px;border-radius:12px;border:2px solid rgba(103,232,249,.45);background:linear-gradient(180deg,#334155,#1e293b);color:#fff;font-size:30px;font-weight:900;display:grid;place-items:center;box-shadow:0 6px 0 #0f172a;transition:all .25s;touch-action:manipulation;outline:none}
+.row.cur .tile{border-color:#67e8f9;box-shadow:0 6px 0 #0f172a,0 0 16px rgba(103,232,249,.6)}
+.tile.ok{background:linear-gradient(180deg,#0e7490,#155e75);border-color:#4ade80}
+.tile.bad{animation:shake .45s}.tile.dim{opacity:.35}
+.tile.focus{outline:3px solid #fde68a}
+.tile.hint{animation:hint 1s ease-in-out infinite}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+#walker{position:absolute;bottom:4px;left:50%;height:120px;transform:translateX(-50%);transition:bottom .5s cubic-bezier(.3,1.4,.5,1);z-index:4;filter:drop-shadow(0 6px 8px rgba(0,0,0,.6));pointer-events:none}
+/* the two characters */
+#cast{position:absolute;z-index:3;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 4px);display:flex;justify-content:space-between;align-items:flex-end;padding:0 6px;pointer-events:none}
+.chr{position:relative;width:48%;display:flex;flex-direction:column;align-items:center}
+.chr img{height:150px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));transform-origin:50% 100%}
+.chr .aura{position:absolute;bottom:0;width:120px;height:40px;border-radius:50%;filter:blur(14px);opacity:.75;transition:background .4s}
+.bub{position:relative;background:#fff;color:#0f172a;font-weight:800;font-size:13.5px;line-height:1.55;padding:8px 11px;border-radius:14px;margin-bottom:6px;max-width:100%;min-height:22px;box-shadow:0 6px 16px rgba(0,0,0,.35);opacity:0;transform:translateY(6px) scale(.95);transition:all .3s}
+.bub.on{opacity:1;transform:none}
+.bub::after{content:"";position:absolute;bottom:-8px;left:50%;margin-left:-8px;border:8px solid transparent;border-bottom:0;border-top-color:#fff}
+.bub .mood{font-size:16px;margin-inline-end:4px}
+.m-excited img{animation:bounce .6s ease-in-out infinite}
+.m-curious img{animation:tilt 2.4s ease-in-out infinite}
+.m-encouraging img{animation:nod 1.2s ease-in-out infinite}
+.m-thinking img{animation:sway 3s ease-in-out infinite}
+.m-celebrating img{animation:party .8s ease-in-out infinite}
+@keyframes bounce{50%{transform:translateY(-10px)}}
+@keyframes tilt{50%{transform:rotate(-4deg)}}
+@keyframes nod{50%{transform:translateY(3px) scaleY(.97)}}
+@keyframes sway{25%{transform:rotate(2deg)}75%{transform:rotate(-2deg)}}
+@keyframes party{25%{transform:translateY(-16px) rotate(-6deg)}75%{transform:translateY(-16px) rotate(6deg)}}
+/* win */
+#win{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(2,6,23,.82);backdrop-filter:blur(5px);text-align:center;padding:20px}
+#win.on{display:flex}
+#win h2{margin:0;font-size:32px}
+#win .stars{font-size:44px;letter-spacing:6px}
+#win .st{color:#e2e8f0;line-height:1.8}
+#win button{border:0;border-radius:16px;padding:14px 24px;font-size:17px;font-weight:900;margin:4px}
+.confetti{position:fixed;top:-20px;width:10px;height:14px;z-index:21;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+</style>
+</head>
+<body>
+
+<!-- ======================= MAP ======================= -->
+<section id="map" class="screen on">
+  <div class="top"><button class="ib" id="mBack" type="button" aria-label="رجوع">→</button><span></span><button class="ib" id="mSound" type="button" aria-label="الصوت">🔊</button></div>
+  <h1>🧩 مغامرة الألغاز</h1>
+  <p class="sub">بطلين من رسمات علي يمشون معك: <b>النينجا المعصوب</b> متحمس ويعطيك تلميحات سريعة، و<b>البطل الهادئ</b> يحلّل ويتذكر محاولاتك. لاحظ، فكّر بالنمط، وافتح البوابات!</p>
+  <div class="duo"><figure><img src="seed/masked_ninja_sheet_a0.png" alt=""><figcaption>النينجا المعصوب 🔥</figcaption></figure><figure><img src="seed/hero_hand_sheet_a0.png" alt=""><figcaption>البطل الهادئ 🧠</figcaption></figure></div>
+  <div class="scene"><img src="puzzle/library.jpg" alt=""><div class="cap"><b>🏛️ المكتبة البلورية</b><small>لف التروس وطابق الرموز والألوان عشان تنفتح البوابة</small><div class="lv" id="lvLib"></div></div></div>
+  <div class="scene"><img src="puzzle/bridge.jpg" alt=""><div class="cap"><b>🌉 جسر الرونات السماوي</b><small>اكتشف النمط في القرص الطائر، واعبر الجسر بلاطة بلاطة</small><div class="lv" id="lvBri"></div></div></div>
+</section>
+
+<!-- ======================= PLAY ======================= -->
+<section id="play" class="screen">
+  <div id="bg"></div>
+  <div id="hud"><button class="ib" id="pBack" type="button" aria-label="الخريطة">→</button><div id="title"></div><button class="ib" id="pReset" type="button" aria-label="إعادة">🔄</button><button class="ib" id="pHint" type="button" aria-label="تلميح">💡</button></div>
+  <div id="board"></div>
+  <div id="cast">
+    <div class="chr" id="cA"><div class="bub" id="bA"></div><div class="aura"></div><img src="seed/masked_ninja_sheet_a0.png" alt="النينجا المعصوب"></div>
+    <div class="chr" id="cB"><div class="bub" id="bB"></div><div class="aura"></div><img src="seed/hero_hand_sheet_a0.png" alt="البطل الهادئ"></div>
+  </div>
+</section>
+<div id="win"><h2 id="wT">🎉 فتحت البوابة!</h2><div class="stars" id="wS"></div><div class="st" id="wD"></div>
+  <div><button id="wNext" type="button" style="background:linear-gradient(90deg,#fde68a,#fb923c);color:#0f172a">▶ المرحلة الجاية</button><button id="wMap" type="button" style="background:#1e293b;color:#fff">🗺️ الخريطة</button></div></div>
+
+<script src="../portal-sdk.js"></script>
+<script>
+'use strict';
+const $=s=>document.querySelector(s),ar=n=>Number(n).toLocaleString('ar-EG');
+const rand=n=>Math.floor(Math.random()*n),pick=a=>a[rand(a.length)],shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rand(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}};
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
+
+/* ======================= sound ======================= */
+let AC=null,soundOn=store.get('pz_sound',true);
+function tone(f,d,type='sine',v=.08){if(!soundOn)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,AC.currentTime);g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d);}catch(e){}}
+const sfx={click:()=>tone(520,.08,'triangle'),ok:()=>{tone(784,.12);setTimeout(()=>tone(1046,.16),80);},bad:()=>tone(180,.22,'sawtooth',.05),win:()=>[523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>tone(f,.4,'sine',.09),i*110))};
+
+/* ======================= the simulated mind (mood + short memory + tiered hints) ======================= */
+const MOODS={excited:['🔥','#f97316'],curious:['🤔','#38bdf8'],encouraging:['💪','#4ade80'],thinking:['🧠','#a78bfa'],celebrating:['🎉','#facc15']};
+const LINES={
+ A:{start:['يلا نبدأ! 🔥 ركّز وشوف وش المطلوب','جاهز؟ أنا متحمس مرّة!','هالبوابة تنتظرنا، يلا!'],
+    good:['ممتاز! 👏','كفو عليك!','صح! كمّل كمّل!','أيوه كذا! 🔥'],
+    bad1:['قريب! جرّب مرة ثانية 😄','ولا يهمك، المحاولة جزء من اللعبة'],
+    bad2:['ركّز على العلامة اللي فوق 👀','خذ نفس وشوف التفاصيل'],
+    hint1:['شوف اللي يلمع! ✨ ابدأ منه'],
+    idle:['وش رايك تجرّب من الطرف؟','أنا أنتظرك 😄 أي حركة تعلّمنا شي'],
+    win:['ياااه! فتحتها! 🎉','بطل! 🏆 يلا اللي بعدها!']},
+ B:{start:['لاحظ القاعدة قبل ما تتحرك. التفكير أول، الحركة ثاني.','كل لغز له نمط. نلقاه سوا.'],
+    repeat:['لاحظت إنك جرّبت «{x}» قبل… خلنا نجرّب شي ثاني.','هذي المرة {n} على نفس الحركة. فكّر بالنمط بدل التجربة.'],
+    logic:[],good:['منظّم 👌','تفكيرك صح.'],
+    win:['حليتها بـ {m} حركة و{h} تلميح. تفكير مرتّب 👌','ممتاز. لاحظت النمط بسرعة.']}};
+class Mind{
+ constructor(id,el,bub){this.id=id;this.el=el;this.bub=bub;this.mood='curious';this.timer=0;this.setMood('curious');}
+ setMood(m){this.mood=m;this.el.className='chr m-'+m;this.el.querySelector('.aura').style.background=MOODS[m][1];}
+ say(text,mood,ms=3800){if(mood)this.setMood(mood);this.bub.innerHTML='<span class="mood">'+MOODS[this.mood][0]+'</span>';this.bub.appendChild(document.createTextNode(text));this.bub.classList.add('on');clearTimeout(this.timer);this.timer=setTimeout(()=>this.bub.classList.remove('on'),ms);}
+}
+const MA=new Mind('A',$('#cA'),$('#bA')),MB=new Mind('B',$('#cB'),$('#bB'));
+const fill=(s,o)=>s.replace(/\{(\w+)\}/g,(_,k)=>o[k]!=null?o[k]:'');
+// session memory for the current puzzle
+const MEM={attempts:0,wrongStreak:0,moves:0,hints:0,history:[],picks:{}};
+function memReset(){Object.assign(MEM,{attempts:0,wrongStreak:0,moves:0,hints:0,history:[],picks:{}});}
+function react(ev,ctx={}){
+ if(ev==='start'){MA.say(pick(LINES.A.start),'excited');setTimeout(()=>MB.say(ctx.rule||pick(LINES.B.start),'thinking',6000),900);return;}
+ if(ev==='good'){MEM.wrongStreak=0;if(Math.random()<.6)MA.say(pick(LINES.A.good),'excited',1800);else MB.say(pick(LINES.B.good),'encouraging',1800);return;}
+ if(ev==='bad'){MEM.attempts++;MEM.wrongStreak++;const k=ctx.key;MEM.picks[k]=(MEM.picks[k]||0)+1;
+  if(k!=null&&MEM.picks[k]>=2){MB.say(fill(MEM.picks[k]>=3?LINES.B.repeat[1]:LINES.B.repeat[0],{x:ctx.label||k,n:ar(MEM.picks[k])}),'thinking',4500);}
+  else if(MEM.wrongStreak===1)MA.say(pick(LINES.A.bad1),'encouraging',2400);
+  else if(MEM.wrongStreak===2)MA.say(pick(LINES.A.bad2),'curious',3000);
+  if(MEM.wrongStreak>=3){giveHint(true);MEM.wrongStreak=0;}return;}
+ if(ev==='win'){MA.say(pick(LINES.A.win),'celebrating',5000);MB.say(fill(pick(LINES.B.win),{m:ar(MEM.moves),h:ar(MEM.hints)}),'celebrating',5000);}}
+let hintLevel=0;
+// tiered hints: 1) visual pointer (what to touch), 2) the logic behind it — never the whole answer at once
+function giveHint(auto){if(!PZ)return;MEM.hints++;hintLevel=Math.min(2,hintLevel+1);
+ if(hintLevel===1||auto){PZ.visualHint();MA.say(pick(LINES.A.hint1),'encouraging',3000);}
+ else{MB.say(PZ.logicHint(),'thinking',7000);PZ.visualHint();}}
+let idleT=0;function poke(){idleT=0;}
+setInterval(()=>{if(!PZ||!$('#play').classList.contains('on'))return;idleT+=1;if(idleT===18){MA.say(pick(LINES.A.idle),'curious',3500);}if(idleT===32){giveHint(true);idleT=0;}},1000);
+
+/* ======================= progress ======================= */
+const SAVE_KEY='ali_puzzles';let PROG=store.get(SAVE_KEY,{lib:[],bri:[]});
+function saveProg(){store.set(SAVE_KEY,PROG);const tot=[...PROG.lib,...PROG.bri].filter(Boolean),stars=tot.reduce((a,b)=>a+b,0);
+ try{window.Game&&Game.save('ali-puzzles',{prog:PROG,score:stars,scores:{'ali-puzzles':stars},summary:`⭐ ${stars} • ${tot.length} مراحل`});}catch(e){}}
+try{window.Game&&Game.load('ali-puzzles').then(d=>{if(d&&d.prog){for(const k of['lib','bri'])d.prog[k].forEach((v,i)=>{if(v>(PROG[k][i]||0))PROG[k][i]=v;});store.set(SAVE_KEY,PROG);renderMap();}});}catch(e){}
+
+/* ======================= puzzle 1: crystal library gears ======================= */
+const SYM=['✦','☾','▲','●','■','✚'],SYMC={'✦':'#fde68a','☾':'#c4b5fd','▲':'#f87171','●':'#60a5fa','■':'#4ade80','✚':'#f472b6'};
+const COLS=[['#ef4444','أحمر'],['#3b82f6','أزرق'],['#22c55e','أخضر'],['#facc15','ذهبي'],['#a855f7','بنفسجي'],['#f97316','برتقالي']];
+const LIB=[
+ {n:3,s:4,mesh:false,rule:'sym',title:'التروس الأولى',tip:'لف كل ترس لين الرمز اللي تحت السهم يصير نفس العلامة اللي فوقه.'},
+ {n:4,s:4,mesh:true,rule:'sym',title:'تروس مترابطة',tip:'هالتروس متشابكة: لما تلف ترس، جاره يلف بالعكس!'},
+ {n:4,s:6,mesh:true,rule:'color',title:'تسلسل الألوان',tip:'هالمرة العلامة لون: خل لون كل ترس تحت السهم نفس اللون اللي فوقه.'},
+ {n:5,s:6,mesh:true,rule:'mix',title:'البوابة الكبرى',tip:'بعض العلامات رموز وبعضها ألوان — طابق كل وحدة حسب نوعها.'}];
+function gearSVG(size,slots,col){const r=size/2,ro=r-2,ri=r-14,teeth=slots*3,parts=[];let d='';
+ for(let i=0;i<teeth*2;i++){const a=i/(teeth*2)*Math.PI*2,rr=i%2?ri+2:ro;d+=(i?'L':'M')+(r+Math.cos(a-Math.PI/2)*rr).toFixed(1)+' '+(r+Math.sin(a-Math.PI/2)*rr).toFixed(1);}
+ parts.push(`<path d="${d}Z" fill="#b45309" stroke="#78350f" stroke-width="2"/>`,`<circle cx="${r}" cy="${r}" r="${ri-4}" fill="url(#gg)" stroke="#fde68a" stroke-width="2"/>`);
+ slots.forEach((s,i)=>{const a=i/slots.length*Math.PI*2-Math.PI/2,x=r+Math.cos(a)*(ri-20),y=r+Math.sin(a)*(ri-20);
+  parts.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${size*.11}" fill="${s.c||'#0f172a'}" stroke="#fde68a" stroke-width="1.5"/>`,`<text x="${x.toFixed(1)}" y="${(y+size*.045).toFixed(1)}" text-anchor="middle" font-size="${size*.13}" font-weight="900" fill="${s.c?'#0f172a':SYMC[s.s]}">${s.s}</text>`);});
+ parts.push(`<circle cx="${r}" cy="${r}" r="${size*.09}" fill="#fde68a" stroke="#78350f" stroke-width="2"/>`);
+ return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><defs><radialGradient id="gg"><stop offset="0" stop-color="#92400e"/><stop offset="1" stop-color="#451a03"/></radialGradient></defs>${parts.join('')}</svg>`;}
+function makeLib(li){const L=LIB[li],n=L.n,S=L.s,gears=[];
+ for(let i=0;i<n;i++){const syms=shuffle(SYM.slice(0,S).slice()),cols=shuffle(COLS.slice(0,S).slice());const slots=syms.map((s,k)=>({s,c:L.rule==='sym'?null:cols[k][0],cn:cols[k][1]}));
+  const kind=L.rule==='mix'?(i%2?'color':'sym'):L.rule;gears.push({slots,r:0,kind});}
+ // solved state is r=0 for every gear (target = slot 0); scramble with random legal moves, so it is always solvable
+ const tap=(i,dir=1)=>{const g=gears[i];g.r=(g.r+dir+S)%S;if(L.mesh){for(const j of[i-1,i+1])if(gears[j])gears[j].r=(gears[j].r-dir+S)%S;}};
+ let tries=0;do{for(let k=0;k<6+li*4;k++)tap(rand(n));tries++;}while(gears.every(g=>g.r===0)&&tries<20);
+ const want=[3,4,6,7][li];
+ const enc=a=>a.join(','),DIST=new Map();{const inv=(a,i)=>{const b=a.slice();b[i]=(b[i]-1+S)%S;if(L.mesh){for(const j of[i-1,i+1])if(j>=0&&j<n)b[j]=(b[j]+1)%S;}return b;};
+  const z=Array(n).fill(0);DIST.set(enc(z),0);const q=[z];while(q.length){const a=q.shift(),d=DIST.get(enc(a));for(let i=0;i<n;i++){const b=inv(a,i),k=enc(b);if(!DIST.has(k)){DIST.set(k,d+1);q.push(b);}}}}
+ const dist=()=>DIST.get(enc(gears.map(g=>g.r)));
+ const size=Math.min(118,Math.floor((Math.min(innerWidth,560)-20)/n)*(L.mesh?1.08:1));
+ const board=$('#board');board.innerHTML='<div class="gears" id="gears"></div><div class="gate" id="gate"></div>';const box=$('#gears');let focus=0,busy=false;
+ const els=gears.map((g,i)=>{const w=document.createElement('div');w.className='gwrap';const t=g.slots[0];
+  const ref=document.createElement('div');ref.className='ref';if(g.kind==='color'){ref.style.background=t.c;ref.title=t.cn;}else{ref.textContent=t.s;ref.style.color=SYMC[t.s];}
+  const pin=document.createElement('div');pin.className='pin';const b=document.createElement('button');b.className='gear';b.type='button';b.setAttribute('aria-label','ترس '+(i+1));b.innerHTML=gearSVG(size,g.slots.map(sl=>({s:sl.s,c:g.kind==='color'?sl.c:null})));
+  if(L.mesh&&i>0)w.style.marginInlineStart=(-size*.14)+'px';b.onclick=()=>{focus=i;turn(i);};w.append(ref,pin,b);box.appendChild(w);return{w,ref,b,svg:b.querySelector('svg'),ang:0};});
+ // the gear shows slot (r) at the top -> rotate so that slot sits under the pin
+ function draw(){gears.forEach((g,i)=>{const E=els[i];const target=-g.r*360/S;let d=target-E.ang;d=((d+540)%360)-180;E.ang+=d;E.svg.style.transform=`rotate(${E.ang}deg)`;E.ref.classList.toggle('ok',g.r===0);E.b.classList.toggle('focus',i===focus);});}
+ function turn(i){if(busy)return;poke();busy=true;setTimeout(()=>busy=false,300);sfx.click();els.forEach(e=>e.b.classList.remove('hint'));
+  const before=dist();tap(i);MEM.moves++;MEM.history.push(i);draw();const after=dist();
+  if(gears.every(g=>g.r===0)){setTimeout(()=>{$('#gate').classList.add('open');sfx.win();winLevel('lib',li);},500);return;}
+  // judged by the real distance to the solution, so a smart "temporary" move is never called a mistake
+  if(after<before){sfx.ok();react('good');}else if(after>before){sfx.bad();react('bad',{key:'g'+i,label:'الترس '+ar(i+1)});}}
+ const kb=e=>{if(!$('#play').classList.contains('on')||PZ.kind!=='lib')return;if(e.key==='ArrowLeft'){focus=Math.min(n-1,focus+1);draw();}else if(e.key==='ArrowRight'){focus=Math.max(0,focus-1);draw();}else if(e.key==='Enter'||e.key===' '){e.preventDefault();turn(focus);}};
+ // one gear whose single turn brings the most gears home (greedy) — that is what the hint points at
+ function best(){let bi=0,bv=1e9;for(let i=0;i<n;i++){const save=gears.map(g=>g.r);tap(i);const v=dist();gears.forEach((g,k)=>g.r=save[k]);if(v<bv){bv=v;bi=i;}}return bi;}
+ draw();return{kind:'lib',kb,_n:n,_S:S,_mesh:L.mesh,_state:()=>gears.map(g=>g.r),_turn:turn,visualHint(){const i=best();els[i].b.classList.add('hint');focus=i;draw();},
+  logicHint(){const i=best(),g=gears[i];const need=(S-g.r)%S;return L.mesh?`باقي ${ar(dist())} حركات تقريباً. جرّب الترس ${ar(i+1)} — وتذكّر: أحياناً لازم تخرّب ترس مؤقتاً عشان تصلّح جيرانه، وهذا مو غلط.`:`الترس ${ar(i+1)} يحتاج ${ar(need)} لفّة عشان يوصل للعلامة اللي فوقه.`;},
+  title:L.title,tip:L.tip};}
+
+/* ======================= puzzle 2: sky rune bridge ======================= */
+const BRI=[
+ {title:'نمط الشمس والقمر',len:7,show:4,period:2,seq:i=>['☀️','🌙'][i%2],pool:['☀️','🌙','⭐','☁️'],tip:'القرص يوريك بداية النمط. كمّله على الجسر!'},
+ {title:'الأشكال الثلاثة',len:9,show:4,period:3,seq:i=>['▲','●','■'][i%3],pool:['▲','●','■','✦','☾'],tip:'النمط هالمرة طوله ثلاث — عدّ زين.'},
+ {title:'الشكل واللون',len:9,show:5,period:4,seq:i=>({s:['▲','▲','●','●'][i%4],c:i%2?'#60a5fa':'#facc15'}),pool:null,tip:'انتبه للشكل واللون مع بعض!'},
+ {title:'الجسر الكبير',len:10,show:4,period:3,seq:i=>'✦'.repeat(i%3+1),pool:['✦','✦✦','✦✦✦','☾','☾☾'],tip:'كم نجمة؟ النمط يكبر ويرجع من جديد.'}];
+const key=v=>typeof v==='string'?v:v.s+v.c,label=v=>typeof v==='string'?v:`<span style="color:${v.c}">${v.s}</span>`;
+function makeBri(li){const B=BRI[li],seqAll=[...Array(B.len+B.show)].map((_,i)=>B.seq(i)),steps=seqAll.slice(B.show);let cur=0,busy=false,focus=1;
+ const optionsFor=k=>{const right=steps[k];let pool;if(B.pool)pool=B.pool.filter(p=>key(p)!==key(right));else{pool=[];for(const s of['▲','●','■'])for(const c of['#60a5fa','#facc15','#f87171']){const v={s,c};if(key(v)!==key(right))pool.push(v);}}
+  return shuffle([right,...shuffle(pool).slice(0,2)]);};
+ const rows=steps.map((_,k)=>optionsFor(k));
+ const board=$('#board');board.innerHTML=`<div class="bridge"><div class="disc" id="disc"></div><div class="deck" id="deck"></div><img id="walker" src="seed/hero_hand_sheet_a0.png" alt=""></div>`;
+ const disc=$('#disc'),deck=$('#deck'),walker=$('#walker');
+ function drawDisc(){const known=seqAll.slice(0,B.show+cur);const vis=known.slice(-Math.max(B.show,B.period*2));disc.innerHTML=vis.map(v=>`<span>${label(v)}</span>`).join('')+'<span class="q">؟</span>';}
+ const VIS=4;
+ function drawDeck(){deck.innerHTML='';for(let k=Math.max(0,cur-1);k<Math.min(steps.length,cur+VIS);k++){const r=document.createElement('div');r.className='row '+(k<cur?'past':k===cur?'cur':'future');
+   rows[k].forEach((v,j)=>{const t=document.createElement('button');t.type='button';t.className='tile'+(k<cur&&key(v)===key(steps[k])?' ok':'')+(k===cur&&j===focus?' focus':'');t.innerHTML=label(v);t.disabled=k!==cur;t.onclick=()=>{focus=j;step(j,t);};r.appendChild(t);});deck.appendChild(r);}
+  walker.style.bottom=(cur>0?60:4)+'px';}
+ function step(j,el){if(busy)return;poke();busy=true;const v=rows[cur][j];MEM.moves++;
+  if(key(v)===key(steps[cur])){sfx.ok();el.classList.add('ok');cur++;react('good');setTimeout(()=>{busy=false;if(cur>=steps.length){sfx.win();winLevel('bri',li);return;}focus=1;drawDisc();drawDeck();},380);}
+  else{sfx.bad();el.classList.add('bad');setTimeout(()=>{el.classList.remove('bad');el.classList.add('dim');busy=false;},460);react('bad',{key:'t'+cur+key(v),label:typeof v==='string'?v:v.s});}}
+ const kb=e=>{if(!$('#play').classList.contains('on')||PZ.kind!=='bri')return;if(e.key==='ArrowLeft'){focus=Math.min(2,focus+1);drawDeck();}else if(e.key==='ArrowRight'){focus=Math.max(0,focus-1);drawDeck();}else if(e.key==='Enter'||e.key===' '){e.preventDefault();const t=deck.querySelector('.row.cur').children[focus];step(focus,t);}};
+ drawDisc();drawDeck();
+ return{kind:'bri',kb,_answer:()=>{if(cur>=steps.length||busy)return null;const r=deck.querySelector('.row.cur');if(!r)return null;const j=rows[cur].findIndex(v=>key(v)===key(steps[cur]));return r.children[j];},_wrong:()=>{const r=deck.querySelector('.row.cur');const j=rows[cur].findIndex(v=>key(v)!==key(steps[cur]));return r.children[j];},visualHint(){const r=deck.querySelector('.row.cur');if(!r)return;const j=rows[cur].findIndex(v=>key(v)===key(steps[cur]));r.children[j].classList.add('hint');},
+  logicHint(){const p=B.period;return li===2?'الشكل يتغيّر كل خطوتين، واللون يتبدّل كل خطوة. شوف آخر خطوتين.':li===3?'عدد النجوم يزيد واحد واحد لين ثلاث، وبعدين يرجع لوحدة.':`النمط يتكرر كل ${ar(p)}. شوف الرمز اللي قبل ${ar(p)} خطوات من علامة الاستفهام.`;},
+  title:B.title,tip:B.tip};}
+
+/* ======================= flow ======================= */
+let PZ=null,cur={scene:'lib',li:0};
+function startLevel(scene,li){cur={scene,li};memReset();hintLevel=0;idleT=0;$('#win').classList.remove('on');for(const m of[MA,MB]){clearTimeout(m.timer);m.bub.classList.remove('on');}
+ $('#bg').style.backgroundImage=`url(puzzle/${scene==='lib'?'library':'bridge'}.jpg)`;show('play');
+ if(PZ&&PZ.kb)removeEventListener('keydown',PZ.kb);PZ=scene==='lib'?makeLib(li):makeBri(li);addEventListener('keydown',PZ.kb);
+ $('#title').innerHTML=`${scene==='lib'?'🏛️ المكتبة البلورية':'🌉 جسر الرونات'}<small>المرحلة ${ar(li+1)}: ${PZ.title}</small>`;react('start',{rule:PZ.tip});}
+function winLevel(scene,li){const stars=MEM.hints===0&&MEM.attempts<=1?3:MEM.hints<=1&&MEM.attempts<=4?2:1;const arr=PROG[scene];arr[li]=Math.max(arr[li]||0,stars);saveProg();react('win');confetti();
+ setTimeout(()=>{$('#wT').textContent=scene==='lib'?'🎉 انفتحت البوابة!':'🎉 عبرت الجسر!';$('#wS').textContent='⭐'.repeat(stars)+'☆'.repeat(3-stars);
+  $('#wD').innerHTML=`حركات: ${ar(MEM.moves)} • تلميحات: ${ar(MEM.hints)} • محاولات خاطئة: ${ar(MEM.attempts)}<br>${stars<3?'💡 للنجوم الثلاث: حلها بدون تلميح وبأقل غلط':'🏆 أداء كامل!'}`;
+  const max=(scene==='lib'?LIB:BRI).length;$('#wNext').style.display=li+1<max?'':'none';$('#win').classList.add('on');},1300);}
+function confetti(){for(let i=0;i<60;i++){const c=document.createElement('div');c.className='confetti';c.style.left=Math.random()*100+'vw';c.style.background=pick(['#f87171','#facc15','#4ade80','#60a5fa','#f472b6','#a78bfa']);c.style.animationDuration=(1.6+Math.random()*1.6)+'s';c.style.animationDelay=Math.random()*.4+'s';document.body.appendChild(c);setTimeout(()=>c.remove(),3600);}}
+function renderMap(){[['lib','#lvLib',LIB],['bri','#lvBri',BRI]].forEach(([k,sel,L])=>{const box=$(sel);box.innerHTML='';L.forEach((lv,i)=>{const b=document.createElement('button');b.type='button';const st=PROG[k][i]||0;
+  b.className=st?'done':'';b.disabled=i>0&&!PROG[k][i-1];b.innerHTML=`${ar(i+1)}<small>${st?'⭐'.repeat(st):b.disabled?'🔒':'●'}</small>`;b.onclick=()=>startLevel(k,i);box.appendChild(b);});});}
+$('#wNext').onclick=()=>startLevel(cur.scene,cur.li+1);$('#wMap').onclick=()=>{$('#win').classList.remove('on');renderMap();show('map');};
+$('#pBack').onclick=()=>{renderMap();show('map');};$('#pReset').onclick=()=>startLevel(cur.scene,cur.li);$('#pHint').onclick=()=>giveHint(false);
+$('#mBack').onclick=()=>{location.href='./';};
+const updSound=()=>$('#mSound').textContent=soundOn?'🔊':'🔇';$('#mSound').onclick=()=>{soundOn=!soundOn;store.set('pz_sound',soundOn);updSound();};updSound();
+renderMap();
+window.__PZ={get pz(){return PZ},get mem(){return MEM},start:startLevel};
+</script>
+</body>
+</html>
