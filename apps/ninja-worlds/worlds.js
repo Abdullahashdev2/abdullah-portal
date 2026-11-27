@@ -9,7 +9,7 @@ export function hub(K, L, S) {
   const cfg = {
     id: 'hub', name: 'ساحة البوابات', sub: 'مركز العوالم', music: 'hub', killY: -25, motes: 0xfff3c4,
     sky: { elev: 26, azim: 160, turb: 5, ray: 1.4, mie: 0.004, mieG: 0.8 }, exposure: 0.5, env: 0.3, fog: [0xb4cbe6, 0.0035], sun: [0xfff1d6, 2.8], hemi: [0xcfe8ff, 0x6b5a4a, 0.9],
-    spawn: from === 'w1' ? { pos: new V(0, 0.3, 6.5), yaw: Math.PI } : from === 'w2' ? { pos: new V(-6.5, 0.3, 0), yaw: Math.PI / 2 } : { pos: new V(0, 0, -7), yaw: 0 },
+    spawn: from === 'w3' ? { pos: new V(6.5, 0.3, 0), yaw: -Math.PI / 2 } : from === 'w1' ? { pos: new V(0, 0.3, 6.5), yaw: Math.PI } : from === 'w2' ? { pos: new V(-6.5, 0.3, 0), yaw: Math.PI / 2 } : { pos: new V(0, 0, -7), yaw: 0 },
   };
   K.plat({ x: 0, y: 0, z: 0, w: 24, d: 24, h: 1.5, m: 'marble', tile: 3, rockDepth: 18 });
   K.plat({ x: 0, y: 0.3, z: 9.5, w: 6, d: 4, h: 0.3, m: 'gold', rock: false });
@@ -18,7 +18,8 @@ export function hub(K, L, S) {
   K.portal({ x: 0, y: 0.3, z: 10.4, rot: 0, to: 'w1', label: S.done.w1 ? '✓ أطلال المكتبة البلورية' : 'أطلال المكتبة البلورية', color: 0xffc94d });
   const w2open = !!S.done.w1;
   K.portal({ x: -10.4, y: 0.3, z: 0, rot: Math.PI / 2, to: 'w2', label: w2open ? (S.done.w2 ? '✓ الجزر السماوية' : 'الجزر السماوية') : '🔒 الجزر السماوية', color: 0xc084fc, active: w2open, locked: !w2open && 'خلّص «أطلال المكتبة» أول عشان تنفتح هالبوابة 🔒' });
-  K.portal({ x: 10.4, y: 0.3, z: 0, rot: -Math.PI / 2, to: null, label: '🔒 عالم قادم قريباً', color: 0x34d399, active: false, locked: 'هذا العالم قاعد ينبني… قريب! 🛠️' });
+  const w3open = !!S.done.w2;
+  K.portal({ x: 10.4, y: 0.3, z: 0, rot: -Math.PI / 2, to: 'w3', label: w3open ? (S.done.w3 ? '✓ حصن الرمال الذهبية' : 'حصن الرمال الذهبية') : '🔒 حصن الرمال الذهبية', color: 0xffb020, active: w3open, locked: !w3open && 'خلّص «الجزر السماوية» أول عشان تنفتح هالبوابة 🔒' });
   // centre monument
   K.plat({ x: 0, y: 0.5, z: 0, w: 3.2, d: 3.2, h: 0.5, m: 'dark', rock: false });
   K.crystal({ x: 0, y: 0.5, z: 0, color: 0x7dd3fc, s: 1.6, light: true, n: 7 });
@@ -34,7 +35,7 @@ export function hub(K, L, S) {
   [[-3.6, 7.5], [3.6, 7.5]].forEach(([x, z]) => K.column({ x, y: 0, z, h: 4.2 }));
   K.mountains({ color: 0x8fa3c4, y: -60, hmin: 90, hmax: 190 }); K.clouds({ y: -26, n: 60 }); K.floaters({ center: new V(0, 0, 0), r: 140, color: 0x8a8097 });
   L.npcDef = { x: 3.2, y: 0, z: -4.5, yaw: -2.5 };
-  K.trigger({ x: 0, z: -7, r: 3, text: S.done.w2 ? 'خلّصت العالمين! 🏆 عوالم جديدة قادمة… تقدر ترجع لأي عالم تجمع الشظايا الناقصة.' : S.done.w1 ? 'رجعت بطل! 🌟 البوابة البنفسجية (يسار) انفتحت: الجزر السماوية.' : 'هلا! 👋 قدّامك البوابة الذهبية — بس أول جرّب الحركات: يسارك جدار مضيء تركض عليه، ويمينك صخرة تتسلقها.' });
+  K.trigger({ x: 0, z: -7, r: 3, text: S.done.w3 ? 'خلّصت العوالم الثلاثة! 🏆 تقدر ترجع لأي عالم تجمع الشظايا الناقصة — وعوالم جديدة جاية.' : S.done.w2 ? 'البوابة الذهبية يمين انفتحت: حصن الرمال 🏜️ — فيه حركة جديدة: التأرجح على الأعمدة!' : S.done.w2 ? 'خلّصت العالمين! 🏆 عوالم جديدة قادمة… تقدر ترجع لأي عالم تجمع الشظايا الناقصة.' : S.done.w1 ? 'رجعت بطل! 🌟 البوابة البنفسجية (يسار) انفتحت: الجزر السماوية.' : 'هلا! 👋 قدّامك البوابة الذهبية — بس أول جرّب الحركات: يسارك جدار مضيء تركض عليه، ويمينك صخرة تتسلقها.' });
   K.trigger({ x: -8.4, z: -6.5, r: 2.6, text: '🧱 اركض بمحاذاة الجدار المضيء واقفز — بتركض عليه! (وأنت عليه اضغط قفز عشان تنط بعيد)' });
   K.trigger({ x: 6, z: -7.5, r: 2.4, text: '⬆️ واجه الجدار المضيء واقفز — تطلع عليه وتتمسك بالحافة. بعدين اضغط لقدّام أو قفز عشان تطلع فوق.' });
   return cfg;
@@ -197,4 +198,67 @@ export function w2(K, L, S) {
   return cfg;
 }
 
-export const WORLDS = { hub, w1, w2 };
+/* ===================== WORLD 3 ===================== */
+export function w3(K, L, S) {
+  const cfg = {
+    id: 'w3', name: 'حصن الرمال الذهبية', sub: 'العالم الثالث', music: 'w3', killY: -12, motes: 0xffe2a8, shardTotal: 10,
+    sky: { elev: 30, azim: 230, turb: 7, ray: 1.2, mie: 0.005, mieG: 0.85 }, exposure: 0.48, env: 0.35, fog: [0xe6c08a, 0.0042], sun: [0xfff0d0, 3.4], hemi: [0xffe8c4, 0x7a5a3a, 0.8],
+    spawn: { pos: new V(0, 0, 0), yaw: 0 },
+  };
+  const sh = (n, x, y, z) => K.shard('w3-' + n, x, y, z, S.shards.includes('w3-' + n));
+  // A — oasis start + swing bars
+  K.plat({ x: 0, y: 0, z: 4, w: 14, d: 12, h: 1.2, rockDepth: 9 });
+  K.checkpoint(-4, 0, 0, 0).on = true;
+  K.palm({ x: -5.5, y: 0, z: 8 }); K.palm({ x: 5.6, y: 0, z: 0.5, s: 1.15 }); K.brazier({ x: 5, y: 0, z: 8.5, light: true });
+  K.banner({ x: -6, y: 4, z: -1.6, color: 0xb45309 });
+  sh(10, 0, 0.8, -1.4);
+  K.trigger({ x: 0, z: 0, r: 3, text: 'حصن الرمال 🏜️ — شايف الأعمدة الذهبية المعلّقة؟ اقفز عليها تتمسك وتتأرجح، واضغط قفز وأنت متأرجح عشان تنطلق للي بعده!' });
+  K.bar({ x: 0, y: 3.3, z: 13.5, len: 4 }); K.bar({ x: 0, y: 3.5, z: 18.5, len: 4 }); K.bar({ x: 0, y: 3.3, z: 23.5, len: 4 });
+  sh(1, 0, 2.6, 21);
+  // B — courtyard: spikes + archers on towers
+  K.plat({ x: 0, y: 0, z: 34, w: 12, d: 14, h: 1.2, rockDepth: 9 });
+  K.checkpoint(4.5, 0, 28.6, 0);
+  K.spikes({ x: 0, y: 0, z: 31.5, w: 12, d: 1.6, period: 2.4, phase: 0 }); K.spikes({ x: 0, y: 0, z: 35.5, w: 12, d: 1.6, period: 2.4, phase: 1.2 });
+  K.plat({ x: -4.5, y: 1.6, z: 39.3, w: 2.4, d: 2.4, h: 1.6, rock: false }); K.plat({ x: 4.5, y: 1.6, z: 39.3, w: 2.4, d: 2.4, h: 1.6, rock: false });
+  K.enemy({ x: -4.5, y: 1.6, z: 39.3, type: 'archer', zone: { x0: -5.2, x1: -3.8, z0: 38.6, z1: 40 } });
+  K.enemy({ x: 4.5, y: 1.6, z: 39.3, type: 'archer', zone: { x0: 3.8, x1: 5.2, z0: 38.6, z1: 40 } });
+  K.enemy({ x: 0, y: 0, z: 38.5, zone: { x0: -5, x1: 5, z0: 37.5, z1: 40.3 } });
+  K.trigger({ x: 0, z: 29, r: 3, text: '🏹 رماة فوق الأبراج! كراتهم الضوئية تقدر تردّها عليهم بضربة سيف في الوقت الصح ⚔️ — وانتبه للأشواك لما تحمرّ الأرض!' });
+  sh(2, -4.5, 2.4, 40.2);
+  // C — blade bridge
+  K.plat({ x: 0, y: 0, z: 51, w: 3.2, d: 20, h: 0.8, rockDepth: 3 });
+  K.checkpoint(0, 0, 40.4, 0);
+  [[45, 0], [50, 1.7], [55, 3.4]].forEach(([z, ph]) => { K.blade({ x: 0, y: 4.6, z, len: 3.8, amp: 1.05, speed: 2.1, phase: ph }); });
+  K.trigger({ x: 0, z: 42.2, r: 1.8, text: '🪓 فؤوس متأرجحة! راقب الإيقاع وعدّي لما تبعد… وإذا انضربت، كمّل!' });
+  sh(3, 0, 1.2, 52.5); sh(9, 1, 0.8, 60.4);
+  // D — wall-run over the sand pit
+  K.wall({ x: 2.3, y: 6, z: 66, w: 0.6, d: 12, h: 12, m: 'sand', run: true });
+  K.trigger({ x: 0.8, z: 58.5, r: 2, text: '🧱 اركض لاصق بالجدار اليمين واقفز — نفس حركة المكتبة!' });
+  sh(4, 1.4, 2.6, 66);
+  // E — timed gate court
+  K.plat({ x: 0, y: 0, z: 79, w: 14, d: 16, h: 1.2, rockDepth: 9 });
+  K.checkpoint(-4, 0, 73, 0);
+  K.plat({ x: 5, y: 3.8, z: 75, w: 3, d: 3, h: 3.8, rock: false, run: true, runFaces: ['-x', '-z'] });
+  const gate = K.timedGate({ x: 0, y: 0, z: 86.6, w: 22, h: 6, d: 1, plate: { x: 5, y: 3.8, z: 75 }, time: 7 });
+  K.column({ x: -11.4, y: 0, z: 86.6, h: 7, r: 0.6 }); K.column({ x: 11.4, y: 0, z: 86.6, h: 7, r: 0.6 });
+  K.spikes({ x: 0, y: 0, z: 80.5, w: 14, d: 1.6, period: 2.0, phase: 0 }); K.spikes({ x: 0, y: 0, z: 84, w: 14, d: 1.6, period: 2.0, phase: 1.0 });
+  K.trigger({ x: -2, z: 73.5, r: 3, text: '🟡 الزر الذهبي فوق الصخرة يفتح البوابة — بس ٧ ثواني بس! اطلع، دوس الزر، وانطلق بين الأشواك.' });
+  sh(5, 5, 4.6, 76.2); sh(6, -6, 0.8, 85.5);
+  // F — fortress roof arena
+  K.plat({ x: 0, y: 0, z: 99, w: 22, d: 24, h: 1.4, m: 'gold', tile: 3, rockDepth: 12 });
+  for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; K.column({ x: Math.cos(a) * 9.2, y: 0, z: 99 + Math.sin(a) * 10.4, h: 5.5, broken: i % 4 === 1 }); }
+  K.palm({ x: -9.5, y: 0, z: 89 }); K.palm({ x: 9.5, y: 0, z: 89.5 }); K.brazier({ x: -4, y: 0, z: 108, light: true }); K.brazier({ x: 4, y: 0, z: 108 });
+  const az = { x0: -10, x1: 10, z0: 88.5, z1: 109.5, y: 0 };
+  K.enemy({ x: -3, y: 0, z: 99, zone: az, group: 'boss', type: 'brute' }); K.enemy({ x: 3, y: 0, z: 101, zone: az, group: 'boss', type: 'brute' });
+  K.enemy({ x: -7, y: 0, z: 105, zone: az, group: 'boss', type: 'archer' }); K.enemy({ x: 7, y: 0, z: 105, zone: az, group: 'boss', type: 'archer' });
+  K.enemy({ x: 0, y: 0, z: 95, zone: az, group: 'boss' }); K.enemy({ x: -4, y: 0, z: 93, zone: az, group: 'boss' });
+  K.trigger({ x: 0, z: 90, r: 4, group: 'boss', text: '👑 حرّاس الحصن كلهم! ابدأ بالرماة، وتدحرج من ضربات الكبار.' });
+  sh(7, 9.6, 0.8, 109.5); sh(8, -9.6, 0.8, 109.5);
+  const exit = K.portal({ x: 0, y: 0, z: 108.5, rot: Math.PI, to: 'hub', label: 'رجوع للساحة', color: 0xffb020, active: false });
+  L.onClear.boss = () => { exit.setActive(true); L.say('الحصن تحرر!! 👑🏆 أنت أسطورة الرمال. البوابة فتحت.'); L.sfx('win'); L.complete = true; };
+  // scenery
+  K.dunes({}); K.mountains({ color: 0xc9925a, y: -45, hmin: 50, hmax: 120 }); K.clouds({ y: 40, n: 30, color: 0xfff3e0, opacity: 0.5 });
+  return cfg;
+}
+
+export const WORLDS = { hub, w1, w2, w3 };

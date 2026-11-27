@@ -16,7 +16,7 @@ try { Object.assign(SAVE, JSON.parse(localStorage.getItem(SKEY)) || {}); } catch
 function persist() {
   try { localStorage.setItem(SKEY, JSON.stringify(SAVE)); } catch (e) {}
   const n = SAVE.shards.length, w = Object.keys(SAVE.done).filter((k) => SAVE.done[k]).length;
-  try { window.Game && Game.save('ninja-worlds', { ...SAVE, score: n, scores: { 'ninja-worlds': n }, summary: `🌍 ${w}/2 عوالم • 💎 ${n}/20` }); } catch (e) {}
+  try { window.Game && Game.save('ninja-worlds', { ...SAVE, score: n, scores: { 'ninja-worlds': n }, summary: `🌍 ${w}/3 عوالم • 💎 ${n}/30` }); } catch (e) {}
 }
 (async () => { try { const c = window.Game && (await Game.load('ninja-worlds')); if (c && c.shards && c.shards.length > SAVE.shards.length) { SAVE = { ...SAVE, ...c }; hudUpdate(); } } catch (e) {} })();
 
@@ -78,7 +78,7 @@ let checkpoint = null, cfg = null;
 function loadWorld(id, from) {
   if (level) level.dispose(); enemies.clear(); sparks.clear(); dust.clear(); motes.clear();
   if (npc) { npc.root.removeFromParent(); npc = null; }
-  level = new Level(scene); worldId = id; SAVE._from = from;
+  level = new Level(scene); worldId = id; SAVE._from = from; $('#timer').classList.remove('on');
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
@@ -106,7 +106,7 @@ function hudUpdate() {
   $('#hearts').innerHTML = Array.from({ length: player.maxHp }, (_, i) => `<span class="${i < player.hp ? 'h on' : 'h'}">❤</span>`).join('');
   if (!cfg) return;
   if (cfg.shardTotal) { const n = SAVE.shards.filter((s) => s.startsWith(cfg.id + '-')).length; $('#shards').textContent = `💎 ${n}/${cfg.shardTotal}`; }
-  else $('#shards').textContent = `💎 ${SAVE.shards.length}/20`;
+  else $('#shards').textContent = `💎 ${SAVE.shards.length}/30`;
   $('#wname').textContent = cfg.name;
 }
 function showDone() {
@@ -152,7 +152,7 @@ function dropItem(forced) {
   if (!forced && player.onGround) it.home.copy(player.pos).add(new V(0, 0.6, 0)); else { it.home.copy(it.origin); sparks.emit(it.origin, { color: it.color, count: 20, speed: 3 }); }
   it.pos.copy(it.home);
 }
-const NPC_LINES = () => SAVE.done.w2 ? ['ما توقعت تخلّص العالمين بهالسرعة! 🏆', 'العوالم الجاية بتكون أكبر… جهّز نفسك 😏', 'ارجع لأي عالم وجمّع الشظايا اللي فاتتك 💎'] :
+const NPC_LINES = () => SAVE.done.w3 ? ['ثلاث عوالم! ما بقى أحد يوقفك 🏆', 'العوالم الجاية بتكون أكبر… جهّز نفسك 😏', 'ارجع لأي عالم وجمّع الشظايا اللي فاتتك 💎'] : SAVE.done.w2 ? ['حصن الرمال فيه أعمدة تتأرجح عليها — اضغط قفز وأنت متأرجح عشان تنطلق 🤸', 'الرماة: اضرب كرتهم وهي قريبة منك ترجع عليهم ⚔️', 'الزر الذهبي يفتح البوابة ٧ ثواني بس!'] : SAVE.done.w2 ? ['ما توقعت تخلّص العالمين بهالسرعة! 🏆', 'العوالم الجاية بتكون أكبر… جهّز نفسك 😏', 'ارجع لأي عالم وجمّع الشظايا اللي فاتتك 💎'] :
   SAVE.done.w1 ? ['الجزر السماوية أصعب: صخور تتحرك وبلاط يتكسّر 🌌', 'تذكّر: وأنت على الجدار، اضغط قفز تنط للجدار اللي قدامك.', 'الكبار يضربون الأرض — ابعد ثم اضرب ⚔️'] :
   ['أنا البطل الهادئ 🧘 — بكون معك بصوتي في كل عالم.', 'الجدار المضيء بالرونات = تقدر تركض عليه أو تطلع عليه.', 'أي حافة تقدر تتمسك فيها — اقفز وأنت لاصق فيها.', 'لما تشيل شي، ما تقدر تضرب. نزّله أول (✋).', 'وأنت في الهوا اضغط ضرب = ضربة قوية للأرض ⬇️'];
 function talk() { const L = NPC_LINES(); say('🧘 ' + L[npc.line % L.length]); npc.line++; }
@@ -289,6 +289,29 @@ function worldLogic(dt) {
   }
   // triggers
   for (const t of level.triggers) if (!t.fired && Math.hypot(t.pos.x - p.x, t.pos.z - p.z) < t.r && Math.abs(t.pos.y - p.y) < t.dy && started) { t.fired = true; if (t.text) say(t.text); if (t.group) spawnGroup(t.group); }
+  // traps
+  if (level.hazards && player.hp > 0) {
+    const chest = new V(p.x, p.y + 1.1, p.z);
+    for (const hz of level.hazards) {
+      if (hz.kind === 'blade') { if (hz.tip.distanceTo(chest) < 0.95 || hz.mid.distanceTo(chest) < 0.8) { if (player.damage(1, new V(p.x + Math.sin(player.yaw) * 0.8, p.y, p.z + Math.cos(player.yaw) * 0.8))) sparks.emit(chest, { color: 0xffffff, count: 14, speed: 6, life: 0.3 }); } }
+      else if (hz.kind === 'spikes' && hz.up && p.x > hz.x0 && p.x < hz.x1 && p.z > hz.z0 && p.z < hz.z1 && p.y - hz.y < 0.6) player.damage(1, new V(p.x - player.vel.x, p.y, p.z - player.vel.z - 0.01));
+    }
+  }
+  // timed gates
+  if (level.gates) for (const G of level.gates) {
+    if (player.onGround && Math.hypot(G.plate.x - p.x, G.plate.z - p.z) < 1.0 && Math.abs(G.plate.y - p.y) < 0.4) {
+      if (G.left <= 0) { sfx.gate(); say(`⏱️ البوابة انفتحت ${G.time} ثواني — اركض!!`); } G.left = G.time; G.b.active = false;
+    }
+    if (G.left > 0) {
+      const before = Math.ceil(G.left); G.left -= dt; const after = Math.ceil(G.left);
+      $('#timer').textContent = '⏱️ ' + Math.max(0, after); $('#timer').classList.add('on');
+      if (after < before && after <= 3 && after > 0) sfx.tone(880, 0, 0.12, 'square', 0.06);
+      if (G.left <= 0) {
+        const b = G.b, inside = p.x + 0.32 > b.min.x && p.x - 0.32 < b.max.x && p.z + 0.32 > b.min.z && p.z - 0.32 < b.max.z;
+        if (inside) G.left = 0.3; else { b.active = true; sfx.gate(); $('#timer').classList.remove('on'); }
+      }
+    }
+  }
   // groups cleared
   for (const g in level.onClear) if (level.spawned[g] && !level.groupsDone[g] && enemies.alive(g) === 0) { level.groupsDone[g] = true; level.onClear[g](); }
   // portals

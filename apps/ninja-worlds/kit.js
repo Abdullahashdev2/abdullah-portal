@@ -274,6 +274,77 @@ export function makeKit(L) {
     [-1, 1].forEach((s) => K.plat({ x: x + Math.cos(rot) * s * 1.45, y: y + 0.6, z: z - Math.sin(rot) * s * 1.45, w: 0.5, d: 0.5, h: 0.6, rock: false, hidden: true }).active = true);
     return P;
   };
+  /* -------- swing bars, traps, timed gates -------- */
+  K.bar = ({ x, y, z, len = 4, axis = 'x' }) => {
+    L.bars = L.bars || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); if (axis === 'z') g.rotation.y = Math.PI / 2; L.add(g);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, len, 12), mat('gold')); pole.rotation.z = Math.PI / 2; pole.castShadow = true; g.add(pole);
+    [-1, 1].forEach((s) => {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), mat('gold')); cap.position.x = s * len / 2; g.add(cap);
+      for (let i = 0; i < 10; i++) { const l = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 6, 10), mat('dark', { metalness: 0.6, roughness: 0.4 })); l.position.set(s * len / 2, 0.15 + i * 0.15, 0); l.rotation.y = (i % 2) * Math.PI / 2; g.add(l); }
+    });
+    const gl = glowSprite(0xffd166, 1.4, 0.45); g.add(gl);
+    L.bars.push({ p: new V(x, y, z), axis, half: len / 2 - 0.1 });
+  };
+  K.blade = ({ x, y, z, len = 3.6, amp = 1.1, speed = 2.2, phase = 0, plane = 'x' }) => {
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); if (plane === 'z') g.rotation.y = Math.PI / 2; L.add(g);
+    const arm = new THREE.Group(); g.add(arm);
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, len, 8), mat('dark', { metalness: 0.7, roughness: 0.35 })); rod.position.y = -len / 2; rod.castShadow = true; arm.add(rod);
+    const sh = new THREE.Shape(); sh.absarc(0, 0, 0.9, Math.PI * 1.05, Math.PI * 1.95, false); sh.lineTo(0, -0.1); sh.closePath();
+    const bl = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: false }), own(new THREE.MeshStandardMaterial({ color: 0xdfe6ee, metalness: 0.95, roughness: 0.15, emissive: 0x7f1d1d, emissiveIntensity: 0.25 })));
+    bl.position.set(0, -len + 0.35, -0.025); bl.castShadow = true; arm.add(bl);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.5), mat('dark')); g.add(cap);
+    const hz = { kind: 'blade', tip: new V(), mid: new V() };
+    L.anim.push((dt, t) => {
+      const a = amp * Math.sin(t * speed + phase); arm.rotation.z = a;
+      const ox = Math.sin(a) * (len - 0.6), oy = -Math.cos(a) * (len - 0.6), mx = Math.sin(a) * (len - 1.3), my = -Math.cos(a) * (len - 1.3);
+      if (plane === 'x') { hz.tip.set(x + ox, y + oy, z); hz.mid.set(x + mx, y + my, z); } else { hz.tip.set(x, y + oy, z - ox); hz.mid.set(x, y + my, z - mx); }
+    });
+    L.hazards.push(hz);
+  };
+  K.spikes = ({ x, y, z, w = 4, d = 2, period = 2.6, phase = 0, upFor = 1.1 }) => {
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, 0.04, d), own(new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 }))); base.position.y = 0.02; base.receiveShadow = true; g.add(base);
+    const nx = Math.max(2, Math.round(w / 0.5)), nz = Math.max(2, Math.round(d / 0.5)), cone = new THREE.ConeGeometry(0.1, 0.55, 6);
+    const im = new THREE.InstancedMesh(cone, mat('dark', { metalness: 0.8, roughness: 0.3 }), nx * nz); im.castShadow = true; g.add(im);
+    const hz = { kind: 'spikes', x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y, up: false };
+    const m4 = new THREE.Matrix4();
+    L.anim.push((dt, t) => {
+      const ph = ((t + phase) % period + period) % period, warn = ph > period - 0.45 && ph < period;
+      const k = ph < upFor ? Math.min(1, ph / 0.08) : ph < upFor + 0.25 ? 1 - (ph - upFor) / 0.25 : 0;
+      hz.up = ph < upFor; base.material.emissive.setHex(warn ? 0x7a1a00 : 0x000000);
+      let i = 0; for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) { m4.makeTranslation(-w / 2 + (a + 0.5) * w / nx, -0.3 + k * 0.55, -d / 2 + (b + 0.5) * d / nz); im.setMatrixAt(i++, m4); }
+      im.instanceMatrix.needsUpdate = true;
+    });
+    L.hazards.push(hz);
+  };
+  K.timedGate = ({ x, y, z, w = 10, h = 6, d = 1, plate, time = 8 }) => {
+    const b = K.wall({ x, y: y + h, z, w, h, d, m: 'sand', ledge: false });
+    const bars = own(new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0xff7a00, emissiveIntensity: 1 }));
+    for (let i = 0; i < Math.floor(w / 1.2); i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.1, h * 0.8, 0.05), bars); r.position.set(-w / 2 + 0.6 + i * 1.2, 0, -d / 2 - 0.03); b.mesh.add(r); }
+    const pg = new THREE.Group(); pg.position.set(plate.x, plate.y, plate.z); L.add(pg);
+    const pm = own(new THREE.MeshStandardMaterial({ color: 0xd4a24a, emissive: 0xffb020, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.4 }));
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 0.12, 20), pm); pad.position.y = 0.06; pad.receiveShadow = true; pg.add(pad);
+    pg.add(Object.assign(glowSprite(0xffb020, 2.4, 0.4), {}));
+    const G = { b, h, y0: b.mesh.position.y, open: 0, left: 0, plate: new V(plate.x, plate.y, plate.z), time, pad };
+    L.gates = L.gates || []; L.gates.push(G);
+    L.anim.push((dt) => { const target = G.left > 0 ? 1 : 0; G.open += (target - G.open) * Math.min(1, dt * (target ? 6 : 3)); b.mesh.position.y = G.y0 - h * 0.97 * G.open; pad.position.y = G.left > 0 ? 0.02 : 0.06; });
+    return G;
+  };
+  K.palm = ({ x, y, z, s = 1 }) => {
+    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g);
+    const tm = own(new THREE.MeshStandardMaterial({ color: 0x8b6a43, roughness: 1, flatShading: true }));
+    let px = 0, py = 0; for (let i = 0; i < 7; i++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.16 - i * 0.012, 0.2 - i * 0.012, 0.75, 7), tm); px += 0.08 * i * 0.25; py += 0.7; seg.position.set(px, py, 0); seg.rotation.z = -0.05 * i; seg.castShadow = true; g.add(seg); }
+    const lm = own(new THREE.MeshStandardMaterial({ color: 0x3f8f3a, roughness: 0.8, side: THREE.DoubleSide, flatShading: true }));
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, leaf = new THREE.Mesh(new THREE.ConeGeometry(0.35, 2.6, 4, 1, true), lm); leaf.scale.z = 0.25; leaf.position.set(px + Math.cos(a) * 1.0, py + 0.1, Math.sin(a) * 1.0); leaf.rotation.set(Math.sin(a) * 1.25, 0, -Math.cos(a) * 1.25); leaf.castShadow = true; g.add(leaf); }
+    K.plat({ x, y: y + 2, z, w: 0.45 * s, d: 0.45 * s, h: 2, rock: false, hidden: true }).active = true;
+  };
+  K.dunes = ({ n = 26, color = 0xe0b87a, y = -30 }) => {
+    const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 1 }));
+    for (let i = 0; i < n; i++) { const r = 40 + Math.random() * 60, m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); m.scale.y = 0.18 + Math.random() * 0.12; const a = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 260; m.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr + 60); m.receiveShadow = true; L.add(m); }
+  };
   K.trigger = (o) => { L.triggers.push({ r: 3, dy: 4, once: true, fired: false, ...o, pos: new V(o.x, o.y ?? 0, o.z) }); };
   K.enemy = (o) => { L.enemyDefs.push(o); };
   return K;

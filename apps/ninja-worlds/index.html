@@ -42,6 +42,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 @media (max-height:500px){#toast{padding:8px 12px;width:min(70vw,560px)}#toastText{font-size:13px}#toast .av{flex-basis:30px;height:30px;font-size:18px}}
 #prompt{position:fixed;z-index:6;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(255,209,102,.95);color:#231600;font-weight:900;border-radius:999px;padding:8px 18px;opacity:0;transition:.2s;pointer-events:none}
 #prompt.on{opacity:1}
+#timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
 #hurt.on{animation:hu .5s}
@@ -104,6 +105,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 <div id="banner"><div id="bSub"></div><div id="bName"></div></div>
 <div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div></div>
 <div id="prompt"></div>
+<div id="timer"></div>
 <div id="hurt"></div>
 
 <div id="touch">

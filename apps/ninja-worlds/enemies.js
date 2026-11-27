@@ -4,7 +4,7 @@ import { glowSprite } from './fx.js';
 const V = THREE.Vector3;
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
-function buildShade(big) {
+function buildShade(big, archer) {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
   const bodyM = new THREE.MeshStandardMaterial({ color: big ? 0x2a1012 : 0x1c1433, roughness: 0.35, metalness: 0.25, emissive: big ? 0x6b0f0f : 0x3b0d66, emissiveIntensity: 0.55, flatShading: true });
   const eyeC = big ? 0xffa31a : 0xff4fd8, eyeM = new THREE.MeshBasicMaterial({ color: eyeC });
@@ -23,17 +23,19 @@ function buildShade(big) {
   });
   const aura = glowSprite(big ? 0xff3b1f : 0x8b5cf6, big ? 3.4 : 2.6, 0.35); aura.position.y = 1.1; inner.add(aura);
   if (big) g.scale.setScalar(1.55);
+  if (archer) { bodyM.color.setHex(0x0f2a2e); bodyM.emissive.setHex(0x0e7490); const orb = glowSprite(0x22d3ee, 0.9, 0.9); orb.position.set(0.55, 0.62, 0.3); inner.add(orb); }
   return { g, inner, body, head, arms, eyes, bodyM, aura };
 }
 
 export class Enemies {
-  constructor(game) { this.g = game; this.list = []; this.pickups = []; }
-  clear() { for (const e of this.list) e.m.g.removeFromParent(); for (const p of this.pickups) p.s.removeFromParent(); this.list = []; this.pickups = []; }
+  constructor(game) { this.g = game; this.list = []; this.pickups = []; this.shots = []; }
+  clear() { for (const e of this.list) e.m.g.removeFromParent(); for (const p of this.pickups) p.s.removeFromParent(); for (const b of this.shots) b.m.removeFromParent(); this.list = []; this.pickups = []; this.shots = []; }
   spawn(def, rise = false) {
-    const big = def.type === 'brute', m = buildShade(big);
+    const big = def.type === 'brute', archer = def.type === 'archer', m = buildShade(big, archer);
     m.g.position.set(def.x, def.y, def.z); this.g.scene.add(m.g);
     const zone = def.zone || { x0: def.x - 5, x1: def.x + 5, z0: def.z - 5, z1: def.z + 5 };
-    const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() };
+    const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() + (archer ? 1 : 0), archer };
+    if (archer) { e.hp = e.maxHp = 2; e.speed = 2.6; }
     if (rise) { m.inner.position.y = -2.2; this.g.fx.emit(new V(def.x, def.y + 0.3, def.z), { color: 0x8b5cf6, count: 40, speed: 4, up: 1, life: 0.9, size: 0.4, grav: -1 }); }
     this.list.push(e); return e;
   }
@@ -74,7 +76,12 @@ export class Enemies {
       switch (e.st) {
         case 'rise': m.inner.position.y = Math.min(0, -2.2 + e.t * 2.6); if (e.t > 0.9) { e.st = 'idle'; m.inner.position.y = 0; } break;
         case 'idle': case 'chase':
-          if (seen) {
+          if (seen && e.archer) {
+            e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 6);
+            if (d < 5.5) { e.pos.x -= (dx / d) * e.speed * dt; e.pos.z -= (dz / d) * e.speed * dt; anim = 'walk'; }
+            else if (d > 12) { e.pos.x += (dx / d) * e.speed * dt; e.pos.z += (dz / d) * e.speed * dt; anim = 'walk'; }
+            if (e.cd <= 0 && d < 16) { e.st = 'windup'; e.t = 0; this.g.sfx.enemyAtk(); }
+          } else if (seen) {
             e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 6);
             if (d > e.reach * 0.85) { const sp = e.speed * (d > 6 ? 1 : 0.85); e.pos.x += (dx / d) * sp * dt; e.pos.z += (dz / d) * sp * dt; anim = 'walk'; }
             else if (e.cd <= 0 && attackers < 2 && Math.abs(dy) < 1.6) { e.st = 'windup'; e.t = 0; this.g.sfx.enemyAtk(); }
@@ -83,8 +90,9 @@ export class Enemies {
         case 'windup': e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 3); if (e.t > (e.big ? 0.75 : 0.55)) { e.st = 'strike'; e.t = 0; e.hit = false; } anim = 'windup'; break;
         case 'strike': {
           anim = 'strike';
-          if (!e.big) { e.pos.x += Math.sin(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); e.pos.z += Math.cos(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); }
-          if (!e.hit && e.t > 0.08) {
+          if (!e.big && !e.archer) { e.pos.x += Math.sin(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); e.pos.z += Math.cos(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); }
+          if (!e.hit && e.t > 0.08 && e.archer) { e.hit = true; this.fire(e, pl); }
+          else if (!e.hit && e.t > 0.08) {
             e.hit = true;
             const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw), inFront = d < 0.5 || (dx * fx + dz * fz) / d > 0.35;
             if (e.big) { const c = e.pos.clone(); c.x += fx * 1.4; c.z += fz * 1.4; this.g.fx.emit(c, { color: 0xff7b3d, count: 40, speed: 6, flat: true, life: 0.5, size: 0.35, grav: 1 }); this.g.shake(0.25); this.g.sfx.slam(); if (Math.hypot(pl.pos.x - c.x, pl.pos.z - c.z) < 2.6 && Math.abs(dy) < 1.2) pl.damage(2, e.pos); }
@@ -93,7 +101,7 @@ export class Enemies {
           if (e.t > 0.25) { e.st = 'recover'; e.t = 0; }
           break;
         }
-        case 'recover': anim = 'idle'; if (e.t > (e.big ? 1.0 : 0.75)) { e.st = 'idle'; e.cd = 0.4 + Math.random() * 0.8; } break;
+        case 'recover': anim = 'idle'; if (e.t > (e.big ? 1.0 : 0.75)) { e.st = 'idle'; e.cd = e.archer ? 1.6 + Math.random() : 0.4 + Math.random() * 0.8; } break;
         case 'stagger': anim = 'stagger'; if (e.t > 0.42) { e.st = 'idle'; e.cd = 0.3; } break;
         case 'dying': {
           const k = e.t / 0.7; m.inner.scale.setScalar(Math.max(0.01, 1 - k)); m.inner.rotation.y += dt * 10; m.inner.position.y = k * 0.8;
@@ -123,6 +131,7 @@ export class Enemies {
       e.flash = Math.max(0, e.flash - dt); m.bodyM.emissive.setHex(e.flash > 0 ? 0xffffff : e.big ? 0x6b0f0f : 0x3b0d66); m.bodyM.emissiveIntensity = e.flash > 0 ? 1.2 : e.st === 'windup' ? 1.0 : 0.55;
     }
     this.list = this.list.filter((e) => !e.gone);
+    this.updateShots(dt, pl);
     // heart pickups
     for (const p of this.pickups) {
       p.t += dt; p.s.position.y = p.y + 0.6 + Math.sin(p.t * 3) * 0.12; p.s.rotation.y += dt * 2;
@@ -130,6 +139,31 @@ export class Enemies {
       if (p.t > 25) { p.taken = true; p.s.removeFromParent(); }
     }
     this.pickups = this.pickups.filter((p) => !p.taken);
+  }
+  fire(e, pl) {
+    const from = e.pos.clone().add(new V(Math.sin(e.yaw) * 0.6, 1.3, Math.cos(e.yaw) * 0.6)), to = pl.pos.clone().add(new V(0, 1.1, 0));
+    const vel = to.sub(from).normalize().multiplyScalar(9.5);
+    const m = new THREE.Group(); m.add(glowSprite(0x22d3ee, 1.1, 1)); m.add(glowSprite(0xffffff, 0.4, 1)); m.position.copy(from); this.g.scene.add(m);
+    this.shots.push({ m, vel, life: 3.5, mine: false });
+  }
+  updateShots(dt, pl) {
+    const chest = pl.pos.clone().add(new V(0, 1.1, 0)), boxes = this.g.level.boxes;
+    for (const b of this.shots) {
+      b.life -= dt; b.m.position.addScaledVector(b.vel, dt);
+      if (Math.random() < 0.5) this.g.fx.emit(b.m.position, { color: b.mine ? 0xffd166 : 0x22d3ee, count: 1, speed: 0.4, life: 0.3, size: 0.2, grav: 0 });
+      const p = b.m.position;
+      if (!b.mine) {
+        if ((pl.state === 'attack' || pl.state === 'slam') && p.distanceTo(chest) < 2.1) {
+          const tgt = this.list.filter((e) => e.alive && e.archer).sort((a, c) => a.pos.distanceTo(p) - c.pos.distanceTo(p))[0];
+          b.vel = tgt ? tgt.pos.clone().add(new V(0, 1.1, 0)).sub(p).normalize().multiplyScalar(15) : b.vel.multiplyScalar(-1.5);
+          b.mine = true; b.life = 2; this.g.sfx.hit(); this.g.hitstop(0.05); this.g.fx.emit(p, { color: 0xffd166, count: 16, speed: 5, life: 0.3 }); continue;
+        }
+        if (p.distanceTo(chest) < 0.6) { pl.damage(1, p); b.life = 0; }
+      } else for (const e of this.list) if (e.alive && e.pos.clone().add(new V(0, 1.1, 0)).distanceTo(p) < 1.0) { this.hurt(e, 2, p, 5); b.life = 0; break; }
+      for (const x of boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { b.life = 0; break; }
+      if (b.life <= 0) { this.g.fx.emit(p, { color: 0x22d3ee, count: 10, speed: 3, life: 0.3 }); b.m.removeFromParent(); }
+    }
+    this.shots = this.shots.filter((b) => b.life > 0);
   }
   dropHeart(at) {
     const s = new THREE.Group(), mm = new THREE.MeshStandardMaterial({ color: 0xff4d6d, emissive: 0xff1f4b, emissiveIntensity: 0.9, roughness: 0.3 });

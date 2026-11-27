@@ -92,6 +92,7 @@ export class Player {
       case 'roll': this.rollUpd(dt, inp); break;
       case 'attack': this.attackUpd(dt, inp); break;
       case 'slam': this.slamUpd(dt); break;
+      case 'swing': this.swingUpd(dt, inp); break;
       case 'hurt': this.st.hurtT -= dt; this.phys(dt); if (this.st.hurtT <= 0) this.state = this.onGround ? 'ground' : 'air'; break;
     }
     if (this.pos.y < this.g.level.cfg.killY) this.g.onFall();
@@ -124,6 +125,7 @@ export class Player {
         if (-this.fwd.dot(w.n) > 0.6 && (vin > 1.2 || this.jumpBuf > 0) && this.vel.y > -4.5) return this.startWallUp(w);
       }
       if (this.vel.y < 2 && this.noGrab <= 0) { const L = this.findLedge(); if (L) return this.startHang(L); }
+      const bar = this.findBar(); if (bar) return this.startSwing(bar);
     }
     if (inp.atkP && !this.carry) { if (this.onGround || this.coyote > 0) return this.startAttack(); if (this.vel.y < 5) return this.startSlam(); }
     if (inp.rollP && this.onGround && !this.carry) return this.startRoll(v, m);
@@ -233,6 +235,42 @@ export class Player {
     if (inp.rollP && k > 0.3) { this.lastAtkEnd = -9; const { v, m } = this.moveInput(inp); return this.startRoll(v, m); }
     if (k >= 1) { this.lastAtkEnd = this.t; if (this.st.queued && this.combo < 3) return this.startAttack(); this.state = this.onGround ? 'ground' : 'air'; if (this.combo >= 3) this.combo = 0; }
   }
+  /* ---------- swing bars ---------- */
+  findBar() {
+    const bars = this.g.level.bars; if (!bars || this.noBar > this.t) return null;
+    const hx = this.pos.x, hy = this.pos.y + 2.0, hz = this.pos.z;
+    for (const b of bars) {
+      if (b === this.lastBar && this.noBar + 0.5 > this.t) continue;
+      const along = b.axis === 'x' ? hx - b.p.x : hz - b.p.z; if (Math.abs(along) > b.half) continue;
+      const d = b.axis === 'x' ? Math.hypot(hy - b.p.y, hz - b.p.z) : Math.hypot(hy - b.p.y, hx - b.p.x);
+      if (d < 0.8) return b;
+    }
+    return null;
+  }
+  startSwing(b) {
+    const f = b.axis === 'x' ? new V(0, 0, 1) : new V(1, 0, 0), vf = this.vel.x * f.x + this.vel.z * f.z;
+    if (vf < 0 || (Math.abs(vf) < 0.5 && this.fwd.dot(f) < 0)) f.negate();
+    this.state = 'swing'; this.bar = b; this.lastBar = b; this.st.f = f;
+    this.st.th = Math.atan2(this.pos.x * f.x + this.pos.z * f.z - (b.p.x * f.x + b.p.z * f.z), 2.0) * 0.6;
+    this.st.om = Math.max(2.2, Math.abs(vf) / 2.0); this.vel.set(0, 0, 0); this.flip = 0;
+    this.yaw = Math.atan2(f.x, f.z); this.g.sfx.grab(); this.ground = null; this.onGround = false;
+  }
+  swingUpd(dt, inp) {
+    const b = this.bar, f = this.st.f, L = 2.0;
+    const push = (inp.mx * f.x + inp.mz * f.z);
+    this.st.om += (-(C.grav / L) * Math.sin(this.st.th) + push * 2.2 * Math.cos(this.st.th)) * dt; this.st.om *= Math.exp(-0.25 * dt);
+    this.st.th += this.st.om * dt; this.st.th = clamp(this.st.th, -1.35, 1.35);
+    const ax = b.axis === 'x' ? 'x' : 'z';
+    const keep = this.pos[ax];
+    this.pos.set(b.p.x + f.x * Math.sin(this.st.th) * L, b.p.y - Math.cos(this.st.th) * L, b.p.z + f.z * Math.sin(this.st.th) * L); this.pos[ax] = keep;
+    if (this.jumpBuf > 0) {
+      this.jumpBuf = 0; const tv = this.st.om * L, c = Math.cos(this.st.th), sn = Math.sin(this.st.th);
+      const fwdBoost = Math.max(3.5, tv * c + 3);
+      this.vel.set(f.x * fwdBoost, Math.max(6.5, tv * sn + 6.5), f.z * fwdBoost);
+      this.state = 'air'; this.noBar = this.t; this.noGrab = 0.2; this.flip = 0.5; this.airLock = 0.25; this.g.sfx.jump(); return;
+    }
+    if (inp.rollP) { this.state = 'air'; this.noBar = this.t; this.vel.set(0, 0, 0); }
+  }
   startSlam() { this.state = 'slam'; this.vel.set(0, 4, 0); this.st.sT = 0; this.g.sfx.slash(3); }
   slamUpd(dt) {
     this.st.sT += dt; if (this.st.sT > 0.15) this.vel.y = -22; this.vel.x = this.vel.z = 0; this.phys(dt, this.st.sT > 0.15 ? 0 : 1);
@@ -297,13 +335,18 @@ export class Player {
       else if (this.combo === 2) { P.shRz = k < 0.25 ? -0.4 : -0.4 + 1.9 * e; P.shRx = k < 0.25 ? 1.6 : 1.6 - 0.7 * e; P.elR = 0.3; P.spineY = k < 0.25 ? 0.7 * w : 0.7 - 1.3 * e; P.thLx = -0.3; P.thRx = 0.5; }
       else { P.shRx = k < 0.25 ? 3.0 : 3.0 - 2.5 * e; P.elR = k < 0.25 ? 0.5 : 0.1; P.spineX = k < 0.25 ? -0.2 : -0.2 + 0.75 * e; P.hipY = k < 0.25 ? 0.05 : -0.25 * e; P.knL = 0.4 + 0.6 * e; P.knR = 0.3 + 0.6 * e; P.shRz = 0.1; }
       rate = 30;
+    } else if (st === 'swing') {
+      P.shLx = P.shRx = 3.0; P.shLz = P.shRz = 0.2; P.elL = P.elR = 0.1; P.spineX = -0.1;
+      const k = Math.sin(this.st.th); P.thLx = P.thRx = 0.4 + k * 0.9; P.knL = P.knR = 0.3 + Math.max(0, -k) * 1.2; P.hipX = 0; rate = 20;
     } else if (st === 'slam') {
       P.shRx = 3.0; P.elR = 0.4; P.thLx = P.thRx = 1.2; P.knL = P.knR = 1.8; P.spineX = 0.4; P.shLx = 2.0; rate = 25;
     }
     if (this.carry) { P.shLx = P.shRx = 2.75; P.elL = P.elR = 0.55; P.shLz = P.shRz = 0.25; P.spineY = 0; }
     if (this.landT > 0) { const k = this.landT / 0.16; P.hipY -= 0.22 * k; P.knL += 0.9 * k; P.knR += 0.9 * k; P.thLx += 0.5 * k; P.thRx += 0.5 * k; }
     blendPose(h, P, dt, rate, fast);
-    h.root.position.copy(this.pos); h.root.rotation.y = this.yaw;
+    h.root.position.copy(this.pos); h.root.rotation.order = 'YXZ'; h.root.rotation.y = this.yaw;
+    this.rootTilt = (this.rootTilt || 0) + (((this.state === 'swing') ? -this.st.th : 0) - (this.rootTilt || 0)) * (this.state === 'swing' ? 1 : Math.min(1, dt * 12));
+    h.root.rotation.x = this.rootTilt;
     h.root.visible = !(this.inv > 0 && this.hp > 0 && this.state !== 'roll' && Math.floor(this.t * 16) % 2 === 0 && this.inv < 1.15);
     h.sword.visible = !this.carry;
   }
