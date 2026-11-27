@@ -1,0 +1,15 @@
+.git
+.git/
+.github
+node_modules
+netlify
+tools
+screenshots
+*.zip
+wrangler.jsonc
+.assetsignore
+.gitignore
+netlify.toml
+vercel.json
+firestore.rules
+README.md

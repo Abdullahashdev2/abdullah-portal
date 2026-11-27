@@ -1,0 +1,8 @@
+// Cloudflare Workers: serve the whole site as static files (no build step)
+{
+  "name": "abdullah-portal",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "."
+  }
+}
