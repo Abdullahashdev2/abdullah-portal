@@ -361,9 +361,9 @@ export class Stealth {
     // النصوص: التكبير، المسافة، الهدف، التلقيم
     g.textAlign = 'center'; g.font = `800 ${Math.round(6 * u)}px system-ui`; g.fillStyle = 'rgba(190,255,190,.92)';
     g.fillText('×' + this.zoomX, cx + R * 0.62, cy - R * 0.62);
-    const d = this.pick && isFinite(this.pick.dist) ? Math.round(this.pick.dist) + ' م' : '— م'; g.fillText('📏 ' + d, cx, cy + R * 0.84);
+    const d = this.pick && isFinite(this.pick.dist) ? Math.round(this.pick.dist) + ' م' : '— م'; g.fillText('📏 ' + d, cx - R * 0.62, cy - R * 0.62);
     if (tgt) { const e = tgt.e, st = e.st === 'sleep' ? 'نايم 😴' : e.alert ? 'منتبه ⚠️' : e.st === 'inv' ? 'يفتّش ❓' : 'ما انتبه'; g.fillStyle = onHead ? 'rgba(255,120,120,.95)' : 'rgba(255,230,160,.95)'; g.fillText((onHead ? '🎯 رأس • ' : '👤 جسم • ') + st, cx, cy - R * 0.8); }
-    if (this.boltT > 0) { g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('🔄 يلقّم…', cx - R * 0.6, cy - R * 0.62); }
+    if (this.boltT > 0) { g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('🔄 يلقّم…', cx, cy + R * 0.36); }
     if (this.hitMark && this.hitMark.t > 0) { g.strokeStyle = this.hitMark.head ? 'rgba(255,60,60,' + this.hitMark.t + ')' : 'rgba(255,255,255,' + this.hitMark.t + ')'; g.lineWidth = 2 * u; const a = 6 * u, b = 11 * u; [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([sx, sy]) => { g.beginPath(); g.moveTo(cx + sx * a, cy + sy * a); g.lineTo(cx + sx * b, cy + sy * b); g.stroke(); }); }
     // عدّاد النفس (قوس يسار)
     g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,.15)'; g.beginPath(); g.arc(cx, cy, R * 0.93, Math.PI * 0.8, Math.PI * 1.2); g.stroke();

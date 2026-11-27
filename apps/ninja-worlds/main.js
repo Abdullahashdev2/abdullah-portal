@@ -523,6 +523,7 @@ const touchCache = {};
 function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (b) b.innerHTML = html; }
 const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
 function touchLabels() {
+  const bc = document.body.classList; bc.toggle('m-aim', !!stealth.aiming); bc.toggle('m-hold', !!stealth.holding); bc.toggle('m-hang', player.state === 'hang' && !!player.edgeHang); bc.toggle('m-hug', player.state === 'hug'); bc.toggle('m-radio', !!stealth.radioOpen);
   const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();
   setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : lab('sword', 'ضرب'));
   setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
