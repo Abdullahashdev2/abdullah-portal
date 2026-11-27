@@ -77,6 +77,7 @@ export function makeKit(L) {
     if (crumble) { mesh.material = own(mesh.material.clone()); mesh.material.color.setHex(0xd8c6ff); const c = glowSprite(0xb794f6, Math.max(w, d) * 0.9, 0.35); c.position.y = h / 2 + 0.05; mesh.add(c); }
     if (run) K.runes(mesh, w, h, d, runFaces);
     if (hidden) mesh.visible = false;
+    if (move || crumble || o.sink || hidden) mesh.userData.dyn = true;
     L.boxes.push(b); L.camMeshes.push(mesh); if (move || crumble || o.sink) L.dyn.push(b);
     return b;
   };
@@ -126,7 +127,7 @@ export function makeKit(L) {
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
     const st = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.22, 1.1, 8), mat('dark')); st.position.y = 0.55; st.castShadow = true; g.add(st);
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.22, 0.3, 12, 1, true), mat('gold')); bowl.position.y = 1.2; bowl.material.side = THREE.DoubleSide; g.add(bowl);
-    const f1 = glowSprite(color, 1.3, 0.9), f2 = glowSprite(0xfff1c1, 0.6, 0.9); f1.position.y = f2.position.y = 1.55; g.add(f1, f2);
+    const f1 = glowSprite(color, 1.3, 0.9), f2 = glowSprite(0xfff1c1, 0.6, 0.9); f1.userData.dyn = true; f1.position.y = f2.position.y = 1.55; g.add(f1, f2);
     if (light && L.lights < 6) { const pl = new THREE.PointLight(color, 8, 10, 2); pl.position.y = 1.8; g.add(pl); L.lights++; }
     const ph = Math.random() * 9; L.anim.push((dt, t) => { const k = 1 + 0.15 * Math.sin(t * 13 + ph) + 0.1 * Math.sin(t * 7.3); f1.scale.setScalar(1.3 * k); f1.position.y = 1.55 + 0.05 * Math.sin(t * 9 + ph); });
     K.plat({ x, y: y + 1.35, z, w: 0.6, d: 0.6, h: 1.35, rock: false, hidden: true }).active = true;
@@ -196,7 +197,7 @@ export function makeKit(L) {
       g.position.set(center.x + Math.cos(a) * rr, center.y - 10 + Math.random() * 40, center.z + Math.sin(a) * rr);
       const rk = new THREE.Mesh(rockUnder(w, w, w * 0.9), own(new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }))); g.add(rk);
       const top = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.55, w * 0.6, 0.5, 9), own(new THREE.MeshStandardMaterial({ color: 0x6aa85a, roughness: 1, flatShading: true }))); top.position.y = 0.2; g.add(top);
-      L.add(g); const ph = Math.random() * 6, y0 = g.position.y; L.anim.push((dt, t) => { g.position.y = y0 + Math.sin(t * 0.4 + ph) * 1.2; });
+      L.add(g); g.userData.dyn = true; const ph = Math.random() * 6, y0 = g.position.y; L.anim.push((dt, t) => { g.position.y = y0 + Math.sin(t * 0.4 + ph) * 1.2; });
     }
   };
 
@@ -205,7 +206,7 @@ export function makeKit(L) {
     if (taken) return;
     const mm = own(new THREE.MeshStandardMaterial({ color: 0xffd166, emissive: 0xffb020, emissiveIntensity: 1.2, metalness: 0.6, roughness: 0.2, flatShading: true }));
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
-    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), mm); m.scale.y = 1.5; g.add(m);
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), mm); m.scale.y = 1.5; g.add(m); g.userData.dyn = m.userData.dyn = true;
     g.add(glowSprite(0xffc94d, 1.6, 0.7));
     const s = { id, g, pos: new V(x, y, z), taken: false }; L.shards.push(s);
     const ph = Math.random() * 6; L.anim.push((dt, t) => { m.rotation.y += dt * 2.5; g.position.y = y + Math.sin(t * 2 + ph) * 0.12; });
@@ -214,7 +215,7 @@ export function makeKit(L) {
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
     const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, 0.3, 8), mat('dark')); base.position.y = 0.15; base.receiveShadow = true; g.add(base);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 1.3, 8), mat('dark')); post.position.y = 0.95; post.castShadow = true; g.add(post);
-    const cap = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), own(new THREE.MeshStandardMaterial({ color: 0x64748b, emissive: 0x000000, flatShading: true, roughness: 0.3 }))); cap.position.y = 1.85; g.add(cap);
+    const cap = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), own(new THREE.MeshStandardMaterial({ color: 0x64748b, emissive: 0x000000, flatShading: true, roughness: 0.3 }))); cap.position.y = 1.85; g.add(cap); cap.userData.dyn = true;
     const gl = glowSprite(0x7dd3fc, 2.2, 0); gl.position.y = 1.85; g.add(gl);
     const c = { pos: new V(x, y, z), yaw, on: false, cap, gl, g }; L.checkpoints.push(c);
     L.anim.push((dt, t) => { cap.rotation.y += dt * (c.on ? 2 : 0.3); if (c.on) gl.material.opacity = 0.7 + 0.2 * Math.sin(t * 4); });
@@ -224,7 +225,7 @@ export function makeKit(L) {
     const g = new THREE.Group(); g.position.set(x, y + 0.6, z); L.add(g);
     const mm = own(new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.1, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.95 }));
     const core = new THREE.Mesh(kind === 'orb' ? new THREE.IcosahedronGeometry(0.3, 1) : new THREE.OctahedronGeometry(0.34, 0), mm); core.castShadow = true; if (kind !== 'orb') core.scale.y = 1.4; g.add(core);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.03, 8, 32), own(new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }))); g.add(ring);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.03, 8, 32), own(new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7 }))); g.add(ring); g.userData.dyn = core.userData.dyn = ring.userData.dyn = true;
     g.add(glowSprite(color, 2.4, 0.7));
     const it = { id, kind, g, home: new V(x, y + 0.6, z), pos: g.position, carried: false, placed: false, color };
     L.items.push(it);
@@ -250,7 +251,7 @@ export function makeKit(L) {
     const mm = own(new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x22d3ee, emissiveIntensity: 1.2 }));
     for (let i = 0; i < Math.floor(w / 1.2); i++) { const r = new THREE.Mesh(new THREE.BoxGeometry(0.08, h * 0.8, 0.05), mm); r.position.set(-w / 2 + 0.6 + i * 1.2, 0, -d / 2 - 0.03); bars.add(r); }
     const sign = textSprite('🔒 يحتاج البلّورة', { scale: 1.2 }); sign.position.set(0, h / 2 + 0.9, 0); b.mesh.add(sign);
-    const gate = { b, open: false, sign };
+    b.mesh.userData.dyn = true; const gate = { b, open: false, sign };
     gate.openGate = () => {
       if (gate.open) return; gate.open = true; b.active = false; sign.visible = false; let k = 0; const y0 = b.mesh.position.y;
       L.anim.push((dt) => { if (k >= 1) return; k = Math.min(1, k + dt / 2.2); b.mesh.position.y = y0 - h * (1 - Math.pow(1 - k, 2)); });
@@ -293,7 +294,7 @@ export function makeKit(L) {
   K.blade = ({ x, y, z, len = 3.6, amp = 1.1, speed = 2.2, phase = 0, plane = 'x' }) => {
     L.hazards = L.hazards || [];
     const g = new THREE.Group(); g.position.set(x, y, z); if (plane === 'z') g.rotation.y = Math.PI / 2; L.add(g);
-    const arm = new THREE.Group(); g.add(arm);
+    const arm = new THREE.Group(); g.add(arm); arm.userData.dyn = true;
     const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, len, 8), mat('dark', { metalness: 0.7, roughness: 0.35 })); rod.position.y = -len / 2; rod.castShadow = true; arm.add(rod);
     const sh = new THREE.Shape(); sh.absarc(0, 0, 0.9, Math.PI * 1.05, Math.PI * 1.95, false); sh.lineTo(0, -0.1); sh.closePath();
     const bl = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.05, bevelEnabled: false }), own(new THREE.MeshStandardMaterial({ color: 0xdfe6ee, metalness: 0.95, roughness: 0.15, emissive: 0x7f1d1d, emissiveIntensity: 0.25 })));
@@ -332,6 +333,7 @@ export function makeKit(L) {
     const pm = own(new THREE.MeshStandardMaterial({ color: 0xd4a24a, emissive: 0xffb020, emissiveIntensity: 0.4, metalness: 0.5, roughness: 0.4 }));
     const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 0.12, 20), pm); pad.position.y = 0.06; pad.receiveShadow = true; pg.add(pad);
     pg.add(Object.assign(glowSprite(0xffb020, 2.4, 0.4), {}));
+    b.mesh.userData.dyn = pad.userData.dyn = true;
     const G = { b, h, y0: b.mesh.position.y, open: 0, left: 0, plate: new V(plate.x, plate.y, plate.z), time, pad };
     L.gates = L.gates || []; L.gates.push(G);
     L.anim.push((dt) => { const target = G.left > 0 ? 1 : 0; G.open += (target - G.open) * Math.min(1, dt * (target ? 6 : 3)); b.mesh.position.y = G.y0 - h * 0.97 * G.open; pad.position.y = G.left > 0 ? 0.02 : 0.06; });
@@ -369,7 +371,7 @@ export function makeKit(L) {
   K.bubble = (x, y, z) => {
     L.bubbles = L.bubbles || [];
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), own(new THREE.MeshStandardMaterial({ color: 0xe0ffff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.1, emissive: 0x66ccff, emissiveIntensity: 0.4 }))); g.add(m);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), own(new THREE.MeshStandardMaterial({ color: 0xe0ffff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.1, emissive: 0x66ccff, emissiveIntensity: 0.4 }))); g.add(m); m.userData.dyn = true;
     g.add(glowSprite(0xaeeaff, 1.6, 0.5));
     const B = { g, pos: new V(x, y, z), t: 0 }; L.bubbles.push(B);
     L.anim.push((dt, t) => { m.scale.setScalar(1 + Math.sin(t * 3 + x) * 0.08); });
@@ -378,7 +380,7 @@ export function makeKit(L) {
     L.hazards = L.hazards || [];
     const g = new THREE.Group(); L.add(g);
     const mm = own(new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.9, transparent: true, opacity: 0.75, roughness: 0.2 }));
-    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); g.add(bell);
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); g.add(bell); g.userData.dyn = bell.userData.dyn = true;
     for (let i = 0; i < 6; i++) { const tn = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.01, 1.2, 4), mm); const a = i / 6 * Math.PI * 2; tn.position.set(Math.cos(a) * 0.3, -0.6, Math.sin(a) * 0.3); g.add(tn); }
     g.add(glowSprite(0xf472b6, 2.4, 0.5));
     const hz = { kind: 'orb', tip: new V(), r: 0.95 }; L.hazards.push(hz);
@@ -416,7 +418,7 @@ export function makeKit(L) {
     L.hazards = L.hazards || [];
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
     const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.25, 10), mat('dark')); vent.position.y = 0.12; g.add(vent);
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 5, 12, 1, true), own(new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }))); col.position.y = 2.5; g.add(col);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 5, 12, 1, true), own(new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }))); col.position.y = 2.5; g.add(col); col.userData.dyn = true;
     const gl = glowSprite(0xff6a00, 3, 0.8); gl.position.y = 0.4; g.add(gl);
     const hz = { kind: 'geyser', x, y, z, on: false }; L.hazards.push(hz);
     L.anim.push((dt, t) => { const ph = ((t + phase) % period + period) % period; hz.on = ph < on; const warn = ph > period - 0.6; col.visible = hz.on; col.scale.set(1, hz.on ? 1 + Math.sin(t * 30) * 0.05 : 1, 1); gl.material.opacity = hz.on ? 1 : warn ? 0.5 + 0.5 * Math.sin(t * 25) : 0.25;
@@ -429,7 +431,7 @@ export function makeKit(L) {
   };
   K.relic = ({ x, y, z, color = 0xa78bfa }) => {
     const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
-    const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 14), own(new THREE.MeshStandardMaterial({ color: 0xf5e6c8, emissive: color, emissiveIntensity: 0.4 }))); scroll.rotation.z = Math.PI / 2; scroll.position.y = 1.3; g.add(scroll);
+    const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 14), own(new THREE.MeshStandardMaterial({ color: 0xf5e6c8, emissive: color, emissiveIntensity: 0.4 }))); scroll.rotation.z = Math.PI / 2; scroll.position.y = 1.3; g.add(scroll); scroll.userData.dyn = true;
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 1, 8), mat('dark')); ped.position.y = 0.5; g.add(ped);
     const gl = glowSprite(color, 2.6, 0.7); gl.position.y = 1.3; g.add(gl);
     L.anim.push((dt, t) => { scroll.position.y = 1.3 + Math.sin(t * 2) * 0.08; scroll.rotation.y = t; });

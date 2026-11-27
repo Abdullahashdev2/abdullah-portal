@@ -24,7 +24,7 @@ function persist() {
 const canvas = $('#gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 const LOW = /Android|iPhone|iPad/i.test(navigator.userAgent) && Math.min(screen.width, screen.height) < 500;
-renderer.setPixelRatio(Math.min(devicePixelRatio, LOW ? 1.4 : 1.75));
+renderer.setPixelRatio(Math.min(devicePixelRatio, LOW ? 1.3 : 1.6));
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
@@ -37,15 +37,48 @@ const pmrem = new THREE.PMREMGenerator(renderer); let envRT = null;
 const sunDir = new V(), lightDir = new V();
 const BREATH = 12; let breath = 12, normalFog = null; const waterFog = new THREE.FogExp2(0x0b5f7a, 0.06);
 /* ---------- lightweight bloom (HDR glow) ---------- */
-let post = null, HQ = true;
-try { const q = localStorage.getItem('nw_hq'); HQ = q == null ? !LOW : q === '1'; } catch (e) {}
+let post = null, HQ = !LOW, bloomSamples = 2;
+/* ---------- adaptive quality: keeps ~60 fps at the sharpest settings the device can hold ---------- */
+const QL = [
+  { name: 'فائقة', dpr: 2.0, bloom: true, msaa: 4, shadow: 2048, soft: true, lights: true },
+  { name: 'عالية', dpr: 1.6, bloom: true, msaa: 2, shadow: 2048, soft: true, lights: true },
+  { name: 'متوسطة', dpr: 1.3, bloom: false, msaa: 0, shadow: 1024, soft: true, lights: true },
+  { name: 'سريعة', dpr: 1.0, bloom: false, msaa: 0, shadow: 1024, soft: false, lights: false },
+  { name: 'أسرع', dpr: 0.8, bloom: false, msaa: 0, shadow: 0, soft: false, lights: false },
+];
+let qMode = 'auto', qLevel = LOW ? 2 : 1, qChanged = 0, qBlock = {}, fpsAvg = 60, ftAcc = 0, ftN = 0;
+try { const m = localStorage.getItem('nw_q'); if (m != null && m !== 'auto') { qMode = +m; qLevel = +m; } } catch (e) {}
+function applyQuality(i) {
+  qLevel = Math.max(0, Math.min(QL.length - 1, i)); const q = QL[qLevel];
+  renderer.setPixelRatio(Math.min(devicePixelRatio, q.dpr)); HQ = q.bloom; bloomSamples = q.msaa;
+  const wantShadow = q.shadow > 0;
+  if (sun.castShadow !== wantShadow || (wantShadow && sun.shadow.mapSize.x !== q.shadow) || renderer.shadowMap.type !== (q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap)) {
+    sun.castShadow = wantShadow; if (wantShadow) sun.shadow.mapSize.set(q.shadow, q.shadow);
+    if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+    renderer.shadowMap.type = q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.needsUpdate = true)); });
+  }
+  if (level) { level.useLights = q.lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = q.lights; }); }
+  qChanged = performance.now(); resize(); qLabel();
+}
+function qLabel() { const b = document.getElementById('pHQ'); if (b) b.textContent = `🎮 الجودة: ${qMode === 'auto' ? 'تلقائي (' + QL[qLevel].name + ')' : QL[qLevel].name} · ${Math.round(fpsAvg)} إطار`; }
+function qTick(dt) {
+  ftAcc += dt; ftN++;
+  if (ftAcc < 1.2) return;
+  fpsAvg = ftN / ftAcc; ftAcc = 0; ftN = 0;
+  if (qMode !== 'auto' || !started || paused || document.hidden) return;
+  const since = performance.now() - qChanged;
+  if (fpsAvg < 50 && qLevel < QL.length - 1 && since > 2500) { qBlock[qLevel - 1] = performance.now(); applyQuality(qLevel + 1); }
+  else if (fpsAvg > 58 && qLevel > 0 && since > 7000 && !(performance.now() - (qBlock[qLevel - 1] || -1e9) < 30000)) applyQuality(qLevel - 1);
+}
+function freezeStatic(root) { root.traverse((o) => { if (o.userData.dyn) return; o.updateMatrix(); o.matrixAutoUpdate = false; }); }
 function makePost() {
   if (post) { post.rt.dispose(); post.lv.forEach((l) => l.forEach((r) => r.dispose())); post = null; }
   if (!HQ) return;
   try {
     const pr = renderer.getPixelRatio(), w = Math.max(2, Math.floor(innerWidth * pr)), h = Math.max(2, Math.floor(innerHeight * pr)), o = { type: THREE.HalfFloatType };
-    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 });
-    const lv = [2, 4, 8, 16].map((d) => [new THREE.WebGLRenderTarget(Math.max(1, (w / d) | 0), Math.max(1, (h / d) | 0), o), new THREE.WebGLRenderTarget(Math.max(1, (w / d) | 0), Math.max(1, (h / d) | 0), o)]);
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: bloomSamples });
+    const lv = [4, 8, 16, 32].map((d) => [new THREE.WebGLRenderTarget(Math.max(1, (w / d) | 0), Math.max(1, (h / d) | 0), o), new THREE.WebGLRenderTarget(Math.max(1, (w / d) | 0), Math.max(1, (h / d) | 0), o)]);
     const vs = 'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
     const mk = (fs, u) => new THREE.ShaderMaterial({ uniforms: u, vertexShader: vs, fragmentShader: fs, depthTest: false, depthWrite: false });
     const bright = mk('uniform sampler2D tex;varying vec2 vUv;void main(){vec3 c=texture2D(tex,vUv).rgb;float l=max(c.r,max(c.g,c.b));gl_FragColor=vec4(c*smoothstep(1.,2.2,l),1.);}', { tex: { value: null } });
@@ -150,7 +183,8 @@ function loadWorld(id, from) {
   if (!checkpoint) checkpoint = { pos: cfg.spawn.pos.clone(), yaw: cfg.spawn.yaw };
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
-  tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate();
+  level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
+  freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate();
   if (started) sfx.music(cfg.music);
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
@@ -184,7 +218,7 @@ $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); fadeTo(() => loadWorld('hub', null)); };
 $('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
 $('#pHelp').onclick = () => $('#help').classList.toggle('on');
-$('#pHQ').onclick = () => { HQ = !HQ; try { localStorage.setItem('nw_hq', HQ ? '1' : '0'); } catch (e) {} makePost(); $('#pHQ').textContent = HQ ? '✨ الرسوم: عالية (توهّج)' : '⚡ الرسوم: سريعة'; };
+$('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
 $('#pUpg').onclick = () => { const n = SAVE.shards.length; $('#upgList').innerHTML = UPG.map((u) => `<div class="${n >= u.n ? 'u on' : 'u'}"><b>${n >= u.n ? '✅' : '🔒'} ${u.name}</b><span>${n >= u.n ? u.desc : 'تنفتح عند ' + u.n + ' 💎 (عندك ' + n + ')'}</span></div>`).join(''); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
   sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
@@ -449,18 +483,19 @@ function simulate(dt) {
   const inp = readInput();
   if (inp.actP) interact();
   acc += dt; let n = 0;
-  while (acc >= STEP && n < 8) {
+  while (acc >= STEP && n < 14) {
     level.update(STEP, player); player.update(STEP, inp); enemies.update(STEP, player);
     inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = false; acc -= STEP; n++;
   }
-  if (n === 8) acc = 0;
+  if (n === 14) acc = 0;
   worldLogic(dt);
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('#toast').classList.remove('on'); }
 }
 loadWorld('hub', null);
+applyQuality(qLevel);
 function frame(now) {
   requestAnimationFrame(frame);
-  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  let dt = Math.min(0.1, (now - last) / 1000); last = now; qTick(dt);
   if (!paused && started && !manual) simulate(dt);
   else if (!started) {
     // title: slow orbit around the plaza
