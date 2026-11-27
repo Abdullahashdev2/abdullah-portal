@@ -677,7 +677,33 @@ function updateCamera(dt) {
 
 /* ---------------- per-frame world logic ---------------- */
 let promptKind = '';
+/* ---------- 🌊 تمايل السفينة + الموجات الكبيرة ---------- */
+let swellT = 0, waveNext = 40, waveWarn = 0, waveHit = 0;
+function shipDeckOutdoor(p) { return p.y > -0.6 && p.y < 1.6 && !(p.z > 117 && p.z < 157 && Math.abs(p.x) < 9); }
+function waveLogic(dt) {
+  if (!cfg || !cfg.ship || !started) { level && (level.waveHit = 0); return; }
+  swellT += dt;
+  if (waveWarn > 0) { waveWarn -= dt; if (waveWarn <= 0) { waveHit = 1.8; G.shake(0.5); sfx.noise(1.6, 180, 0.5, 0.35, 'lowpass'); sfx.noise(1.2, 900, 0.4, 0.12, 'bandpass', 0.2);
+      for (let i = 0; i < 4; i++) sparks.emit(new V(Math.sign(Math.random() - 0.5) * 15.5, 1.5, player.pos.z + (Math.random() - 0.5) * 20), { color: 0xe0f2fe, count: 30, speed: 7, up: 7, life: 1, size: 0.4, grav: 8 }); } }
+  else if (waveHit > 0) waveHit -= dt;
+  else if ((waveNext -= dt) <= 0) { waveNext = 45 + Math.random() * 30; waveWarn = 2.4; say('🌊 موجة كبيرة جاية! تمسّك… أو استغلها: الحراس على السطح بيتمسكون وما بيشوفون شي'); sfx.tone(90, 60, 2.2, 'sine', 0.12); }
+  level.waveHit = waveHit;
+  // تدفّك الموجة وأنت على السطح المكشوف
+  if (waveHit > 0 && player.onGround && shipDeckOutdoor(player.pos) && !player.inLocker && player.state !== 'hug') {
+    const side = Math.sin(swellT * 0.9) >= 0 ? 1 : -1, f = 5.5 * Math.min(1, waveHit / 0.5);
+    player.vel.x += side * f * dt * 3; player.vel.z += Math.sin(swellT * 0.6) * f * dt;
+  }
+}
+function applySwell(dt) {
+  if (!cfg || !cfg.ship) return;
+  const big = waveHit > 0 ? Math.min(1, waveHit / 0.5) : 0, warm = waveWarn > 0 ? 0.3 : 0;
+  const roll = (0.022 + 0.07 * big + 0.02 * warm) * Math.sin(swellT * 0.9) + 0.012 * Math.sin(swellT * 0.37);
+  const pitch = (0.012 + 0.03 * big) * Math.sin(swellT * 0.53 + 1);
+  const k = stealth.aiming ? 0.35 : player.inLocker ? 0.5 : 1;
+  camera.rotateZ(roll * k); camera.rotateX(pitch * k * 0.6);
+}
 function worldLogic(dt) {
+  waveLogic(dt);
   const p = player.pos;
   stealth.update(dt); wallSense(dt);
   // automatic sliding doors (locked ones need the right keycard)
@@ -839,7 +865,7 @@ function frame(now) {
   scarf.update(Math.min(dt, 1 / 30), hero.scarfAnchor.getWorldPosition(tmpA), r, player.vel, tNow);
   if (hero.sword.visible) { const b = hero.sword.localToWorld(tmpA.set(0, 0, 0.2)), t = hero.sword.localToWorld(tmpB.set(0, 0, 1.05)); trail.update(b, t, player.state === 'attack' || player.state === 'slam', dt); } else trail.update(tmpA, tmpA, false, dt);
   sparks.update(dt); dust.update(dt); motes.update(dt);
-  updateCamera(dt);
+  updateCamera(dt); applySwell(dt);
   if (remote.on && (tvSendT -= dt) <= 0) { tvSendT = 0.35; sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); }
   sun.position.copy(player.pos).addScaledVector(lightDir, 60); sun.target.position.copy(player.pos);
   sky.position.copy(camera.position);
@@ -853,7 +879,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = { scene, renderer,
+window.__G = { scene, renderer, wave: () => { waveNext = 0; },
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },

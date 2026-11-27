@@ -199,6 +199,8 @@ export class Enemies {
     const hidden = this.g.playerHidden && this.g.playerHidden();
     if (hidden === 'locker') return 0;
     // متنكّر بزي حارس: من بعيد ما يشكّون — قريب منهم يتمعّنون فيك شوي شوي، والركض/الضرب/السحب يفضحك
+    // وقت الموجة الكبيرة: حراس السطح المكشوف متمسكين بالحديد — ما يشوفون شي
+    if (e.ship && this.g.level.waveHit > 0 && e.pos.y > -0.6 && e.pos.y < 1.6 && !(e.pos.z > 117 && e.pos.z < 157 && Math.abs(e.pos.x) < 9)) return 0;
     const dis = this.g.disguised && this.g.disguised();
     if (dis && !dis.reveal) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
     const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
@@ -263,6 +265,7 @@ export class Enemies {
   shipThink(e, dt, pl, d, dy, dx, dz, toYaw) {
     const phase = this.g.level.phase || 'normal';
     if (e.st === 'dragged' || e.st === 'held') return 'idle';
+    if (this.g.level.waveHit > 0 && e.pos.y > -0.6 && e.pos.y < 1.6 && !['sleep', 'thrown'].includes(e.st) && !(e.pos.z > 117 && e.pos.z < 157 && Math.abs(e.pos.x) < 9)) return 'idle'; // متمسك بالحديد
     if (e.st === 'sleep') { e.sleepT -= dt; if (Math.random() < dt * 0.8) this.g.fx.emit(e.pos.clone().add(new V(0, 0.8, 0)), { color: 0xbfdbfe, count: 1, speed: 0.4, up: 1, life: 1.4, size: 0.18, grav: -0.6 });
       if (e.sleepT <= 0 && !e.hidden) { e.st = 'idle'; e.sus = 0; e.wait = 1.5; this.g.onGuardWoke && this.g.onGuardWoke(e); } return 'idle'; }
     if (e.st === 'drowsy') { e.drowsyT -= dt; e.yaw += Math.sin(e.t * 5) * dt; if (e.drowsyT <= 0) this.sleep(e); return 'stagger'; }
@@ -295,7 +298,8 @@ export class Enemies {
     if (e.st === 'inv' && !walking) { P.headY = Math.sin(t * 1.3) * 0.6; }
     if (e.st === 'radio') { P.shLx = 2.5; P.shLz = 0.35; P.elL = 2.5; P.headY = 0.2; }
     if (anim === 'stagger' || e.st === 'drowsy') { P.spineX = -0.25 + Math.sin(t * 6) * 0.15; P.knL = P.knR = 0.6; P.headX = 0.4; P.shRx = 0.2; P.shLx = 0.2; P.elR = P.elL = 0.4; }
-    if (e.st === 'held') { const sq = Math.sin(e.t * 18) * 0.25 * (1 - (e.choke || 0)); P.headX = -0.5; P.spineX = -0.2; P.shLx = 2.2 + sq; P.shRx = 2.0 - sq; P.elL = P.elR = 1.6; P.shLz = P.shRz = 0.3; P.knL = 0.3 + (e.choke || 0) * 0.6; P.knR = 0.2 + (e.choke || 0) * 0.6; P.thLx = 0.2 + sq * 0.5; }
+    if (e.ship && this.g.level.waveHit > 0 && e.alive && !['sleep', 'dragged', 'held', 'thrown'].includes(e.st) && e.pos.y > -0.6 && e.pos.y < 1.6) { P.knL = P.knR = 0.9; P.hipY = -0.25; P.spineX = 0.5; P.shLx = P.shRx = 1.2; P.elL = P.elR = 0.6; P.shLz = P.shRz = 0.6; }
+    else if (e.st === 'held') { const sq = Math.sin(e.t * 18) * 0.25 * (1 - (e.choke || 0)); P.headX = -0.5; P.spineX = -0.2; P.shLx = 2.2 + sq; P.shRx = 2.0 - sq; P.elL = P.elR = 1.6; P.shLz = P.shRz = 0.3; P.knL = 0.3 + (e.choke || 0) * 0.6; P.knR = 0.2 + (e.choke || 0) * 0.6; P.thLx = 0.2 + sq * 0.5; }
     else if (e.st === 'thrown') { P.shLz = P.shRz = 2.2; P.thLx = 0.8; P.thRx = -0.6; P.knL = P.knR = 0.4; P.spineX = -0.4; }
     else if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
     blendPose(h, P, dt, e.st === 'sleep' ? 5 : 12);
