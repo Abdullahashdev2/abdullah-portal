@@ -42,6 +42,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 @media (max-height:500px){#toast{padding:8px 12px;width:min(70vw,560px)}#toastText{font-size:13px}#toast .av{flex-basis:30px;height:30px;font-size:18px}}
 #prompt{position:fixed;z-index:6;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(255,209,102,.95);color:#231600;font-weight:900;border-radius:999px;padding:8px 18px;opacity:0;transition:.2s;pointer-events:none}
 #prompt.on{opacity:1}
+#breath{position:fixed;z-index:6;left:50%;top:calc(112px + env(safe-area-inset-top));transform:translateX(-50%);width:min(60vw,260px);height:12px;border-radius:9px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.3);display:none;overflow:hidden}#breath.on{display:block}
+#breathFill{height:100%;width:100%;background:#7dd3fc;transition:width .1s}
+#bossbar{position:fixed;z-index:6;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(80vw,520px);display:none;text-align:center;font-weight:900;font-size:13px;text-shadow:0 2px 4px #000}#bossbar.on{display:block}
+#bossbar .bar{height:14px;border-radius:9px;background:rgba(0,0,0,.55);border:1px solid rgba(255,140,60,.6);overflow:hidden;margin-top:4px}#bossFill{height:100%;width:100%;background:linear-gradient(90deg,#ff3d00,#ffb020);transition:width .2s}
+@media (pointer:coarse){#bossbar{bottom:auto;top:calc(130px + env(safe-area-inset-top))}}
+#uw{position:fixed;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at 50% 30%,rgba(40,180,220,.08),rgba(0,40,70,.45));opacity:0;transition:opacity .25s}#uw.on{opacity:1}
+#spBtn{width:58px;height:58px;right:186px;bottom:70px;border-color:rgba(167,139,250,.8)}#spBtn.cool{opacity:.35}
+#upgList{display:none;text-align:right;margin:6px 0}#upgList.on{display:block}#upgList .u{background:rgba(255,255,255,.05);border-radius:12px;padding:8px 10px;margin:6px 0;opacity:.6}#upgList .u.on{opacity:1;border:1px solid rgba(255,209,102,.4)}#upgList b{display:block;font-size:14px}#upgList span{font-size:12px;color:#94a3b8}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -106,6 +114,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 <div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div></div>
 <div id="prompt"></div>
 <div id="timer"></div>
+<div id="breath"><div id="breathFill"></div></div>
+<div id="bossbar">🌋 عملاق الحمم<div class="bar"><div id="bossFill"></div></div></div>
+<div id="uw"></div>
 <div id="hurt"></div>
 
 <div id="touch">
@@ -116,6 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
     <button id="atkBtn" data-btn="atk">⚔️<small>ضرب</small></button>
     <button id="rollBtn" data-btn="roll">🌀<small>تدحرج</small></button>
     <button id="actBtn" data-btn="act">✋<small>شيل</small></button>
+    <button id="spBtn" data-btn="sp" style="display:none">✴️<small>دوّامة</small></button>
   </div>
 </div>
 
@@ -125,6 +137,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
   <button id="pCheck">🔄 ارجع لآخر نقطة حفظ</button>
   <button id="pHub">🏛️ الرجوع لساحة البوابات</button>
   <button id="pSound">🔊 الصوت: شغّال</button>
+  <button id="pUpg">🎁 الترقيات</button>
+  <div id="upgList"></div>
+  <button id="pHQ">✨ الرسوم: عالية (توهّج)</button>
   <button id="pHelp">🎮 طريقة اللعب</button>
   <div id="help">
     🏃 <b>اركض بمحاذاة جدار مضيء واقفز</b> = تركض على الجدار. وأنت عليه اضغط قفز = تنط للجهة الثانية.<br>
@@ -132,7 +147,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
     🧗 <b>أي حافة</b>: اقفز وأنت لاصق فيها تتمسك. يمين/يسار = تمشي على الحافة. قدّام أو قفز = تطلع. ورا = تنزل.<br>
     ⚔️ اضغط ضرب ٣ مرات = كومبو. <b>في الهوا</b> اضغط ضرب = ضربة أرضية قوية.<br>
     🌀 التدحرج يخليك ما تنضرب لحظة — استخدمه لما تحمرّ عيون الظل.<br>
-    ✋ شيل البلّورات والكرات وحطها على المنصّات.
+    ✋ شيل البلّورات والكرات وحطها على المنصّات.<br>
+    🤸 الأعمدة الذهبية: اقفز عليها تتمسك، واضغط قفز تنطلق.<br>
+    🌊 بالماء: قفز = تطلع لفوق، تدحرج = تغطس. راقب شريط الهوا 🫧<br>
+    🌙 بالقلعة: ابعد عن ضوء الكشافات، اختبئ بالعشب، واضرب الحارس من وراه = ضربة صامتة 🤫
   </div>
 </div></div>
 

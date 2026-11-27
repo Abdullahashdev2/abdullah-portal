@@ -83,6 +83,9 @@ export class Player {
     if (inp.jumpP) this.jumpBuf = 0.14; else this.jumpBuf = Math.max(0, this.jumpBuf - dt);
     this.inp = inp;
     if (this.ground && this.ground.active && (this.onGround || this.state === 'hang')) this.pos.add(this.ground.delta);
+    const W = this.g.waterAt && this.g.waterAt(this.pos);
+    if (W && this.state !== 'swim' && this.state !== 'climb' && this.state !== 'hang' && this.pos.y + 1.0 < W.y1 && this.vel.y <= 0 && this.t > (this.leapT || 0)) this.startSwim(W);
+    if (inp.spP && !this.carry && (this.state === 'ground' || this.state === 'air' || this.state === 'attack')) this.startSpin();
     switch (this.state) {
       case 'ground': case 'air': this.locomotion(dt, inp); break;
       case 'wallrun': this.wallRun(dt); break;
@@ -93,6 +96,8 @@ export class Player {
       case 'attack': this.attackUpd(dt, inp); break;
       case 'slam': this.slamUpd(dt); break;
       case 'swing': this.swingUpd(dt, inp); break;
+      case 'swim': this.swimUpd(dt, inp); break;
+      case 'spin': this.spinUpd(dt); break;
       case 'hurt': this.st.hurtT -= dt; this.phys(dt); if (this.st.hurtT <= 0) this.state = this.onGround ? 'ground' : 'air'; break;
     }
     if (this.pos.y < this.g.level.cfg.killY) this.g.onFall();
@@ -129,6 +134,11 @@ export class Player {
     }
     if (inp.atkP && !this.carry) { if (this.onGround || this.coyote > 0) return this.startAttack(); if (this.vel.y < 5) return this.startSlam(); }
     if (inp.rollP && this.onGround && !this.carry) return this.startRoll(v, m);
+    if (inp.rollP && !this.onGround && !this.carry && this.g.upg.dash && !this.dashed) {
+      this.dashed = true; const d = m > 0.2 ? v.clone().normalize() : this.fwd; this.yaw = Math.atan2(d.x, d.z);
+      this.vel.set(d.x * 15, 2, d.z * 15); this.airLock = 0.22; this.inv = Math.max(this.inv, 0.25); this.g.sfx.roll();
+      this.g.fx.emit(this.pos.clone().add(new V(0, 1, 0)), { color: 0x9be7ff, count: 24, speed: 3, life: 0.35, size: 0.3, vel: d.clone().multiplyScalar(-4) });
+    }
     this.phys(dt);
     if (this.onGround) {
       this.state = 'ground'; this.lastWall = null;
@@ -138,7 +148,7 @@ export class Player {
   }
   onLand(fall) {
     if (fall < -9) { this.landT = 0.16; this.g.sfx.land(Math.min(1.5, -fall / 14)); this.g.dust(this.pos, 14); }
-    this.lastWall = null; this.noGrab = 0; this.flip = 0;
+    this.lastWall = null; this.noGrab = 0; this.flip = 0; this.dashed = false;
   }
   /* ---------- wall run ---------- */
   startWallRun(w, dir) {
@@ -227,7 +237,7 @@ export class Player {
     this.vel.x = f.x * lunge; this.vel.z = f.z * lunge; this.phys(dt);
     if (!this.st.hit && k >= 0.38) {
       this.st.hit = true; const big = this.combo === 3;
-      const n = this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, big ? 2 : 1, big ? 9 : 3.5);
+      const n = this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
       if (n) { this.g.hitstop(big ? 0.09 : 0.055); this.g.shake(big ? 0.3 : 0.14); this.g.sfx.hit(); }
     }
     if (inp.atkP) this.st.queued = true;
@@ -271,11 +281,49 @@ export class Player {
     }
     if (inp.rollP) { this.state = 'air'; this.noBar = this.t; this.vel.set(0, 0, 0); }
   }
+  /* ---------- spin special (unlocked by shards) ---------- */
+  startSpin() {
+    if (!this.g.upg.spin || this.t < (this.spinReady || 0)) return false;
+    this.state = 'spin'; this.st.spT = 0; this.st.hit = 0; this.spinReady = this.t + (this.g.upg.fastSpin ? 1.5 : 3);
+    this.g.sfx.slash(3); this.g.sfx.wallrun(); this.g.hud(); return true;
+  }
+  spinUpd(dt) {
+    this.st.spT += dt; this.vel.x *= Math.exp(-4 * dt); this.vel.z *= Math.exp(-4 * dt); this.phys(dt, this.onGround ? 1 : 0.4);
+    if (this.st.hit < 2 && this.st.spT > 0.12 + this.st.hit * 0.2) {
+      this.st.hit++; const n = this.g.enemies.hitRadius(this.pos, 3.3, 2 + this.g.upg.dmg, 9);
+      if (n) { this.g.hitstop(0.07); this.g.shake(0.3); this.g.sfx.hit(); }
+      this.g.fx.emit(this.pos.clone().add(new V(0, 1, 0)), { color: this.g.upg.fire ? 0xffa040 : 0x9be7ff, count: 40, speed: 7, flat: true, life: 0.35, size: 0.3, grav: 0 });
+    }
+    if (this.st.spT > 0.55) this.state = this.onGround ? 'ground' : 'air';
+  }
+  /* ---------- swimming ---------- */
+  startSwim(W) {
+    this.state = 'swim'; this.water = W; this.vel.y *= 0.25; this.flip = 0; this.onGround = false; this.ground = null; this.dashed = false;
+    if (this.carry) this.g.dropItem(true);
+    this.g.splash && this.g.splash(new V(this.pos.x, W.y1, this.pos.z));
+  }
+  swimUpd(dt, inp) {
+    const W = this.g.waterAt(this.pos); if (!W || this.pos.y + 0.7 > W.y1 + 0.4) { this.state = 'air'; return; }
+    this.water = W;
+    const { v, m } = this.moveInput(inp); const sp = 4.8;
+    this.steer(dt, v.clone().multiplyScalar(sp), 12);
+    const surf = W.y1 - 1.35;
+    const vyT = inp.jumpH ? 4 : inp.rollH ? -4.2 : Math.max(-1, Math.min(1.4, (surf - this.pos.y) * 2.2));
+    this.vel.y += (vyT - this.vel.y) * Math.min(1, dt * 4);
+    if (W.cur) { this.vel.x += W.cur.x * dt * 3; this.vel.z += W.cur.z * dt * 3; }
+    let drx = 0, drz = 0; for (const c of this.g.level.currents || []) if (this.pos.x > c.x0 && this.pos.x < c.x1 && this.pos.z > c.z0 && this.pos.z < c.z1) { drx += c.fx * 0.6; drz += c.fz * 0.6; }
+    if (m > 0.1) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * 6);
+    // leap out of the water at the surface
+    if (this.jumpBuf > 0 && this.pos.y > surf - 0.35) { this.jumpBuf = 0; this.vel.y = 10.5; this.state = 'air'; this.leapT = this.t + 0.5; this.g.sfx.jump(); this.g.splash && this.g.splash(new V(this.pos.x, W.y1, this.pos.z)); }
+    this.contacts.length = 0; this.moveH('x', (this.vel.x + drx) * dt); this.moveH('z', (this.vel.z + drz) * dt);
+    const wasG = this.onGround; this.moveV(dt); if (this.onGround && !wasG) this.vel.y = 0; this.onGround = false;
+    if (inp.atkP && !this.carry) { this.startAttack(); }
+  }
   startSlam() { this.state = 'slam'; this.vel.set(0, 4, 0); this.st.sT = 0; this.g.sfx.slash(3); }
   slamUpd(dt) {
     this.st.sT += dt; if (this.st.sT > 0.15) this.vel.y = -22; this.vel.x = this.vel.z = 0; this.phys(dt, this.st.sT > 0.15 ? 0 : 1);
     if (this.onGround) {
-      const n = this.g.enemies.hitRadius(this.pos, 2.9, 2, 8); this.g.shake(0.35); this.g.sfx.slam(); if (n) this.g.hitstop(0.08);
+      const n = this.g.enemies.hitRadius(this.pos, 2.9, 2 + this.g.upg.dmg, 8); this.g.shake(0.35); this.g.sfx.slam(); if (n) this.g.hitstop(0.08);
       this.g.fx.emit(this.pos.clone().add(new V(0, 0.2, 0)), { color: 0x9be7ff, count: 50, speed: 8, flat: true, life: 0.45, size: 0.3, grav: 0 }); this.g.dust(this.pos, 20);
       this.state = 'attack'; this.combo = 3; this.st.aT = ATK[3] * 0.7; this.st.hit = true; this.st.queued = false;
     }
@@ -341,12 +389,19 @@ export class Player {
     } else if (st === 'slam') {
       P.shRx = 3.0; P.elR = 0.4; P.thLx = P.thRx = 1.2; P.knL = P.knR = 1.8; P.spineX = 0.4; P.shLx = 2.0; rate = 25;
     }
+    if (st === 'swim') {
+      const sw = Math.sin(t * 7), mv = Math.min(1, hs / 3);
+      P.shLx = 2.4 + sw * 0.9 * mv; P.shRx = 2.4 - sw * 0.9 * mv; P.shLz = P.shRz = 0.4 + 0.3 * (1 - mv); P.elL = P.elR = 0.4;
+      P.thLx = Math.sin(t * 9) * 0.4; P.thRx = -Math.sin(t * 9) * 0.4; P.knL = P.knR = 0.3; P.spineX = 0.1; P.headX = -0.5 * mv; rate = 10;
+    } else if (st === 'spin') { P.shRz = 1.5; P.shRx = 1.2; P.elR = 0.1; P.shLz = 1.3; P.thLz = P.thRz = 0.35; P.knL = P.knR = 0.5; P.hipY = -0.15; rate = 30; }
     if (this.carry) { P.shLx = P.shRx = 2.75; P.elL = P.elR = 0.55; P.shLz = P.shRz = 0.25; P.spineY = 0; }
     if (this.landT > 0) { const k = this.landT / 0.16; P.hipY -= 0.22 * k; P.knL += 0.9 * k; P.knR += 0.9 * k; P.thLx += 0.5 * k; P.thRx += 0.5 * k; }
     blendPose(h, P, dt, rate, fast);
     h.root.position.copy(this.pos); h.root.rotation.order = 'YXZ'; h.root.rotation.y = this.yaw;
-    this.rootTilt = (this.rootTilt || 0) + (((this.state === 'swing') ? -this.st.th : 0) - (this.rootTilt || 0)) * (this.state === 'swing' ? 1 : Math.min(1, dt * 12));
-    h.root.rotation.x = this.rootTilt;
+    const tiltT = this.state === 'swing' ? -this.st.th : this.state === 'swim' ? (hs > 1.2 ? 1.2 : 0.15) : 0;
+    this.rootTilt = (this.rootTilt || 0) + (tiltT - (this.rootTilt || 0)) * (this.state === 'swing' ? 1 : Math.min(1, dt * (this.state === 'swim' ? 4 : 12)));
+    if (this.state === 'swim') h.root.position.y += 0.9 * Math.sin(this.rootTilt);
+    h.root.rotation.x = this.rootTilt; h.root.rotation.y += this.state === 'spin' ? (this.st.spT / 0.55) * Math.PI * 4 : 0;
     h.root.visible = !(this.inv > 0 && this.hp > 0 && this.state !== 'roll' && Math.floor(this.t * 16) % 2 === 0 && this.inv < 1.15);
     h.sword.visible = !this.carry;
   }

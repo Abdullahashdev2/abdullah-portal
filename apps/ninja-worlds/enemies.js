@@ -4,7 +4,7 @@ import { glowSprite } from './fx.js';
 const V = THREE.Vector3;
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
-function buildShade(big, archer) {
+function buildShade(big, archer, guard, boss) {
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
   const bodyM = new THREE.MeshStandardMaterial({ color: big ? 0x2a1012 : 0x1c1433, roughness: 0.35, metalness: 0.25, emissive: big ? 0x6b0f0f : 0x3b0d66, emissiveIntensity: 0.55, flatShading: true });
   const eyeC = big ? 0xffa31a : 0xff4fd8, eyeM = new THREE.MeshBasicMaterial({ color: eyeC });
@@ -22,20 +22,30 @@ function buildShade(big, archer) {
     return a;
   });
   const aura = glowSprite(big ? 0xff3b1f : 0x8b5cf6, big ? 3.4 : 2.6, 0.35); aura.position.y = 1.1; inner.add(aura);
-  if (big) g.scale.setScalar(1.55);
+  if (big) g.scale.setScalar(boss ? 3.1 : 1.55);
+  if (boss) { bodyM.color.setHex(0x1a0d08); bodyM.emissive.setHex(0xff4500); bodyM.emissiveIntensity = 0.9; aura.material.color.setHex(0xff5a1f); aura.scale.setScalar(4.5); }
+  let cone = null;
+  if (guard) {
+    bodyM.color.setHex(0x1f2937); bodyM.emissive.setHex(0x3f3f00); const lan = glowSprite(0xffe08a, 0.8, 1); lan.position.set(-0.55, 0.7, 0.35); inner.add(lan);
+    const geo = new THREE.ConeGeometry(Math.tan(0.62) * 9, 9, 28, 1, true); geo.translate(0, -4.5, 0); geo.rotateX(-Math.PI / 2);
+    cone = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.045, depthWrite: false, side: THREE.FrontSide, blending: THREE.AdditiveBlending }));
+    cone.position.set(0, 1.62, 0.3); cone.rotation.x = 0.12; inner.add(cone);
+  }
   if (archer) { bodyM.color.setHex(0x0f2a2e); bodyM.emissive.setHex(0x0e7490); const orb = glowSprite(0x22d3ee, 0.9, 0.9); orb.position.set(0.55, 0.62, 0.3); inner.add(orb); }
-  return { g, inner, body, head, arms, eyes, bodyM, aura };
+  return { g, inner, body, head, arms, eyes, bodyM, aura, cone };
 }
 
 export class Enemies {
   constructor(game) { this.g = game; this.list = []; this.pickups = []; this.shots = []; }
   clear() { for (const e of this.list) e.m.g.removeFromParent(); for (const p of this.pickups) p.s.removeFromParent(); for (const b of this.shots) b.m.removeFromParent(); this.list = []; this.pickups = []; this.shots = []; }
   spawn(def, rise = false) {
-    const big = def.type === 'brute', archer = def.type === 'archer', m = buildShade(big, archer);
+    const boss = def.type === 'boss', big = def.type === 'brute' || boss, archer = def.type === 'archer', guard = def.type === 'guard', m = buildShade(big, archer, guard, boss);
     m.g.position.set(def.x, def.y, def.z); this.g.scene.add(m.g);
     const zone = def.zone || { x0: def.x - 5, x1: def.x + 5, z0: def.z - 5, z1: def.z + 5 };
     const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() + (archer ? 1 : 0), archer };
     if (archer) { e.hp = e.maxHp = 2; e.speed = 2.6; }
+    if (guard) { Object.assign(e, { guard: true, alert: !!def.alert, sus: def.alert ? 1 : 0, pi: 0, wait: 0, speed: 3.6 }); e.yaw = 0; }
+    if (boss) { Object.assign(e, { boss: true, hp: 40, maxHp: 40, reach: 4.4, speed: 2.4, summonT: 8 }); }
     if (rise) { m.inner.position.y = -2.2; this.g.fx.emit(new V(def.x, def.y + 0.3, def.z), { color: 0x8b5cf6, count: 40, speed: 4, up: 1, life: 0.9, size: 0.4, grav: -1 }); }
     this.list.push(e); return e;
   }
@@ -43,27 +53,31 @@ export class Enemies {
   nearest(p, maxD) { let best = null, bd = maxD; for (const e of this.list) { if (!e.alive || e.st === 'rise') continue; const d = Math.hypot(e.pos.x - p.x, e.pos.z - p.z); if (d < bd && Math.abs(e.pos.y - p.y) < 2.5) { bd = d; best = e; } } return best; }
   hurt(e, dmg, from, knock) {
     if (!e.alive || e.st === 'rise' || e.st === 'dying') return false;
+    if (e.guard && !e.alert) {
+      const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw), dx0 = from.x - e.pos.x, dz0 = from.z - e.pos.z, l0 = Math.hypot(dx0, dz0) || 1;
+      if ((dx0 * fx + dz0 * fz) / l0 < 0.35) { dmg = 99; this.g.onTakedown && this.g.onTakedown(e); } else this.alarm(e);
+    }
     e.hp -= dmg; e.flash = 0.18;
     const dx = e.pos.x - from.x, dz = e.pos.z - from.z, l = Math.hypot(dx, dz) || 1;
-    e.kb.set((dx / l) * knock / (e.big ? 2.2 : 1), 0, (dz / l) * knock / (e.big ? 2.2 : 1));
+    const kr = e.boss ? 10 : e.big ? 2.2 : 1; e.kb.set((dx / l) * knock / kr, 0, (dz / l) * knock / kr);
     const hitP = e.pos.clone(); hitP.y += e.big ? 1.6 : 1.1;
     this.g.fx.emit(hitP, { color: 0xffffff, count: 14, speed: 7, life: 0.25, size: 0.18, grav: 4 });
     this.g.fx.emit(hitP, { color: e.big ? 0xff6a3d : 0xc084fc, count: 18, speed: 4, life: 0.5, size: 0.3, grav: 2 });
     if (e.hp <= 0) { e.st = 'dying'; e.t = 0; e.alive = false; this.g.sfx.enemyDie(); this.g.onEnemyKilled(e); }
-    else if (!e.big || dmg >= 2) { e.st = 'stagger'; e.t = 0; }
+    else if (!e.boss && (!e.big || dmg >= 2)) { e.st = 'stagger'; e.t = 0; }
     return true;
   }
   hitArc(p, yaw, range, cosMin, dmg, knock) {
     let n = 0; const fx = Math.sin(yaw), fz = Math.cos(yaw);
     for (const e of this.list) {
-      if (!e.alive) continue; const dx = e.pos.x - p.x, dz = e.pos.z - p.z, d = Math.hypot(dx, dz), rr = range + (e.big ? 0.6 : 0);
+      if (!e.alive) continue; const dx = e.pos.x - p.x, dz = e.pos.z - p.z, d = Math.hypot(dx, dz), rr = range + (e.boss ? 2 : e.big ? 0.6 : 0);
       if (d > rr || Math.abs(e.pos.y - p.y) > 2) continue;
       if (d > 0.6 && (dx * fx + dz * fz) / d < cosMin) continue;
       if (this.hurt(e, dmg, p, knock)) n++;
     }
     return n;
   }
-  hitRadius(p, r, dmg, knock) { let n = 0; for (const e of this.list) { if (!e.alive) continue; if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.big ? 0.6 : 0) && Math.abs(e.pos.y - p.y) < 2) if (this.hurt(e, dmg, p, knock)) n++; } return n; }
+  hitRadius(p, r, dmg, knock) { let n = 0; for (const e of this.list) { if (!e.alive) continue; if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.boss ? 2 : e.big ? 0.6 : 0) && Math.abs(e.pos.y - p.y) < 2.5) if (this.hurt(e, dmg, p, knock)) n++; } return n; }
   update(dt, pl) {
     const attackers = this.list.filter((e) => e.st === 'windup' || e.st === 'strike').length;
     for (const e of this.list) {
@@ -73,7 +87,9 @@ export class Enemies {
       // knockback + zone clamp
       e.pos.x += e.kb.x * dt; e.pos.z += e.kb.z * dt; e.kb.multiplyScalar(Math.exp(-7 * dt));
       let anim = 'idle';
-      switch (e.st) {
+      if (e.guard && !e.alert && e.alive && (e.st === 'idle' || e.st === 'chase')) { anim = this.patrol(e, dt, pl, d, dy, dx, dz); }
+      else if (e.boss && e.alive && (e.st === 'idle' || e.st === 'chase') && seen) { anim = this.bossThink(e, dt, pl, d, dx, dz, toYaw); }
+      else switch (e.st) {
         case 'rise': m.inner.position.y = Math.min(0, -2.2 + e.t * 2.6); if (e.t > 0.9) { e.st = 'idle'; m.inner.position.y = 0; } break;
         case 'idle': case 'chase':
           if (seen && e.archer) {
@@ -87,21 +103,21 @@ export class Enemies {
             else if (e.cd <= 0 && attackers < 2 && Math.abs(dy) < 1.6) { e.st = 'windup'; e.t = 0; this.g.sfx.enemyAtk(); }
           } else { e.yaw += Math.sin(e.t * 0.5) * dt * 0.3; }
           break;
-        case 'windup': e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 3); if (e.t > (e.big ? 0.75 : 0.55)) { e.st = 'strike'; e.t = 0; e.hit = false; } anim = 'windup'; break;
+        case 'windup': e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 3); if (e.t > (e.boss ? (e.hp < 14 ? 0.7 : 0.95) : e.big ? 0.75 : 0.55)) { e.st = 'strike'; e.t = 0; e.hit = false; } anim = 'windup'; break;
         case 'strike': {
           anim = 'strike';
           if (!e.big && !e.archer) { e.pos.x += Math.sin(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); e.pos.z += Math.cos(e.yaw) * 6 * dt * (e.t < 0.12 ? 1 : 0); }
-          if (!e.hit && e.t > 0.08 && e.archer) { e.hit = true; this.fire(e, pl); }
+          if (!e.hit && e.t > 0.08 && (e.archer || e.volley)) { e.hit = true; if (e.volley) { for (let k = -2; k <= 2; k++) this.fire(e, pl, k * 0.22, 0xff7a1a); e.volley = false; } else this.fire(e, pl); }
           else if (!e.hit && e.t > 0.08) {
             e.hit = true;
             const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw), inFront = d < 0.5 || (dx * fx + dz * fz) / d > 0.35;
-            if (e.big) { const c = e.pos.clone(); c.x += fx * 1.4; c.z += fz * 1.4; this.g.fx.emit(c, { color: 0xff7b3d, count: 40, speed: 6, flat: true, life: 0.5, size: 0.35, grav: 1 }); this.g.shake(0.25); this.g.sfx.slam(); if (Math.hypot(pl.pos.x - c.x, pl.pos.z - c.z) < 2.6 && Math.abs(dy) < 1.2) pl.damage(2, e.pos); }
+            if (e.big) { const R = e.boss ? 4.8 : 2.6, c = e.pos.clone(); c.x += fx * (e.boss ? 2.6 : 1.4); c.z += fz * (e.boss ? 2.6 : 1.4); if (e.boss) { this.g.fx.emit(c, { color: 0xff4500, count: 80, speed: 10, flat: true, life: 0.6, size: 0.5, grav: 0 }); this.g.shake(0.5); } this.g.fx.emit(c, { color: 0xff7b3d, count: 40, speed: 6, flat: true, life: 0.5, size: 0.35, grav: 1 }); this.g.shake(0.25); this.g.sfx.slam(); if (Math.hypot(pl.pos.x - c.x, pl.pos.z - c.z) < R && Math.abs(dy) < 1.5) pl.damage(2, e.pos); }
             else if (d < e.reach + 0.3 && inFront && Math.abs(dy) < 1.4) pl.damage(1, e.pos);
           }
           if (e.t > 0.25) { e.st = 'recover'; e.t = 0; }
           break;
         }
-        case 'recover': anim = 'idle'; if (e.t > (e.big ? 1.0 : 0.75)) { e.st = 'idle'; e.cd = e.archer ? 1.6 + Math.random() : 0.4 + Math.random() * 0.8; } break;
+        case 'recover': anim = 'idle'; if (e.t > (e.big ? 1.0 : 0.75)) { e.st = 'idle'; e.cd = e.boss ? (e.hp < 14 ? 0.8 : 1.4) : e.archer ? 1.6 + Math.random() : 0.4 + Math.random() * 0.8; } break;
         case 'stagger': anim = 'stagger'; if (e.t > 0.42) { e.st = 'idle'; e.cd = 0.3; } break;
         case 'dying': {
           const k = e.t / 0.7; m.inner.scale.setScalar(Math.max(0.01, 1 - k)); m.inner.rotation.y += dt * 10; m.inner.position.y = k * 0.8;
@@ -112,8 +128,8 @@ export class Enemies {
       }
       const z = e.zone; e.pos.x = Math.max(z.x0, Math.min(z.x1, e.pos.x)); e.pos.z = Math.max(z.z0, Math.min(z.z1, e.pos.z));
       // separation
-      for (const o of this.list) { if (o === e || !o.alive) continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
-      if (e.alive && d < 0.75 && Math.abs(dy) < 1.5) { e.pos.x -= (dx / (d || 1)) * (0.75 - d); e.pos.z -= (dz / (d || 1)) * (0.75 - d); }
+      for (const o of this.list) { if (o === e || !o.alive) continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.boss || o.boss) ? 4 : (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
+      const pr = e.boss ? 2.4 : 0.75; if (e.alive && d < pr && Math.abs(dy) < 1.5) { if (e.boss) { pl.pos.x += (dx / (d || 1)) * (pr - d); pl.pos.z += (dz / (d || 1)) * (pr - d); } else { e.pos.x -= (dx / (d || 1)) * (pr - d); e.pos.z -= (dz / (d || 1)) * (pr - d); } }
       // visuals
       m.g.rotation.y = e.yaw;
       if (e.st !== 'dying' && e.st !== 'rise') m.inner.position.y = Math.sin(e.t * 3 + e.def.x) * 0.06;
@@ -128,6 +144,7 @@ export class Enemies {
       m.inner.rotation.x += (lean - m.inner.rotation.x) * Math.min(1, dt * 12);
       const flare = e.st === 'windup' ? 1.6 + Math.sin(e.t * 40) * 0.4 : 0.6;
       m.eyes.forEach((s) => s.scale.setScalar(flare));
+      if (m.cone) { m.cone.visible = e.alive && !e.alert; m.cone.material.color.setRGB(1, 0.88 - e.sus * 0.7, 0.54 - e.sus * 0.5); m.cone.material.opacity = 0.045 + e.sus * 0.1; }
       e.flash = Math.max(0, e.flash - dt); m.bodyM.emissive.setHex(e.flash > 0 ? 0xffffff : e.big ? 0x6b0f0f : 0x3b0d66); m.bodyM.emissiveIntensity = e.flash > 0 ? 1.2 : e.st === 'windup' ? 1.0 : 0.55;
     }
     this.list = this.list.filter((e) => !e.gone);
@@ -140,11 +157,51 @@ export class Enemies {
     }
     this.pickups = this.pickups.filter((p) => !p.taken);
   }
-  fire(e, pl) {
-    const from = e.pos.clone().add(new V(Math.sin(e.yaw) * 0.6, 1.3, Math.cos(e.yaw) * 0.6)), to = pl.pos.clone().add(new V(0, 1.1, 0));
-    const vel = to.sub(from).normalize().multiplyScalar(9.5);
-    const m = new THREE.Group(); m.add(glowSprite(0x22d3ee, 1.1, 1)); m.add(glowSprite(0xffffff, 0.4, 1)); m.position.copy(from); this.g.scene.add(m);
+  fire(e, pl, spread = 0, color = 0x22d3ee) {
+    const h = e.boss ? 3.5 : 1.3, from = e.pos.clone().add(new V(Math.sin(e.yaw) * 0.6, h, Math.cos(e.yaw) * 0.6)), to = pl.pos.clone().add(new V(0, 1.1, 0));
+    const vel = to.sub(from).normalize().applyAxisAngle(new V(0, 1, 0), spread).multiplyScalar(e.boss ? 11 : 9.5);
+    const m = new THREE.Group(); m.add(glowSprite(color, e.boss ? 1.8 : 1.1, 1)); m.add(glowSprite(0xffffff, 0.4, 1)); m.position.copy(from); this.g.scene.add(m);
     this.shots.push({ m, vel, life: 3.5, mine: false });
+  }
+  alarm(e) {
+    if (e.alert) return; e.alert = true; e.sus = 1; e.st = 'idle'; e.cd = 0.6;
+    this.g.onAlarm && this.g.onAlarm(e);
+    for (const o of this.list) if (o.guard && !o.alert && o.alive && o.pos.distanceTo(e.pos) < 14) { o.alert = true; o.sus = 1; }
+  }
+  sees(e, pl, d, dy, dx, dz) {
+    const hidden = this.g.playerHidden && this.g.playerHidden();
+    const range = hidden ? 2.4 : 9;
+    if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
+    if (d > range || Math.abs(dy) > 3.5) return 0;
+    if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
+    const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5);
+    for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of this.g.level.boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return 0; }
+    return 1 + (9 - d) / 9;
+  }
+  patrol(e, dt, pl, d, dy, dx, dz) {
+    const path = e.def.path || [[e.def.x, e.def.z]]; let anim = 'idle';
+    if (e.wait > 0) { e.wait -= dt; e.yaw += Math.sin(e.t * 1.7) * dt * 1.2; }
+    else {
+      const [tx, tz] = path[e.pi % path.length], vx = tx - e.pos.x, vz = tz - e.pos.z, l = Math.hypot(vx, vz);
+      if (l < 0.3) { e.pi++; e.wait = 1.1; } else { e.pos.x += (vx / l) * 1.8 * dt; e.pos.z += (vz / l) * 1.8 * dt; e.yaw += angDiff(e.yaw, Math.atan2(vx, vz)) * Math.min(1, dt * 5); anim = 'walk'; }
+    }
+    const s = pl.hp > 0 ? this.sees(e, pl, d, dy, dx, dz) : 0;
+    if (s) { e.sus += dt * 1.6 * s; e.yaw += angDiff(e.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 2 * e.sus); e.wait = Math.max(e.wait, 0.3); }
+    else e.sus = Math.max(0, e.sus - dt * 0.5);
+    if (e.sus >= 1) this.alarm(e);
+    return anim;
+  }
+  bossThink(e, dt, pl, d, dx, dz, toYaw) {
+    const phase = e.hp > 26 ? 1 : e.hp > 13 ? 2 : 3; let anim = 'idle';
+    if (phase !== e.phase) { e.phase = phase; if (phase > 1) { this.g.onBossPhase && this.g.onBossPhase(phase); e.cd = 1.2; } }
+    e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 2.5);
+    if (d > 4) { const sp = e.speed * (phase === 3 ? 1.3 : 1); e.pos.x += (dx / d) * sp * dt; e.pos.z += (dz / d) * sp * dt; anim = 'walk'; }
+    if (phase === 3) { e.summonT -= dt; if (e.summonT <= 0) { e.summonT = 13; for (const k of [-1, 1]) this.spawn({ x: e.pos.x + k * 4, y: e.def.y, z: e.pos.z + 2, zone: e.zone, group: e.group }, true); } }
+    if (e.cd <= 0) {
+      if (d < 5.5) { e.st = 'windup'; e.t = 0; this.g.sfx.enemyAtk(); }
+      else if (phase >= 2 && d < 20) { e.volley = true; e.st = 'windup'; e.t = 0.3; this.g.sfx.enemyAtk(); }
+    }
+    return anim;
   }
   updateShots(dt, pl) {
     const chest = pl.pos.clone().add(new V(0, 1.1, 0)), boxes = this.g.level.boxes;
@@ -154,12 +211,12 @@ export class Enemies {
       const p = b.m.position;
       if (!b.mine) {
         if ((pl.state === 'attack' || pl.state === 'slam') && p.distanceTo(chest) < 2.1) {
-          const tgt = this.list.filter((e) => e.alive && e.archer).sort((a, c) => a.pos.distanceTo(p) - c.pos.distanceTo(p))[0];
+          const tgt = this.list.filter((e) => e.alive && (e.archer || e.boss)).sort((a, c) => a.pos.distanceTo(p) - c.pos.distanceTo(p))[0];
           b.vel = tgt ? tgt.pos.clone().add(new V(0, 1.1, 0)).sub(p).normalize().multiplyScalar(15) : b.vel.multiplyScalar(-1.5);
           b.mine = true; b.life = 2; this.g.sfx.hit(); this.g.hitstop(0.05); this.g.fx.emit(p, { color: 0xffd166, count: 16, speed: 5, life: 0.3 }); continue;
         }
         if (p.distanceTo(chest) < 0.6) { pl.damage(1, p); b.life = 0; }
-      } else for (const e of this.list) if (e.alive && e.pos.clone().add(new V(0, 1.1, 0)).distanceTo(p) < 1.0) { this.hurt(e, 2, p, 5); b.life = 0; break; }
+      } else for (const e of this.list) if (e.alive && e.pos.clone().add(new V(0, e.boss ? 3 : 1.1, 0)).distanceTo(p) < (e.boss ? 2.6 : 1.0)) { this.hurt(e, 2, p, 5); b.life = 0; break; }
       for (const x of boxes) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { b.life = 0; break; }
       if (b.life <= 0) { this.g.fx.emit(p, { color: 0x22d3ee, count: 10, speed: 3, life: 0.3 }); b.m.removeFromParent(); }
     }

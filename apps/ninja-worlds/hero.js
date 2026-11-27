@@ -82,6 +82,12 @@ export function buildHero(variant = 'ninja') {
     return { th, kn, ft };
   };
   const LL = leg(1), RL = leg(-1);
+  if (!calm) {
+    const sheath = add(spine, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.95, 0.07), M(0x111827, 0.5)), 0.08, 0.28, -0.2); sheath.rotation.z = 0.7;
+    add(sheath, new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.08, 0.085), gold), 0, 0.45, 0);
+    const seam = add(head, new THREE.Mesh(new THREE.TorusGeometry(0.158, 0.005, 6, 40), new THREE.MeshBasicMaterial({ color: 0x7dd3fc })), 0, 0.012, 0); seam.rotation.x = Math.PI / 2; seam.castShadow = false;
+    [L.sh, Rr.sh].forEach((s2, i) => { const pad = add(s2, new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0x334155, 0.35, 0.6)), 0, 0.02, 0); pad.scale.set(1.1, 0.7, 1.1); });
+  }
   const scarfAnchor = G(); scarfAnchor.position.set(0, 0.07, -0.13); chest.add(scarfAnchor);
   if (!calm) add(chest, new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 8, 20), red), 0, 0.07, 0).rotation.x = Math.PI / 2;
   root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });

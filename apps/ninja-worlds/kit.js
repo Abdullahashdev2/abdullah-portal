@@ -20,6 +20,10 @@ export class Level {
         const cur = b.center; b.delta.subVectors(nc, cur); cur.copy(nc);
         b.min.add(b.delta); b.max.add(b.delta); b.mesh.position.add(b.delta);
       }
+      if (b.sink) {
+        const k = b.sink; k.off = player.ground === b ? Math.max(-k.depth, k.off - dt * k.rate) : Math.min(0, k.off + dt * 0.6);
+        const ny = b.base.y + k.off, dy = ny - b.center.y; b.delta.y = dy; b.center.y = ny; b.min.y += dy; b.max.y += dy; b.mesh.position.y += dy;
+      }
       if (b.crumble) {
         const c = b.crumble;
         if (c.state === 0) {
@@ -65,7 +69,7 @@ export function makeKit(L) {
     const { x = 0, y = 0, z = 0, w = 4, d = 4, h = 1, m = 'sand', rock = true, run = false, ledge = true, crumble = false, move = null, hidden = false, runFaces, tile = 2 } = o;
     const mesh = new THREE.Mesh(tiledBox(w, h, d, tile), typeof m === 'string' ? mat(m) : m);
     mesh.position.set(x, y - h / 2, z); mesh.castShadow = true; mesh.receiveShadow = true; L.add(mesh);
-    const b = { min: new V(x - w / 2, y - h, z - d / 2), max: new V(x + w / 2, y, z + d / 2), run, ledge, beam: Math.min(w, d) < 0.8, active: !hidden, mesh, base: new V(x, y, z), center: new V(x, y, z), delta: new V(), meshBase: mesh.position.clone(), crumble: crumble ? { t: 0, state: 0 } : null, move, kind: o.kind };
+    const b = { min: new V(x - w / 2, y - h, z - d / 2), max: new V(x + w / 2, y, z + d / 2), run, ledge, beam: Math.min(w, d) < 0.8, active: !hidden, mesh, base: new V(x, y, z), center: new V(x, y, z), delta: new V(), meshBase: mesh.position.clone(), crumble: crumble ? { t: 0, state: 0 } : null, move, kind: o.kind, sink: o.sink ? { off: 0, rate: o.sink.rate || 0.8, depth: o.sink.depth || 4 } : null };
     if (rock && h < 4) {
       const r = new THREE.Mesh(rockUnder(w, d, o.rockDepth || Math.max(2.4, Math.min(w, d) * 0.75)), mat('rock', { flatShading: true }));
       r.position.y = -h / 2; r.castShadow = true; r.receiveShadow = true; mesh.add(r);
@@ -73,7 +77,7 @@ export function makeKit(L) {
     if (crumble) { mesh.material = own(mesh.material.clone()); mesh.material.color.setHex(0xd8c6ff); const c = glowSprite(0xb794f6, Math.max(w, d) * 0.9, 0.35); c.position.y = h / 2 + 0.05; mesh.add(c); }
     if (run) K.runes(mesh, w, h, d, runFaces);
     if (hidden) mesh.visible = false;
-    L.boxes.push(b); L.camMeshes.push(mesh); if (move || crumble) L.dyn.push(b);
+    L.boxes.push(b); L.camMeshes.push(mesh); if (move || crumble || o.sink) L.dyn.push(b);
     return b;
   };
   K.wall = (o) => K.plat({ rock: false, ...o });
@@ -344,6 +348,92 @@ export function makeKit(L) {
   K.dunes = ({ n = 26, color = 0xe0b87a, y = -30 }) => {
     const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 1 }));
     for (let i = 0; i < n; i++) { const r = 40 + Math.random() * 60, m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); m.scale.y = 0.18 + Math.random() * 0.12; const a = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 260; m.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr + 60); m.receiveShadow = true; L.add(m); }
+  };
+  /* -------- water, lava, stealth -------- */
+  K.water = ({ x0, x1, z0, z1, y0, y1, color = 0x1aa3c4 }) => {
+    L.waters = L.waters || []; const W = { x0, x1, z0, z1, y0, y1 }; L.waters.push(W);
+    const w = x1 - x0, d = z1 - z0, geo = new THREE.PlaneGeometry(w, d, Math.ceil(w / 1.5), Math.ceil(d / 1.5)); geo.rotateX(-Math.PI / 2);
+    const um = own(new THREE.ShaderMaterial({
+      uniforms: { t: { value: 0 }, c: { value: new THREE.Color(color) }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 } }, transparent: true, side: THREE.DoubleSide, depthWrite: false, fog: true,
+      vertexShader: '#include <fog_pars_vertex>\nuniform float t;varying vec3 wp;void main(){vec3 p=position;p.y+=sin(p.x*.6+t*1.6)*.08+cos(p.z*.5+t*1.3)*.08;vec4 w=modelMatrix*vec4(p,1.);wp=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;\n#include <fog_vertex>\n}',
+      fragmentShader: '#include <fog_pars_fragment>\nuniform float t;uniform vec3 c;varying vec3 wp;void main(){float a=sin(wp.x*1.3+t*2.)*sin(wp.z*1.1-t*1.7);float s=smoothstep(.6,1.,a);vec3 col=mix(c,vec3(.85,1.,1.),s*.6);gl_FragColor=vec4(col,.62+s*.2);\n#include <fog_fragment>\n}',
+    }));
+    const m = new THREE.Mesh(geo, um); m.position.set((x0 + x1) / 2, y1, (z0 + z1) / 2); L.add(m);
+    L.anim.push((dt, t) => { um.uniforms.t.value = t; });
+    return W;
+  };
+  K.current = ({ x0, x1, z0, z1, fx = 0, fz = 0, y = -3 }) => {
+    L.currents = L.currents || []; L.currents.push({ x0, x1, z0, z1, fx, fz });
+    L.anim.push(() => { if (Math.random() < 0.5 && L.emit) L.emit(new V(x0 + Math.random() * (x1 - x0), y + (Math.random() - 0.5) * 8, z0 + Math.random() * (z1 - z0)), { color: 0xcffafe, count: 1, speed: 0.2, life: 1.6, size: 0.14, grav: -0.3, vel: new V(fx * 0.8, 0, fz * 0.8) }); });
+  };
+  K.bubble = (x, y, z) => {
+    L.bubbles = L.bubbles || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.42, 18, 14), own(new THREE.MeshStandardMaterial({ color: 0xe0ffff, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.1, emissive: 0x66ccff, emissiveIntensity: 0.4 }))); g.add(m);
+    g.add(glowSprite(0xaeeaff, 1.6, 0.5));
+    const B = { g, pos: new V(x, y, z), t: 0 }; L.bubbles.push(B);
+    L.anim.push((dt, t) => { m.scale.setScalar(1 + Math.sin(t * 3 + x) * 0.08); });
+  };
+  K.jelly = ({ x, y, z, amp = 2, speed = 1, phase = 0, ax = 'y' }) => {
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); L.add(g);
+    const mm = own(new THREE.MeshStandardMaterial({ color: 0xf472b6, emissive: 0xdb2777, emissiveIntensity: 0.9, transparent: true, opacity: 0.75, roughness: 0.2 }));
+    const bell = new THREE.Mesh(new THREE.SphereGeometry(0.55, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); g.add(bell);
+    for (let i = 0; i < 6; i++) { const tn = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.01, 1.2, 4), mm); const a = i / 6 * Math.PI * 2; tn.position.set(Math.cos(a) * 0.3, -0.6, Math.sin(a) * 0.3); g.add(tn); }
+    g.add(glowSprite(0xf472b6, 2.4, 0.5));
+    const hz = { kind: 'orb', tip: new V(), r: 0.95 }; L.hazards.push(hz);
+    L.anim.push((dt, t) => { const o = Math.sin(t * speed + phase) * amp; g.position.set(x + (ax === 'x' ? o : 0), y + (ax === 'y' ? o : 0), z + (ax === 'z' ? o : 0)); bell.scale.y = 1 + Math.sin(t * 4 + phase) * 0.15; hz.tip.copy(g.position); });
+  };
+  K.kelp = ({ x, y, z, h = 5, color = 0x2f9e44 }) => {
+    const geo = new THREE.PlaneGeometry(0.5, h, 1, 8); geo.translate(0, h / 2, 0);
+    const m = new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.8 }))); m.position.set(x, y, z); m.rotation.y = Math.random() * 3; L.add(m);
+    const p = geo.attributes.position, base = Float32Array.from(p.array), ph = Math.random() * 6;
+    L.anim.push((dt, t) => { for (let i = 0; i < p.count; i++) { const yy = base[i * 3 + 1]; p.array[i * 3] = base[i * 3] + Math.sin(t * 1.3 + yy * 0.6 + ph) * 0.25 * (yy / h); } p.needsUpdate = true; });
+  };
+  K.coral = ({ x, y, z, color = 0xfb7185, s = 1 }) => {
+    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g);
+    const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.15, flatShading: true }));
+    for (let i = 0; i < 6; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.12, 0.8 + Math.random() * 0.8, 6), mm); c.position.set((Math.random() - 0.5) * 0.7, 0.4, (Math.random() - 0.5) * 0.7); c.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9); g.add(c); const b = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), mm); b.position.copy(c.position).multiplyScalar(1.6); b.position.y = 0.9 + Math.random() * 0.5; g.add(b); }
+  };
+  K.fish = ({ x, y, z, n = 14, color = 0xfbbf24, r = 3 }) => {
+    const geo = new THREE.ConeGeometry(0.12, 0.45, 5); geo.rotateX(Math.PI / 2);
+    const im = new THREE.InstancedMesh(geo, own(new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3, roughness: 0.4 })), n); L.add(im);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new V(1, 1, 1), pv = new V();
+    const seeds = Array.from({ length: n }, () => [Math.random() * 6, 0.6 + Math.random() * 0.8, (Math.random() - 0.5) * 2]);
+    L.anim.push((dt, t) => { seeds.forEach(([ph, sp, oy], i) => { const a = t * sp * 0.6 + ph; pv.set(x + Math.cos(a) * r, y + oy + Math.sin(t + ph) * 0.4, z + Math.sin(a) * r); e.set(0, -a, 0); q.setFromEuler(e); m4.compose(pv, q, sc); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; });
+  };
+  K.lava = ({ y = -2, size = 600, cz = 60 }) => {
+    const geo = new THREE.PlaneGeometry(size, size, 1, 1); geo.rotateX(-Math.PI / 2);
+    const um = own(new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } },
+      vertexShader: 'varying vec3 wp;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
+      fragmentShader: 'uniform float t;varying vec3 wp;float h(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}void main(){vec2 p=wp.xz*.12;float v=n(p+t*.05)*.6+n(p*2.3-t*.08)*.3+n(p*5.+t*.2)*.1;float c=smoothstep(.35,.75,v);vec3 col=mix(vec3(.35,.03,0.),vec3(2.2,.75,.12),c);col+=vec3(1.5,.9,.3)*smoothstep(.8,.95,v);gl_FragColor=vec4(col,1.);}',
+    }));
+    const m = new THREE.Mesh(geo, um); m.position.set(0, y, cz); L.add(m);
+    L.anim.push((dt, t) => { um.uniforms.t.value = t; });
+    if (L.lights < 6) { const pl = new THREE.PointLight(0xff5a1f, 0, 0); L.lights++; }
+  };
+  K.geyser = ({ x, y, z, period = 3, phase = 0, on = 1.1 }) => {
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const vent = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 0.25, 10), mat('dark')); vent.position.y = 0.12; g.add(vent);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 5, 12, 1, true), own(new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }))); col.position.y = 2.5; g.add(col);
+    const gl = glowSprite(0xff6a00, 3, 0.8); gl.position.y = 0.4; g.add(gl);
+    const hz = { kind: 'geyser', x, y, z, on: false }; L.hazards.push(hz);
+    L.anim.push((dt, t) => { const ph = ((t + phase) % period + period) % period; hz.on = ph < on; const warn = ph > period - 0.6; col.visible = hz.on; col.scale.set(1, hz.on ? 1 + Math.sin(t * 30) * 0.05 : 1, 1); gl.material.opacity = hz.on ? 1 : warn ? 0.5 + 0.5 * Math.sin(t * 25) : 0.25;
+      if (hz.on && L.emit && Math.random() < 0.6) L.emit(new V(x, y + 0.5, z), { color: 0xffa040, count: 2, speed: 3, up: 3, life: 0.8, size: 0.35, grav: -4 }); });
+  };
+  K.shadowZone = ({ x, z, y = 0, w = 3, d = 6 }) => {
+    L.shadows = L.shadows || []; L.shadows.push({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2, y });
+    const gm = own(new THREE.MeshStandardMaterial({ color: 0x1f3d2b, roughness: 1, flatShading: true }));
+    for (let i = 0; i < Math.round(w * d * 1.6); i++) { const b = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.1 + Math.random() * 0.5, 4), gm); b.position.set(x + (Math.random() - 0.5) * w, y + 0.55, z + (Math.random() - 0.5) * d); b.rotation.set((Math.random() - 0.5) * 0.4, Math.random() * 3, (Math.random() - 0.5) * 0.4); L.add(b); }
+  };
+  K.relic = ({ x, y, z, color = 0xa78bfa }) => {
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.9, 14), own(new THREE.MeshStandardMaterial({ color: 0xf5e6c8, emissive: color, emissiveIntensity: 0.4 }))); scroll.rotation.z = Math.PI / 2; scroll.position.y = 1.3; g.add(scroll);
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 1, 8), mat('dark')); ped.position.y = 0.5; g.add(ped);
+    const gl = glowSprite(color, 2.6, 0.7); gl.position.y = 1.3; g.add(gl);
+    L.anim.push((dt, t) => { scroll.position.y = 1.3 + Math.sin(t * 2) * 0.08; scroll.rotation.y = t; });
+    return g;
   };
   K.trigger = (o) => { L.triggers.push({ r: 3, dy: 4, once: true, fired: false, ...o, pos: new V(o.x, o.y ?? 0, o.z) }); };
   K.enemy = (o) => { L.enemyDefs.push(o); };
