@@ -88,7 +88,7 @@ button{font-family:inherit;cursor:pointer}
   <button id="geminiBtn" type="button" style="display:block;width:min(100%,520px);margin:-6px auto 18px;border:1px solid rgba(167,139,250,.6);background:rgba(124,58,237,.15);color:#ddd6fe;border-radius:18px;padding:12px;font-size:15px;font-weight:800">🪄 لوّنها مجاناً عن طريق تطبيق Gemini</button>
   <div id="grid"></div>
   <div class="foot">كل الشخصيات من خيال وإبداع <b>علي</b> 💛<br>الرسمات اللي تضيفها تنحفظ في هذا الجهاز</div>
-  <input type="file" id="file" accept="image/*" hidden>
+  <input type="file" id="file" accept="image/*,.glb,model/gltf-binary" hidden>
 </section>
 
 <!-- ======================= CROP ======================= -->
@@ -97,7 +97,7 @@ button{font-family:inherit;cursor:pointer}
   <canvas id="cropCv"></canvas>
   <div id="cropBar">
     <div class="two"><button class="big gray" id="rotL" type="button">⟲ لف</button><button class="big gray" id="rotR" type="button">⟳ لف</button><button class="big gray" id="cropAll" type="button">🔲 الكل</button></div>
-    <div class="chips" id="cropKind" style="margin-top:10px;justify-content:center"><button type="button" data-k="pencil" class="on">✏️ رسمة رصاص</button><button type="button" data-k="color">🎨 صورة ملوّنة جاهزة (من Gemini)</button></div>
+    <div class="chips" id="cropKind" style="margin-top:10px;justify-content:center"><button type="button" data-k="pencil" class="on">✏️ رسمة رصاص</button><button type="button" data-k="color">🎨 ملوّنة جاهزة</button><button type="button" data-k="sheet">🔄 لوحة زوايا</button></div>
     <input class="txt" id="newName" maxlength="24" placeholder="اسم الشخصية (مثلاً: البطل الخارق)" style="margin-top:10px">
     <button class="big" id="cropGo" type="button">✨ حوّلها لشخصية حيّة</button>
   </div>
@@ -162,8 +162,10 @@ button{font-family:inherit;cursor:pointer}
 </aside>
 <aside class="sheet" id="geminiSheet">
   <h3>🪄 لوّنها بتطبيق Gemini</h3>
-  <p style="color:#cbd5e1;line-height:1.9;font-size:14px;margin:6px 0">١. افتح تطبيق <b>Gemini</b> وارفع صورة رسمة علي.<br>٢. اضغط الزر تحت عشان تنسخ الوصف، والصقه مع الصورة.<br>٣. احفظ الصورة اللي يطلّعها Gemini في جوالك.<br>٤. ارجع هنا واضغط <b>📷 أضف رسمة</b>، واختر <b>🎨 صورة ملوّنة جاهزة</b>.</p>
-  <button class="big" id="copyPrompt" type="button">📋 انسخ الوصف لـ Gemini</button>
+  <p style="color:#cbd5e1;line-height:1.9;font-size:14px;margin:6px 0">١. افتح تطبيق <b>Gemini</b> وارفع صورة رسمة علي.<br>٢. انسخ وصف من تحت والصقه مع الصورة.<br>٣. احفظ الصورة اللي يطلّعها Gemini في جوالك.<br>٤. ارجع هنا واضغط <b>📷 أضف رسمة</b>، واختر نوعها: <b>🎨 ملوّنة</b> أو <b>🔄 لوحة زوايا</b>.</p>
+  <button class="big" id="copyPrompt" type="button">📋 انسخ وصف «شخصية كاملة» (للّعب)</button>
+  <button class="big" id="copySheet" type="button" style="background:linear-gradient(90deg,#f59e0b,#ec4899)">📋 انسخ وصف «لوحة الزوايا» (أمام، ثلاثة أرباع، جنب، خلف)</button>
+  <p style="color:#94a3b8;line-height:1.9;font-size:13px;margin:10px 0 0">🧊 <b>تبغاها 3D حقيقي (GLB)؟</b> Gemini يطلّع صور بس. خذ صورة «لوحة الزوايا» لأداة تحويل صورة إلى 3D مثل <b>Meshy</b> أو <b>Tripo</b> (Image to 3D)، وإذا فيها خيار <b>Rig / Animate</b> فعّله عشان تجيك بهيكل وحركة مشي، ونزّلها بصيغة <b>GLB</b> وارفعها هنا من 📷 أضف رسمة.</p>
   <button class="big gray" data-close type="button">تم</button>
 </aside>
 <div id="busy">✨ أجهّز الرسمة…</div>
@@ -174,6 +176,7 @@ button{font-family:inherit;cursor:pointer}
 import * as THREE from 'three';
 import { Sky } from '../saeq-albatal/lib/Sky.js';
 import { createFullKit } from './fullbody.js';
+import { GLTFLoader } from '../saeq-albatal/lib/loaders/GLTFLoader.js';
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,t)=>a+(b-a)*t,rand=(a,b)=>a+Math.random()*(b-a);
 const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,outBack=t=>{const c=1.70158,c3=c+1;return 1+c3*Math.pow(t-1,3)+c*Math.pow(t-1,2);},seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
@@ -200,9 +203,9 @@ async function loadChars(){const saved=ls.get('ali_seed_cfg',{});const seeds=SEE
  const mine=(await DB.all()).sort((a,b)=>b.created-a.created).map(c=>Object.assign(c,{cfg:Object.assign({},DEF,c.cfg||{})}));CHARS=[...mine,...seeds];}
 function renderGrid(){const g=$('#grid');g.innerHTML='';CHARS.forEach((c,i)=>{const b=document.createElement('button');b.className='dcard';b.type='button';b.style.setProperty('--r',((i*37)%7-3)*.6+'deg');
  b.innerHTML=`<div class="pic"><img alt="" draggable="false"><div class="scan" style="animation-delay:${(i%5)*.4}s"></div></div><b></b><span class="tap">👆 انقر لتتحوّل</span>`;
- b.querySelector('img').src=c.src;b.querySelector('b').textContent=c.name;if(!c.seed){const m=document.createElement('span');m.className='mine';m.textContent='جديدة';b.appendChild(m);}
+ b.querySelector('img').src=c.src;b.querySelector('b').textContent=c.name;if(!c.seed){const m=document.createElement('span');m.className='mine';m.textContent=c.glb?'🧊 3D':c.views?'🔄 زوايا':c.art?'🪄 ملوّنة':'جديدة';b.appendChild(m);}
  b.onclick=()=>chooseKind(c);g.appendChild(b);});}
-let kindFor=null;function chooseKind(c){kindFor=c;$('#kindName').textContent=c.name;$('#kFull').style.order=ls.get('ali_kind','cut')==='full'?-1:0;sheet('kindSheet',true);}
+let kindFor=null;function chooseKind(c){if(c.glb){openChar(c,'glb');return;}kindFor=c;$('#kindName').textContent=c.name;$('#kFull').style.order=ls.get('ali_kind','cut')==='full'?-1:0;sheet('kindSheet',true);}
 
 /* ======================= renderer ======================= */
 const canvas=$('#gl');let renderer=null,scene,camera,clock=new THREE.Clock();
@@ -272,7 +275,14 @@ class Character{
   // squash on landing, stretch in the air
   const target=this.y>.02?1+clamp(this.vy*.03,-.12,.14):1;u.uSquash.value=lerp(u.uSquash.value,target,dt*12);if(this.land>0){this.land-=dt;u.uSquash.value=1-.22*Math.sin(Math.min(1,1-this.land/.25)*Math.PI);}
   this.shadow.material.opacity=.5*clamp(1-this.y/4,.15,1);this.shadow.position.y=.01;this.shadow.scale.setScalar(Math.max(.6,this.W*.9)*clamp(1-this.y/6,.5,1));}
- steer(dt){if(Math.abs(this.vel.x)>.3)this.face=Math.sign(this.vel.x);this.inner.scale.x=lerp(this.inner.scale.x,this.W*this.face,dt*12);if(this.dance<=0)this.inner.rotation.y=lerp(this.inner.rotation.y,clamp(-this.vel.z*.06,-.45,.45)*this.face,dt*6);}
+ setView(i,mirror){const V=this.def.viewTex;if(!V||!V[i])return;if(i!==this.view){this.view=i;const v=V[i];this.layers.forEach(m=>m.material.uniforms.uMask.value=v.mask);this.u.uArt.value=v.art;this.aspect=v.aspect;this.H=this.cfg.size*this.cfg.sh;this.W=this.cfg.size*this.aspect*this.cfg.sw;}
+  this.face=mirror?-1:1;}
+ steer(dt){if(this.def.viewTex&&this.def.viewTex.length>1&&!this.transforming){const p=this.group.position,v=this.vel;if(v.length()>.3)this.heading=Math.atan2(v.x,v.z);if(this.heading==null)this.heading=Math.atan2(camera.position.x-p.x,camera.position.z-p.z);
+   const camYaw=Math.atan2(camera.position.x-p.x,camera.position.z-p.z);let rel=this.heading-camYaw;rel=Math.atan2(Math.sin(rel),Math.cos(rel));const a=Math.abs(rel),n=this.def.viewTex.length;
+   // 4 views: front, three-quarter, side, back  |  3 views: front, side, back  |  2 views: front, back
+   let idx=n>=4?(a<Math.PI/8?0:a<3*Math.PI/8?1:a<5*Math.PI/8?2:a<7*Math.PI/8?2:3):n===3?(a<Math.PI/4?0:a<3*Math.PI/4?1:2):(a<Math.PI/2?0:1);
+   this.setView(idx,rel<0&&idx>0&&idx<n-1);this.inner.rotation.y=camYaw;this.inner.scale.x=lerp(this.inner.scale.x,this.W*this.face,dt*14);this.inner.scale.y=this.H;return;}
+  if(Math.abs(this.vel.x)>.3)this.face=Math.sign(this.vel.x);this.inner.scale.x=lerp(this.inner.scale.x,this.W*this.face,dt*12);if(this.dance<=0)this.inner.rotation.y=lerp(this.inner.rotation.y,clamp(-this.vel.z*.06,-.45,.45)*this.face,dt*6);}
  dispose(){this.geo.dispose();this.layers.forEach(m=>m.material.dispose());this.shadow.geometry.dispose();}}
 const SHADOW_TEX=canvasTex(64,64,(x,w,h)=>{const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(0,0,0,.7)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,w,h);});
 SHADOW_TEX.colorSpace=THREE.NoColorSpace;
@@ -348,7 +358,9 @@ function makeDoor(label){const g=new THREE.Group();const fm=mat(0xfef3c7,.6);
 /* ======================= the transformation (drawing -> hologram -> real) ======================= */
 let hero=null,friends=[],stage=null,mode='idle',tf=0,starsGot=0;
 const PARTICLES=1400;let parts=null,partData=null,ringFx=null,dust=null;
-async function makeCharacter(def){if(def.art&&!def.artTex){def.artTex=await loadTex(def.art,true);}const tex=await loadTex(def.mask,false);tex.colorSpace=THREE.NoColorSpace;tex.generateMipmaps=true;tex.minFilter=THREE.LinearMipmapLinearFilter;return new Character(def,tex);}
+async function makeCharacter(def){if(def.art&&!def.artTex){def.artTex=await loadTex(def.art,true);}
+ if(def.views&&!def.viewTex){def.viewTex=[];for(const v of def.views){const a=await loadTex(v.art,true),m=await loadTex(v.mask,false);m.colorSpace=THREE.NoColorSpace;def.viewTex.push({art:a,mask:m,aspect:a.image.width/a.image.height});}}
+ const tex=await loadTex(def.mask,false);tex.colorSpace=THREE.NoColorSpace;tex.generateMipmaps=true;tex.minFilter=THREE.LinearMipmapLinearFilter;return new Character(def,tex);}
 async function pencilTex(def){const img=new Image();img.src=def.mask;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);
  const d=x.getImageData(0,0,c.width,c.height),o=x.createImageData(c.width,c.height);for(let i=0;i<c.width*c.height;i++){const L=d.data[i*4]/255;const g=58+20*Math.random();o.data[i*4]=255-(255-g)*L;o.data[i*4+1]=253-(253-g)*L;o.data[i*4+2]=246-(246-g-6)*L;o.data[i*4+3]=255;}
  x.putImageData(o,0,0);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;}
@@ -358,6 +370,8 @@ async function samplePoints(def){const img=new Image();img.src=def.mask;await im
 let pendingBody=null;
 async function openChar(def,kind){$('#busy').classList.add('on');try{initGL();show('play');if(!FULL)FULL=createFullKit(THREE,{Character,SHADOW_TEX});
  if(!world||world.key!==worldKey)buildWorld(worldKey);if(hero){scene.remove(hero.group);hero.dispose();}if(pendingBody){scene.remove(pendingBody.group);pendingBody=null;}
+ if(stage){scene.remove(stage.g);stage=null;}
+ if(def.glb){await openGlb(def);return;}
  kind=kind||def.cfg.kind||'cut';def.cfg.kind=kind;hero=await makeCharacter(def);hero.def=def;
  if(kind==='full'){const c=Object.assign({outfit:'casual',build:1,legs:1},def.cfg);pendingBody=new FULL.FullBody(def,hero.tex.image,c);pendingBody.group.visible=false;}
  const pts=await samplePoints(def);await startTransform(def,pts);}catch(e){console.error(e);alert('ما قدرت أفتح الرسمة 😕');show('gallery');}finally{$('#busy').classList.remove('on');}}
@@ -471,7 +485,7 @@ async function goWorld(key,viaDoor){if(mode==='portal')return;const from=worldKe
  setTimeout(()=>{flash(false);mode='play';banner(WORLDS[key].name);setTimeout(()=>banner(''),1600);},120);ls.set('ali_world',key);}
 // friends: Ali's other drawings walk around as real characters
 let friendsOn=ls.get('ali_friends',true);
-async function spawnFriends(){friends.forEach(f=>{scene.remove(f.c.group);f.c.dispose();});friends=[];if(!friendsOn)return;const pool=CHARS.filter(c=>c.id!==hero.def.id).slice(0,4);
+async function spawnFriends(){friends.forEach(f=>{scene.remove(f.c.group);f.c.dispose();});friends=[];if(!friendsOn)return;const pool=CHARS.filter(c=>c.id!==hero.def.id&&!c.glb).slice(0,4);
  for(const def of pool){try{const c=await makeCharacter(def);c.cfg.size=Math.min(c.cfg.size,1.5);c.apply();c.setThick(1);const x=rand(-12,12),z=rand(-14,6);c.group.position.set(x,world.ground(x,z),z);scene.add(c.group);friends.push({c,target:new THREE.Vector3(x,0,z),wait:rand(0,3)});}catch(e){}}}
 function stepFriend(f,dt,t){const c=f.c,p=c.group.position;f.wait-=dt;const d=new THREE.Vector3(f.target.x-p.x,0,f.target.z-p.z);let moving=false;
  if(f.wait<=0){if(d.length()<.4){f.wait=rand(1,4);f.target.set(rand(-20,20),0,rand(-20,10));}else{d.normalize().multiplyScalar(2.2*dt);p.add(d);moving=true;if(Math.abs(d.x)>.001)c.face=Math.sign(d.x);}}
@@ -512,6 +526,8 @@ const HOLO_C=['#22d3ee','#a78bfa','#4ade80','#fb923c','#f472b6','#facc15','#ffff
 function swatches(box,list,key){box.innerHTML='';list.forEach(c=>{const b=document.createElement('button');b.type='button';b.style.background=c;if(hero.cfg[key]===c)b.className='on';b.onclick=()=>{hero.cfg[key]=c;hero.apply();swatches(box,list,key);};box.appendChild(b);});
  const i=document.createElement('input');i.type='color';i.value=hero.cfg[key];i.oninput=()=>{hero.cfg[key]=i.value;hero.apply();};box.appendChild(i);}
 $('#pEdit').onclick=()=>{if(!hero)return;$('#eName').value=hero.def.name;
+ const isG=!!hero.glb;['#eKind','#eStyle','#eLine','#eFill','#eHolo','#eW','#eH','#eT','#eGlow','#eReplay'].forEach(sel=>{const el=$(sel);const box=el.closest('.row')||el;box.style.display=isG?'none':'';});
+ document.querySelectorAll('#editSheet .lbl').forEach(l=>{if(!/الحجم/.test(l.textContent))l.style.display=isG?'none':'';});
  const ek=$('#eKind');ek.innerHTML='';[['cut','✂️ مقصوصة'],['full','🧍 شخصية كاملة']].forEach(([k,l])=>{const b=document.createElement('button');b.type='button';b.textContent=l;if((hero.full?'full':'cut')===k)b.className='on';
   b.onclick=()=>{if((hero.full?'full':'cut')===k)return;sheet(null,false);hero.def.cfg=Object.assign({},hero.cfg,{kind:k});openChar(hero.def,k);};ek.appendChild(b);});
  $('#eFullBox').style.display=hero.full?'':'none';
@@ -527,7 +543,7 @@ $('#pEdit').onclick=()=>{if(!hero)return;$('#eName').value=hero.def.name;
  [['#eSize','size'],['#eW','sw'],['#eH','sh'],['#eT','thick'],['#eGlow','glow']].forEach(([s,k])=>{const el=$(s);el.value=hero.cfg[k];const f=()=>{hero.cfg[k]=+el.value;hero.apply();};el.oninput=hero.full?null:f;el.onchange=f;});
  $('#eDel').style.display=hero.def.seed?'none':'';sheet('editSheet',true);};
 $('#eSave').onclick=async()=>{const d=hero.def;d.name=$('#eName').value.trim()||d.name;d.cfg=Object.assign({},hero.cfg);
- if(d.seed){const s=ls.get('ali_seed_cfg',{});s[d.id]={name:d.name,cfg:d.cfg};ls.set('ali_seed_cfg',s);}else await DB.put({id:d.id,name:d.name,src:d.src,mask:d.mask,art:d.art,cfg:d.cfg,created:d.created,fromId:d.fromId});
+ if(d.seed){const s=ls.get('ali_seed_cfg',{});s[d.id]={name:d.name,cfg:d.cfg};ls.set('ali_seed_cfg',s);}else await DB.put({id:d.id,name:d.name,src:d.src,mask:d.mask,art:d.art,views:d.views,glb:d.glb,cfg:d.cfg,created:d.created,fromId:d.fromId});
  sheet(null,false);hint('💾 انحفظت');renderGrid();};
 $('#eReplay').onclick=async()=>{sheet(null,false);hero.def.cfg=Object.assign({},hero.cfg);openChar(hero.def,hero.full?'full':'cut');};
 $('#eDel').onclick=async()=>{if(!confirm('أكيد تبغى تحذف هذي الرسمة؟'))return;await DB.del(hero.def.id);await loadChars();renderGrid();sheet(null,false);mode='idle';show('gallery');};
@@ -535,7 +551,7 @@ $('#eDel').onclick=async()=>{if(!confirm('أكيد تبغى تحذف هذي ال
 /* ======================= export: transparent PNG + 3D-print STL ======================= */
 function download(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
 async function maskData(def){const img=new Image();img.src=def.mask;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const x=c.getContext('2d');x.drawImage(img,0,0);return{c,d:x.getImageData(0,0,c.width,c.height).data,w:c.width,h:c.height};}
-$('#pExport').onclick=()=>sheet('exportSheet',true);
+$('#pExport').onclick=()=>{if(hero&&hero.glb){download(hero.def.name+'.glb',new Blob([hero.def.glb],{type:'model/gltf-binary'}));return;}sheet('exportSheet',true);};
 $('#xPng').onclick=async()=>{if(hero.def.art){const b=await (await fetch(hero.def.art)).blob();download((hero.def.name||'شخصية')+'.png',b);return;}const {d,w,h}=await maskData(hero.def);const S=2,c=document.createElement('canvas');c.width=w*S;c.height=h*S;const x=c.getContext('2d');const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tx=tmp.getContext('2d'),im=tx.createImageData(w,h);
  const hex=s=>[parseInt(s.slice(1,3),16),parseInt(s.slice(3,5),16),parseInt(s.slice(5,7),16)];const cf=hero.cfg,F=hex(cf.fill),Ln=hex(cf.line),Hl=hex(cf.holo);
  for(let i=0;i<w*h;i++){const L=d[i*4]/255,B=d[i*4+1]/255,A=d[i*4+3]/255;let c=cf.style==='holo'?Hl.map(v=>v*(.3+L)):cf.style==='pencil'?[255*(1-L)+30*L,255*(1-L)+30*L,255*(1-L)+35*L]:F.map((v,k)=>v*(1-L)+Ln[k]*L);
@@ -561,7 +577,7 @@ $('#xStl').onclick=async()=>{const {d,w,h}=await maskData(hero.def);const N=Math
 /* ======================= adding a new drawing ======================= */
 let cropImg=null,cropRot=0,cropRect=null;
 $('#addBtn').onclick=()=>$('#file').click();
-$('#file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const img=new Image();img.src=URL.createObjectURL(f);try{await img.decode();}catch(err){alert('ما قدرت أقرأ الصورة');return;}cropImg=img;cropRot=0;cropRect=null;$('#newName').value='';show('crop');drawCrop();};
+$('#file').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;if(/\.glb$/i.test(f.name)||/gltf/.test(f.type)){await addGlb(f);return;}const img=new Image();img.src=URL.createObjectURL(f);try{await img.decode();}catch(err){alert('ما قدرت أقرأ الصورة');return;}cropImg=img;cropRot=0;cropRect=null;$('#newName').value='';show('crop');drawCrop();};
 function rotated(){const c=document.createElement('canvas'),r=cropRot%2!==0;const s=Math.min(1,1400/Math.max(cropImg.width,cropImg.height));const w=cropImg.width*s,h=cropImg.height*s;c.width=r?h:w;c.height=r?w:h;const x=c.getContext('2d');x.translate(c.width/2,c.height/2);x.rotate(cropRot*Math.PI/2);x.drawImage(cropImg,-w/2,-h/2,w,h);return c;}
 let cropSrc=null,cropScale=1;
 function drawCrop(){cropSrc=rotated();const cv=$('#cropCv'),mw=innerWidth-24,mh=innerHeight-260;cropScale=Math.min(mw/cropSrc.width,mh/cropSrc.height);cv.width=cropSrc.width*cropScale;cv.height=cropSrc.height*cropScale;
@@ -578,10 +594,22 @@ $('#cropAll').onclick=()=>{const cv=$('#cropCv');cropRect={x:0,y:0,w:cv.width,h:
 $('#cropBack').onclick=()=>show('gallery');
 let cropKind='pencil';document.querySelectorAll('#cropKind button').forEach(b=>b.onclick=()=>{cropKind=b.dataset.k;document.querySelectorAll('#cropKind button').forEach(x=>x.classList.toggle('on',x===b));});
 const GEMINI_PROMPT=`Redraw this child's hand-drawn pencil sketch as a finished, full-colour anime / cartoon character illustration, like a character from a modern animated series or video game. Keep the SAME character as in the sketch: the same face, hairstyle, eyes, expression, accessories and clothing details — stay faithful to the child's design, just finish it professionally. Complete everything the sketch is missing so it becomes a full character: full body from the top of the head to the feet, standing upright, front view, arms held slightly away from the body, legs slightly apart, both hands and both feet clearly visible. Clean confident line art, vibrant cel shading, friendly and family-appropriate. Plain pure white background, no text, no frame, no ground shadow, no other objects.`;
+const SHEET_PROMPT=`Create a professional character turnaround sheet (model sheet) of the character in this child's pencil sketch, redrawn as a finished full-colour anime / cartoon video-game character, ready to be used as reference for 3D modelling.
+Show exactly FOUR full-body views side by side in ONE row, from left to right: 1) FRONT view, 2) THREE-QUARTER view turned 45 degrees to the character's left (we see the right side of its face), 3) SIDE profile view facing right, 4) BACK view.
+The same character in every view: same scale, same height, feet on the same baseline, consistent colours and details, with clear empty white space between the views so they never touch or overlap.
+Neutral A-pose: standing straight, arms held down and slightly away from the body, legs slightly apart, hands and feet fully visible.
+Keep the SAME face, hairstyle, eyes, expression, accessories and clothing as the sketch — stay faithful to the child's design — and complete the full body from the top of the head to the feet with all details a 3D artist needs (front, sides and back of the hair and clothes).
+Clean confident line art, cel shading, friendly and family-appropriate. Plain pure white background, no text, no labels, no arrows, no grid, no frame, no ground shadow, no other objects.`;
+async function copyText(btn,txt,label){try{await navigator.clipboard.writeText(txt);btn.textContent='✅ انتسخ! الصقه في Gemini مع صورة الرسمة';}catch(e){prompt('انسخ الوصف:',txt);}setTimeout(()=>btn.textContent=label,2600);}
+$('#copySheet').onclick=()=>copyText($('#copySheet'),SHEET_PROMPT,'📋 انسخ وصف «لوحة الزوايا» (أمام، ثلاثة أرباع، جنب، خلف)');
 $('#geminiBtn').onclick=()=>sheet('geminiSheet',true);
-$('#copyPrompt').onclick=async()=>{try{await navigator.clipboard.writeText(GEMINI_PROMPT);$('#copyPrompt').textContent='✅ انتسخ! الصقه في Gemini';}catch(e){prompt('انسخ الوصف:',GEMINI_PROMPT);}setTimeout(()=>$('#copyPrompt').textContent='📋 انسخ الوصف لـ Gemini',2500);};
+$('#copyPrompt').onclick=()=>copyText($('#copyPrompt'),GEMINI_PROMPT,'📋 انسخ وصف «شخصية كاملة» (للّعب)');
 $('#cropGo').onclick=async()=>{$('#busy').classList.add('on');await new Promise(r=>setTimeout(r,50));try{
   const r=cropRect,s=1/cropScale,c=document.createElement('canvas');c.width=Math.max(8,Math.round(r.w*s));c.height=Math.max(8,Math.round(r.h*s));c.getContext('2d').drawImage(cropSrc,r.x*s,r.y*s,r.w*s,r.h*s,0,0,c.width,c.height);
+  if(cropKind==='sheet'){const views=await splitSheet(c);if(!views){alert('ما قدرت ألقى الزوايا 😕 تأكد إن الخلفية بيضاء والزوايا متباعدة');return;}
+   const small3=document.createElement('canvas');const k3=Math.min(1,640/Math.max(c.width,c.height));small3.width=Math.round(c.width*k3);small3.height=Math.round(c.height*k3);small3.getContext('2d').drawImage(c,0,0,small3.width,small3.height);
+   const d3={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي بالزوايا',src:small3.toDataURL('image/jpeg',.88),mask:views[0].mask,art:views[0].art,views,cfg:Object.assign({},DEF,{size:2}),created:Date.now()};
+   await DB.put(d3);await loadChars();renderGrid();$('#busy').classList.remove('on');openChar(CHARS.find(x=>x.id===d3.id),'cut');hint('🔄 '+ar(views.length)+' زوايا — لف حولها وشوف كل جهة');return;}
   if(cropKind==='color'){const o2=await artFromAI(c.toDataURL('image/png'));if(!o2){alert('ما قدرت أفصل الشخصية عن الخلفية 😕 تأكد إن خلفيتها بيضاء');return;}
    const small2=document.createElement('canvas');const k2=Math.min(1,640/Math.max(c.width,c.height));small2.width=Math.round(c.width*k2);small2.height=Math.round(c.height*k2);small2.getContext('2d').drawImage(c,0,0,small2.width,small2.height);
    const d2={id:'u'+Date.now(),name:$('#newName').value.trim()||'شخصية علي الملوّنة',src:small2.toDataURL('image/jpeg',.88),mask:o2.mask,art:o2.art,cfg:Object.assign({},DEF,{size:2}),created:Date.now()};
@@ -611,6 +639,19 @@ async function artFromAI(url){const img=new Image();img.src=url;await img.decode
  const ad=art.getContext('2d').getImageData(0,0,cw,ch),mk=document.createElement('canvas');mk.width=cw;mk.height=ch;const mx=mk.getContext('2d'),md=mx.createImageData(cw,ch);
  for(let i=0;i<cw*ch;i++){const a=ad.data[i*4+3]/255,l=(.299*ad.data[i*4]+.587*ad.data[i*4+1]+.114*ad.data[i*4+2])/255;md.data[i*4]=Math.round(Math.max(0,Math.min(1,(.55-l)*2.4))*a*255);md.data[i*4+1]=a>.5?255:0;md.data[i*4+3]=Math.round(a*255);}
  mx.putImageData(md,0,0);return{art:art.toDataURL('image/png'),mask:mk.toDataURL('image/png')};}
+// split a turnaround sheet (views side by side on white) into separate views, each with its own art + mask
+async function splitSheet(canvas){const full=await artFromAI(canvas.toDataURL('image/png'));if(!full)return null;const img=new Image();img.src=full.art;await img.decode();
+ const w=img.width,h=img.height,c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.drawImage(img,0,0);const d=x.getImageData(0,0,w,h).data;
+ const col=new Float32Array(w);for(let i=0;i<w;i++){let n=0;for(let j=0;j<h;j++)if(d[(j*w+i)*4+3]>40)n++;col[i]=n;}
+ const minGap=Math.max(4,Math.round(w*.012)),segs=[];let st=-1,gap=0;
+ for(let i=0;i<=w;i++){const on=i<w&&col[i]>h*.004;if(on){if(st<0)st=i;gap=0;}else if(st>=0){gap++;if(gap>=minGap||i===w){segs.push([st,i-gap]);st=-1;gap=0;}}}
+ const big=segs.filter(([a,b])=>b-a>w*.04);if(big.length<2||big.length>6)return null;
+ const views=[];for(const [a,b] of big){let y0=h,y1=0;for(let j=0;j<h;j++)for(let i=a;i<=b;i++)if(d[(j*w+i)*4+3]>40){if(j<y0)y0=j;if(j>y1)y1=j;}
+  const vw=b-a+1,vh=y1-y0+1,v=document.createElement('canvas');v.width=vw;v.height=vh;v.getContext('2d').drawImage(c,a,y0,vw,vh,0,0,vw,vh);
+  const vd=v.getContext('2d').getImageData(0,0,vw,vh),mk=document.createElement('canvas');mk.width=vw;mk.height=vh;const mx=mk.getContext('2d'),md=mx.createImageData(vw,vh);
+  for(let i=0;i<vw*vh;i++){const al=vd.data[i*4+3]/255,l=(.299*vd.data[i*4]+.587*vd.data[i*4+1]+.114*vd.data[i*4+2])/255;md.data[i*4]=Math.round(Math.max(0,Math.min(1,(.55-l)*2.4))*al*255);md.data[i*4+1]=al>.5?255:0;md.data[i*4+3]=Math.round(al*255);}
+  mx.putImageData(md,0,0);views.push({art:v.toDataURL('image/png'),mask:mk.toDataURL('image/png')});}
+ return views;}
 let aiBusy=false;
 async function aiRedraw(def){if(aiBusy)return;const tok=await idToken();
  if(!tok){alert('🪄 هذي الميزة تحتاج تسجيل دخول في البوابة أول (زر 👤 فوق في صفحة البوابة) عشان ما أحد يستخدمها من برا العائلة.');return;}
@@ -624,15 +665,54 @@ async function aiRedraw(def){if(aiBusy)return;const tok=await idToken();
  catch(e){console.error(e);alert('🪄 ما زبط هالمرة: '+(e.message||e));}
  finally{clearInterval(iv);busy.classList.remove('on');busy.textContent='✨ أجهّز الرسمة…';aiBusy=false;}}
 
+/* ======================= 🧊 real 3D characters (GLB, e.g. from Meshy / Tripo) ======================= */
+const gltfLoader=new GLTFLoader();
+async function addGlb(f){$('#busy').classList.add('on');try{const buf=await f.arrayBuffer();await new Promise((res,rej)=>gltfLoader.parse(buf.slice(0),'',res,rej));
+  const name=(f.name||'شخصية').replace(/\.glb$/i,'').slice(0,24);const thumb=canvasCard('🧊',name);
+  const d={id:'g'+Date.now(),name,src:thumb,glb:buf,cfg:Object.assign({},DEF,{size:1.4}),created:Date.now()};await DB.put(d);await loadChars();renderGrid();$('#busy').classList.remove('on');openChar(CHARS.find(x=>x.id===d.id),'glb');}
+ catch(e){console.error(e);alert('ما قدرت أقرأ ملف الـ GLB 😕');}finally{$('#busy').classList.remove('on');}}
+function canvasCard(icon,name){const c=document.createElement('canvas');c.width=c.height=320;const x=c.getContext('2d');const g=x.createLinearGradient(0,0,0,320);g.addColorStop(0,'#312e81');g.addColorStop(1,'#0f172a');x.fillStyle=g;x.fillRect(0,0,320,320);
+ x.font='120px system-ui';x.textAlign='center';x.textBaseline='middle';x.fillText(icon,160,140);x.fillStyle='#e0e7ff';x.font='bold 30px system-ui';x.direction='rtl';x.fillText(name,160,250,290);return c.toDataURL('image/jpeg',.85);}
+class GlbBody{
+ constructor(def,gltf){this.def=def;this.cfg=Object.assign({},def.cfg);this.full=true;this.glb=true;this.group=new THREE.Group();this.inner=new THREE.Group();this.group.add(this.inner);
+  this.vel=new THREE.Vector3();this.y=0;this.vy=0;this.face=1;this.yaw=0;this.dance=0;this.wave=0;this.land=0;this.crouch=0;
+  this.model=gltf.scene;this.inner.add(this.model);this.model.traverse(o=>{if(o.isMesh){o.frustumCulled=false;if(o.material&&o.material.map)o.material.map.colorSpace=THREE.SRGBColorSpace;}});
+  this.clips=gltf.animations||[];this.mixer=this.clips.length?new THREE.AnimationMixer(this.model):null;this.acts={};
+  const find=re=>this.clips.find(c=>re.test(c.name));const map={idle:find(/idle|stand|breath/i)||null,walk:find(/walk/i),run:find(/run|jog|sprint/i),dance:find(/dance|wave|cheer/i)};
+  if(this.mixer){if(!map.idle&&!map.walk)map.walk=this.clips[0];for(const k in map)if(map[k]){const a=this.mixer.clipAction(map[k]);a.enabled=true;a.setEffectiveWeight(0);a.play();this.acts[k]=a;}}
+  const sh=new THREE.Mesh(new THREE.CircleGeometry(.5,32),new THREE.MeshBasicMaterial({map:SHADOW_TEX,transparent:true,depthWrite:false,opacity:.55}));sh.rotation.x=-Math.PI/2;sh.position.y=.01;this.shadow=sh;this.group.add(sh);this.apply();}
+ apply(){this.model.scale.setScalar(1);this.model.position.set(0,0,0);this.model.updateMatrixWorld(true);const b=new THREE.Box3().setFromObject(this.model),sz=b.getSize(new THREE.Vector3());
+  const target=(this.cfg.size||1.4)/1.4*2,k=target/Math.max(.001,sz.y);this.model.scale.setScalar(k);this.model.updateMatrixWorld(true);const b2=new THREE.Box3().setFromObject(this.model);const c=b2.getCenter(new THREE.Vector3());
+  this.model.position.set(-c.x,-b2.min.y,-c.z);this.H=target;this.W=Math.max(.4,Math.max(sz.x,sz.z)*k*.5);this.shadow.scale.setScalar(Math.max(.6,this.W*1.6));}
+ setThick(){} lookAt(){}
+ steer(dt){const v=this.vel;if(v.length()>.3){const want=Math.atan2(v.x,v.z);let d=want-this.yaw;d=Math.atan2(Math.sin(d),Math.cos(d));this.yaw+=d*Math.min(1,dt*10);}if(this.dance<=0)this.inner.rotation.y=this.yaw;}
+ update(dt,t,moving,speed){const A=this.acts,run=moving&&speed>3.4;const want={idle:moving?0:1,walk:moving&&!run?1:0,run:run?1:0,dance:this.dance>0?1:0};
+  if(this.dance>0){this.dance-=dt;want.idle=want.walk=want.run=0;if(!A.dance)this.inner.rotation.y+=dt*6;}
+  if(this.mixer){for(const k in A){const a=A[k];const w=want[k]!=null?want[k]:0;a.setEffectiveWeight(lerp(a.getEffectiveWeight(),w,Math.min(1,dt*8)));}
+   if(A.walk&&!A.run&&run)A.walk.setEffectiveWeight(1);if(A.walk)A.walk.timeScale=moving?clamp(speed/2.4,.6,2.2):1;if(!A.idle&&!moving&&A.walk)A.walk.setEffectiveWeight(0);this.mixer.update(dt);}
+  // models without animations still feel alive: bob, sway and lean
+  const bob=this.mixer&&(A.walk||A.run)?0:(moving?Math.abs(Math.sin(t*10))*.06:Math.sin(t*2)*.01);this.model.rotation.z=this.mixer?0:(moving?Math.sin(t*10)*.06:0);
+  this.inner.position.y=this.y+bob;let sq=1;if(this.land>0){this.land-=dt;sq=1-.12*Math.sin(clamp(1-this.land/.25,0,1)*Math.PI);}this.inner.scale.set(1/Math.sqrt(sq),sq,1/Math.sqrt(sq));
+  this.shadow.material.opacity=.5*clamp(1-this.y/4,.15,1);}
+ setGlow(k,color){this.model.traverse(o=>{if(o.isMesh&&o.material&&'emissive'in o.material){o.material.emissive=new THREE.Color(color);o.material.emissiveIntensity=k;}});}
+ dispose(){if(this.mixer)this.mixer.stopAllAction();this.model.traverse(o=>{if(o.geometry)o.geometry.dispose();});this.shadow.geometry.dispose();}}
+async function openGlb(def){const g=await new Promise((res,rej)=>gltfLoader.parse(def.glb.slice(0),'',res,rej));const B=new GlbBody(def,g);
+ if(!world||world.key!==worldKey)buildWorld(worldKey);B.group.position.set(0,world.ground(0,-1),-1);scene.add(B.group);hero=B;B.intro=0;mode='glbIntro';playUI(false);sfx.whoosh();
+ if(!ringFx){ringFx=new THREE.Mesh(new THREE.TorusGeometry(1,.035,8,96),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));}scene.add(ringFx);ringFx.visible=true;
+ camera.position.set(0,B.group.position.y+B.H*.8,B.group.position.z+B.H*2.4);camLook.set(0,B.group.position.y+B.H*.5,B.group.position.z);camera.lookAt(camLook);}
+function stepGlbIntro(dt,t){const B=hero;B.intro+=dt;B.update(dt,t,false,0);const k=seg(B.intro,0,1.6),e=outBack(k);B.inner.scale.setScalar(Math.max(.001,e));B.inner.rotation.y=(1-ease(k))*Math.PI*2;B.setGlow(1.8*(1-seg(B.intro,.8,2)),hero.cfg.holo);
+ ringFx.position.set(B.group.position.x,B.group.position.y+B.H*.5,B.group.position.z);ringFx.scale.setScalar(.3+k*2.5*B.W*2);ringFx.material.opacity=1-k;if(B.intro>.4&&!B.flashed){B.flashed=true;flash();sfx.shine();}
+ if(B.intro>2.1){ringFx.visible=false;B.setGlow(0,'#000');B.inner.rotation.y=0;mode='play';playUI(true);banner(`🧊 ${B.def.name} وصلت!`);setTimeout(()=>banner(''),2000);hint('👈 امشِ • ⤴️ نط • 💃 رقصة');spawnFriends();}}
+
 /* ======================= main loop ======================= */
 function loop(){requestAnimationFrame(loop);if(!renderer||!$('#play').classList.contains('on'))return;const dt=Math.min(.05,clock.getDelta()),t=clock.elapsedTime;
- if(mode==='transform'&&hero&&stage)stepTransform(dt);else if(mode==='play'&&hero)stepPlay(dt,t);
+ if(mode==='glbIntro'&&hero)stepGlbIntro(dt,t);else if(mode==='transform'&&hero&&stage)stepTransform(dt);else if(mode==='play'&&hero)stepPlay(dt,t);
  if(hero&&mode==='transform')hero.update(dt,t,false,0);if(world&&world.sea)world.sea.position.y=.05+Math.sin(t*.8)*.05;
  renderer.render(scene,camera);}
 requestAnimationFrame(loop);
 worldKey=ls.get('ali_world','paper');if(!WORLDS[worldKey])worldKey='paper';
 await loadChars();renderGrid();
-window.__ALI={get pending(){return pendingBody},get tf(){return tf},get mode(){return mode},get hero(){return hero},get world(){return world},goWorld,get stars(){return starsGot}};
+window.__ALI={get camera(){return camera},get pending(){return pendingBody},get tf(){return tf},get mode(){return mode},get hero(){return hero},get world(){return world},goWorld,get stars(){return starsGot}};
 </script>
 </body>
 </html>
