@@ -41,8 +41,10 @@ async function callGemini(key, model, b64, mime, prompt, withRatio) {
 
 export default async (req) => {
   if (req.method !== 'POST') return json(405, { error: 'POST only' });
-  const key = process.env.GEMINI_API_KEY;
+  // tolerate the usual paste mistakes: spaces, new lines, quotes, "GEMINI_API_KEY=" prefix
+  const key = String(process.env.GEMINI_API_KEY || '').replace(/^\s*GEMINI_API_KEY\s*=\s*/i, '').replace(/["'`\s]/g, '');
   if (!key) return json(503, { error: 'المفتاح GEMINI_API_KEY مو مضاف في إعدادات Netlify بعد' });
+  const keyHint = !/^AIza/.test(key) ? 'المفتاح المحفوظ ما يبدأ بـ AIza — يمكن نسخت شي ثاني غير المفتاح' : key.length !== 39 ? `المفتاح المحفوظ طوله ${key.length} حرف والمفروض 39 — يمكن انقص أو زاد عند النسخ` : key.includes('.') ? 'المفتاح فيه نقاط — يمكن نسخت النسخة المختصرة من القائمة' : '';
   let body; try { body = await req.json(); } catch (e) { return json(400, { error: 'bad json' }); }
   const user = await verifyUser(body.idToken).catch(() => null);
   if (!user) return json(401, { error: 'سجّل دخول في البوابة أول' });
@@ -56,7 +58,9 @@ export default async (req) => {
   for (const model of MODELS) {
     for (const withRatio of [true, false]) {
       try { const r = await callGemini(key, model, m[3], m[1], prompt, withRatio); if (r.image) return json(200, { image: `data:${r.mime};base64,${r.image}`, model }); last = r;
-        if (r.status === 404) break; if (r.status !== 400) return json(r.status || 502, { error: r.error }); }
+        if (r.status === 404) break;
+        if (/api key/i.test(r.error || '')) return json(401, { error: 'مفتاح Gemini مرفوض من Google. ' + (keyHint || 'انسخه من جديد كامل من aistudio.google.com وحطه في Netlify بدون مسافات، وبعدين Trigger deploy') });
+        if (r.status !== 400) return json(r.status || 502, { error: r.error }); }
       catch (e) { last = { error: e.name === 'AbortError' ? 'الذكاء الاصطناعي تأخر كثير، جرّب مرة ثانية' : String(e.message || e) }; return json(504, last); }
     }
   }
