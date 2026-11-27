@@ -198,6 +198,9 @@ export class Enemies {
   sees(e, pl, d, dy, dx, dz) {
     const hidden = this.g.playerHidden && this.g.playerHidden();
     if (hidden === 'locker') return 0;
+    // متنكّر بزي حارس: من بعيد ما يشكّون — قريب منهم يتمعّنون فيك شوي شوي، والركض/الضرب/السحب يفضحك
+    const dis = this.g.disguised && this.g.disguised();
+    if (dis && !dis.reveal) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
     const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
     const range = hidden ? 2.4 : (e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1); // ملزوق بالجدار وساكن = أصعب تنشاف
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;

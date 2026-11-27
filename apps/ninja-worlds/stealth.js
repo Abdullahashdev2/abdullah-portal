@@ -24,6 +24,7 @@ export class Stealth {
   get L() { return this.c.level(); }
   setup(level, cfg) {
     this.on = !!cfg.ship; this.exitAim(); this.drop(); this.release(true); this.leaveLocker(true); this.flying = [];
+    this.radio = false; this.radioSus = 0; this.radioCd = 0; this.chatT = 18; this.setDisguise(false, true); this.closeRadio(true);
     const d = this.c.upg().darts || 0;
     this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d };
     level.phase = 'normal'; level.phaseT = 0; level.lastSeen = null;
@@ -33,6 +34,7 @@ export class Stealth {
   preInput(inp) {
     if (!this.on) { inp.aimP = false; return; }
     const P = this.c.player;
+    if (inp.spP && !this.aiming && !this.holding && this.gadget()) inp.spP = false;
     if (this.holding) { // ماسك حارس من الخلف
       if (inp.atkP) { inp.atkP = false; this.choke(); }
       if (inp.actP) { inp.actP = false; if (!this.throwBody(this.holding)) this.c.say('🌊 قرّب من حافة السفينة (السطح المكشوف) عشان ترميه في البحر — أو اضغط ⚔️ عشان تخنقه لين يغمى عليه'); }
@@ -99,7 +101,7 @@ export class Stealth {
     if (e.choke >= 1) {
       const P = this.c.player; this.holding = null; P.holding = false;
       this.c.enemies.sleep(e, true); e.sleepT = 150; e.choke = 0;
-      this.c.sfx.tone(300, 90, 0.5, 'sine', 0.12); this.c.addCoins(4, e.pos);
+      this.c.sfx.tone(300, 90, 0.5, 'sine', 0.12); this.c.addCoins(4, e.pos); this.takeRadio();
       if (!this.L._chokeTip) { this.L._chokeTip = true; this.c.say('😵 أغمى عليه — بس بيصحى بعد شوي. اسحبه (✋) لخزانة أو ارمه في البحر عشان محد يلقاه.'); }
     }
   }
@@ -138,6 +140,56 @@ export class Stealth {
       }
     }
     this.flying = this.flying.filter((f) => !f.done);
+  }
+  /* ---------- أداة خاصة (زر ✴️): البس زي حارس نايم / افتح الراديو ---------- */
+  nearBody() { const P = this.c.player; return this.c.enemies.list.find((x) => x.ship && x.alive && x.st === 'sleep' && !x.hidden && !x.stripped && x.pos.distanceTo(P.pos) < 1.9); }
+  gadgetLabel() {
+    if (!this.on || this.aiming) return null;
+    if (!this.holding && !this.dragging && !this.disguise && this.nearBody()) return '🧥 البس زيّه';
+    if (this.radio) return '📻 راديو';
+    return null;
+  }
+  gadget() {
+    if (!this.on) return false;
+    if (!this.dragging && !this.disguise) { const e = this.nearBody(); if (e) { e.stripped = true; this.setDisguise(true); this.takeRadio(true); this.c.sfx.noise(0.3, 800, 0.8, 0.12, 'bandpass'); this.c.say('🧥 لبست زي الحارس! من بعيد يحسبونك منهم — بس لا تقرّب منهم كثير، ولا تركض، ولا تضرب قدّامهم، ولا تسحب جثث.'); return true; } }
+    if (this.radio) { this.openRadio(); return true; }
+    return false;
+  }
+  setDisguise(on, silent) { this.disguise = on; const h = this.c.hero; if (h && h.mats && (on || h.disguised)) this.c.setDisguise && this.c.setDisguise(on); }
+  disguisedInfo() {
+    if (!this.disguise) return null; const P = this.c.player, hs = Math.hypot(P.vel.x, P.vel.z);
+    return { reveal: hs > 5.2 || P.state === 'attack' || P.state === 'roll' || P.state === 'hug' || this.holding || this.dragging || this.aiming };
+  }
+  /* ---------- 📻 الراديو: تنصّت + انتحال صوت القائد ---------- */
+  takeRadio(silent) { if (this.radio) return; this.radio = true; this.log = ['«…كل الوحدات، بلّغوا عن مواقعكم كل خمس دقايق.»']; this.chatT = 12; if (!silent) this.c.say('📻 أخذت الراديو حقه! اضغط زر 📻 — تتنصّت عليهم وتقدر تقلّد صوت القائد وتعطيهم أوامر غلط.'); }
+  openRadio() {
+    const el = document.getElementById('radio'); if (!el) return; this.radioOpen = true;
+    el.querySelector('#rSus').style.width = Math.round(Math.min(1, this.radioSus) * 100) + '%';
+    el.querySelector('#rCd').textContent = this.radioCd > 0 ? `⏳ لازم تنتظر ${Math.ceil(this.radioCd)} ثانية قبل أمر جديد (عشان ما يشكّون)` : '🎙️ اختر أمر — بصوت القائد';
+    el.querySelectorAll('.rcmd').forEach((b) => (b.disabled = this.radioCd > 0));
+    el.querySelector('#rLog').innerHTML = (this.log || []).slice(-4).map((t) => '<div>' + t + '</div>').join('') || '<div>… ما فيه كلام حالياً</div>';
+    el.classList.add('on'); this.c.pauseFor && this.c.pauseFor(true); this.c.sfx.noise(0.25, 3000, 0.5, 0.06, 'highpass');
+  }
+  closeRadio(silent) { const el = document.getElementById('radio'); if (el) el.classList.remove('on'); if (this.radioOpen && !silent) this.c.pauseFor && this.c.pauseFor(false); this.radioOpen = false; }
+  chatter(t) { this.log = this.log || []; this.log.push(t); if (this.log.length > 12) this.log.shift(); if (this.radio) this.c.say('📻 ' + t); }
+  command(kind) {
+    if (this.radioCd > 0) return; const E = this.c.enemies, P = this.c.player, L = this.L;
+    this.closeRadio(); this.radioCd = 20; this.radioSus += kind === 'calm' ? 0.55 : 0.38;
+    this.c.sfx.tone(700, 500, 0.15, 'square', 0.05);
+    if (this.radioSus > 1) { this.radioSus = 0.5; this.c.say('📻 «هذا مو صوت القائد!! في دخيل معه راديو!» — انكشفت الخدعة!'); this.setPhase('alert'); L.lastSeen = P.pos.clone(); return; }
+    const guards = E.list.filter((e) => e.ship && e.alive && !e.hidden && !['sleep', 'dragged', 'held', 'thrown', 'dying'].includes(e.st));
+    if (kind === 'stern' || kind === 'bow') {
+      const z = kind === 'stern' ? 8 : 232; let n = 0;
+      for (const e of guards) if (!e.alert && Math.abs(e.pos.z - P.pos.z) < 70) { e.st = 'inv'; e.invPos = new V(e.pos.x * 0.3, e.pos.y, z); e.invT = -8; n++; }
+      this.c.say(`📻 (بصوتك): «كل الوحدات، تجمّعوا عند ${kind === 'stern' ? 'المؤخرة' : 'المقدمة'} فوراً!» — ${n} حارس يمشون هناك 🚶`);
+    } else if (kind === 'calm') {
+      if (L.phase === 'normal') { this.c.say('📻 «القائد: ليش تعلن هدوء والوضع هادي أصلاً؟» 🤔 (ما كان فيه إنذار)'); return; }
+      this.setPhase('caution'); for (const e of guards) { e.alert = false; e.sus = 0; if (e.st === 'chase' || e.st === 'inv') e.st = 'idle'; }
+      this.c.say('📻 (بصوتك): «انتهى الإنذار، ارجعوا لمواقعكم.» — صدّقوا! بس صاروا حذرين ⚡');
+    } else if (kind === 'rest') {
+      let n = 0; for (const e of guards) if (!e.alert && e.pos.distanceTo(P.pos) < 45) { e.st = 'idle'; e.wait = 22; e.sus = 0; n++; }
+      this.c.say(`📻 (بصوتك): «استراحة ٢٠ ثانية للجميع.» — ${n} حارس وقفوا مكانهم ☕`);
+    }
   }
   drop() { if (this.dragging) { this.dragging.st = 'sleep'; this.dragging = null; } if (this.c.player) this.c.player.dragging = false; }
   nearLocker(r) { const P = this.c.player; let best = null, bd = r; for (const lk of this.L.lockers || []) { const d = Math.hypot(lk.front.x - P.pos.x, lk.front.z - P.pos.z); if (d < bd && Math.abs(lk.pos.y - P.pos.y) < 1) { bd = d; best = lk; } } return best; }
@@ -183,6 +235,15 @@ export class Stealth {
     const P = this.c.player, L = this.L, E = this.c.enemies;
     if (this.aiming) { P.yaw = this.c.cam.yaw; }
     this.updateThrown(dt);
+    this.radioCd = Math.max(0, this.radioCd - dt); this.radioSus = Math.max(0, this.radioSus - dt * 0.012);
+    if (this.radio && (this.chatT -= dt) <= 0) {
+      this.chatT = 26 + Math.random() * 18; const E = this.c.enemies.list, asleep = E.filter((e) => e.ship && (e.st === 'sleep')).length, gone = (L.thrown || 0);
+      const lines = ['«الوحدة ٢: المخزن هادي. باقي على تبديل النوبة شوي.»', '«الجسر: الكشافات شغّالة. محد يقرّب من مهبط المقدمة.»', '«المحركات: سمعت صوت حديد قبل شوي… يمكن الموج.»', '«القائد: بطاقة القيادة في مكتب المشرف — لا أحد يدخله.»'];
+      if (asleep) lines.push(`«وين ${asleep > 1 ? 'الوحدات ' + asleep : 'الوحدة ٤'}؟ ما ترد على الراديو…»`);
+      if (gone) lines.push(`«سمعت شي طاح في البحر؟ لا لا… أكيد الموج.»`);
+      if (L.phase !== 'normal') lines.push('«كل الوحدات: فتّشوا الممرات، الدخيل قريب!»');
+      this.chatter(lines[Math.floor(Math.random() * lines.length)]);
+    }
     if (this.holding) {
       const e = this.holding, fwd = new V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), tgt = P.pos.clone().addScaledVector(fwd, 0.5);
       e.pos.lerp(tgt, Math.min(1, dt * 14)); e.pos.y = P.pos.y; e.yaw = P.yaw; e.heldT += dt; e.choke = Math.max(0, e.choke - dt * 0.06);
@@ -227,7 +288,7 @@ export class Stealth {
     if (ph === 'normal' && prev !== 'normal') this.c.say('😮‍💨 هدأت الأوضاع — رجعوا لدورياتهم.');
   }
   // hooks from enemies
-  spotted(e, fromSearch) { if (fromSearch || this.L.phase === 'evasion') { this.setPhase('alert'); this.L.lastSeen = this.c.player.pos.clone(); } }
+  spotted(e, fromSearch) { if (this.disguise) { this.setDisguise(false); this.c.say('😱 انكشف تنكّرك! خلعوا عنك الزي — اهرب!'); } if (fromSearch || this.L.phase === 'evasion') { this.setPhase('alert'); this.L.lastSeen = this.c.player.pos.clone(); } }
   radioDone() { this.setPhase('alert'); this.L.lastSeen = this.c.player.pos.clone(); }
   bodyFound() { if (this.L.phase === 'normal') { this.setPhase('caution'); this.c.say('😲 لقوا زميلهم نايم! صاروا حذرين — خبّ الأجسام بالخزائن.'); } }
   guardWoke() { if (this.L.phase === 'normal') this.setPhase('caution'); }

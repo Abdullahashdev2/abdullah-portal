@@ -222,6 +222,23 @@ export function setSpy(h, on) {
   h.sword.visible = !on; if (h.sheath) h.sheath.visible = !on; if (h.collar) h.collar.visible = !on;
   h.spy = on;
 }
+/* ---------- زي الحارس (تنكّر): لون الزي الزيتي + قبعة + سترة ---------- */
+export function setDisguise(h, on) {
+  if (!h.mats) return;
+  if (!h.disGear) {
+    const parts = [], M2 = (c, r = 0.75) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+    const put = (p2, m, x, y, z) => { m.position.set(x, y, z); m.castShadow = true; p2.add(m); parts.push(m); return m; };
+    const capM = put(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.172, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), M2(0x4b5340)), 0, 0.04, 0);
+    put(capM, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.015, 0.12), M2(0x4b5340)), 0, 0.03, 0.15);
+    put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.36, 0.31), M2(0x2f3a2b, 0.85)), 0, 0.26, 0.01);
+    for (let i = -1; i <= 1; i++) put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.06), M2(0x26301f)), i * 0.12, 0.18, 0.18);
+    h.disGear = parts;
+  }
+  h.disGear.forEach((m) => (m.visible = on));
+  if (on) { h.mats.suit.color.setHex(0x4b5340); h.mats.suit2.color.setHex(0x23262b); h.mats.trim.color.setHex(0x2d3436); h.mats.trim.emissiveIntensity = 0; }
+  else if (h.spy) setSpy(h, true);
+  h.disguised = on;
+}
 /* human ship guard: the calm-hero body re-dressed as a soldier (balaclava, cap, vest, rifle) */
 export function buildSoldier(seed = 0) {
   const h = buildHero('calm');

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'sky';
 import { Particles, Sound } from './fx.js';
-import { buildHero, blendPose, BASE, Scarf, Trail, setSpy } from './hero.js';
+import { buildHero, blendPose, BASE, Scarf, Trail, setSpy, setDisguise } from './hero.js';
 import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
@@ -181,6 +181,7 @@ const G = {
   onAlarm: () => { level.alarms = (level.alarms || 0) + 1; sfx.tone(880, 660, 0.25, 'square', 0.12); sfx.tone(880, 660, 0.25, 'square', 0.12, 0.3); if (level.alarms <= 3) say('🚨 انكشفت! الحارس شافك — حاربه أو اهرب للظل.'); },
   onRadio: (e) => stealth.radioDone(e),
   tryGrab: () => stealth.tryGrab(),
+  disguised: () => stealth.disguisedInfo(),
   onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.12); stealth.spotted(e, search); },
   onBodyFound: () => stealth.bodyFound(),
   onGuardWoke: () => stealth.guardWoke(),
@@ -243,7 +244,7 @@ function applyAtmo(c) {
   const es = new THREE.Scene(), s2 = new Sky(); s2.scale.setScalar(1000); for (const k in u) if (s2.material.uniforms[k]) s2.material.uniforms[k].value = u[k].value.clone ? u[k].value.clone() : u[k].value;
   es.add(s2); if (envRT) envRT.dispose(); envRT = pmrem.fromScene(es, 0.02); scene.environment = LITE ? null : envRT.texture; if (LITE) { sky.visible = false; scene.background = new THREE.Color(c.fog[0]); } s2.geometry.dispose(); s2.material.dispose();
 }
-let checkpoint = null, cfg = null;
+let checkpoint = null, cfg = null, radioPaused = false;
 function loadWorld(id, from) {
   if (level) level.dispose(); enemies.clear(); sparks.clear(); dust.clear(); motes.clear();
   if (npc) { npc.root.removeFromParent(); npc = null; }
@@ -342,7 +343,7 @@ function togglePause(v) { if (!started || $('#done').classList.contains('on')) r
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
 let navIdx = 0, navCool = 0;
 function activeMenu() {
-  for (const s of ['#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
+  for (const s of ['#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
   const t = document.getElementById('title'); if (t && !t.classList.contains('off')) return t;
   return null;
 }
@@ -354,7 +355,7 @@ function menuNav(dir) {
   bs[navIdx].classList.add('navfocus'); try { bs[navIdx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
 }
 function menuSelect() { const m = activeMenu(); if (!m) return; const bs = menuButtons(m); const b = bs[Math.min(navIdx, bs.length - 1)]; if (b) { b.click(); setTimeout(() => { if (activeMenu()) menuNav(0); }, 60); } }
-function menuBack() { if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
+function menuBack() { if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
 let gpPrev = {};
 function menuPoll(dt) {
   navCool = Math.max(0, navCool - dt);
@@ -403,7 +404,7 @@ applyMirror();
 $('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 تصويب' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 تصويب' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(stealth.gadgetLabel() ? [{ id: 'sp', label: stealth.gadgetLabel() }] : G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
 if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -532,7 +533,7 @@ const keys = {}, prev = {};
 const vin = { jump: 0, atk: 0, roll: 0, act: 0, sp: 0, aim: 0 }, held = { jump: false, roll: false };
 const virt = { mx: 0, my: 0 }; // joystick
 const cam = { yaw: 0, pitch: 0.32, dist: 6.4, want: 6.4, target: new V(), lastManual: -9, dx: 0, dy: 0 };
-const stealth = new Stealth({ camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
+const stealth = new Stealth({ setDisguise: (on) => setDisguise(hero, on), pauseFor: (v) => { if (v) { if (!paused) { paused = true; radioPaused = true; } } else if (radioPaused) { paused = false; radioPaused = false; } }, camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
 let stormT = 4, flash = 0;
 addEventListener('keydown', (e) => {
   /* TV remote / keyboard menu navigation: arrows move, OK/Enter selects, Back returns */
@@ -562,6 +563,7 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { if (mouse && mouse.moved < 8 && performance.now() - mouse.t < 300 && e.button === 0) vin.atk++; mouse = null; return; } touchUp(e); });
 canvas.addEventListener('pointercancel', touchUp);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+document.querySelectorAll('#radio .rcmd').forEach((b) => (b.onclick = () => stealth.command(b.dataset.cmd))); $('#rClose').onclick = () => stealth.closeRadio();
 addEventListener('wheel', (e) => { if (!stealth.aiming) return; e.preventDefault(); stealth.zoomStep(e.deltaY < 0 ? 1 : -1); }, { passive: false });
 { const zi = $('#zIn'), zo = $('#zOut'), zb = $('#zBreath');
   const tap = (el, fn) => el && el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
@@ -764,6 +766,7 @@ function worldLogic(dt) {
   }
   // prompt
   let label = '';
+  { const gl = stealth.gadgetLabel(), spb = $('#spBtn'); if (spb) { const want = gl || (G.upg.spin ? '✴️<small>دوّامة</small>' : null); const html = gl ? gl.split(' ')[0] + '<small>' + gl.split(' ').slice(1).join(' ') + '</small>' : want; if (spb.dataset.h !== String(html)) { spb.dataset.h = String(html); if (html) spb.innerHTML = html; spb.style.display = html ? '' : 'none'; } } }
   const edgeN = stealth.on && stealth.seaEdge();
   if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
   else if (stealth.dragging && edgeN) label = 'ارمه في البحر 🌊';
