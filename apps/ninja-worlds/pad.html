@@ -106,9 +106,9 @@ $('#look').addEventListener('pointerup', endLook); $('#look').addEventListener('
 // buttons
 document.querySelectorAll('.pad button').forEach((b) => {
   const k = b.dataset.k;
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); st.c[k]++; if (k === 'jump') st.j = true; if (k === 'roll') st.r = true; b.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); try { b.setPointerCapture(e.pointerId); } catch (_) {} st.c[k]++; if (k === 'jump') st.j = true; if (k === 'roll') st.r = true; b.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
   const up = () => { if (k === 'jump') st.j = false; if (k === 'roll') st.r = false; b.classList.remove('down'); };
-  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
 });
 $('#pauseB').onclick = () => { st.c.pause++; send(true); };
 // stream input ~60 times a second (inputs are cumulative, so a lost packet never loses a press)

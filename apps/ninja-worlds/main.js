@@ -7,6 +7,7 @@ import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
 import { remote, openTV, closeTV, sendTV } from './tv.js';
+import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
 const V = THREE.Vector3, $ = (s) => document.querySelector(s);
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
@@ -112,7 +113,7 @@ const sfx = new Sound();
 addEventListener('resize', resize); resize();
 
 /* ---------------- game object shared with modules ---------------- */
-let level = null, player, enemies, hero, scarf, trail, npc = null, worldId = 'hub';
+let skin = null; let level = null, player, enemies, hero, scarf, trail, npc = null, worldId = 'hub';
 let shakeAmt = 0, stopT = 0, fading = false, startTime = 0, worldFalls = 0;
 const G = {
   scene, sfx,
@@ -154,7 +155,7 @@ function computeUpg() {
 }
 hero = buildHero('ninja'); scene.add(hero.root);
 player = new Player(G, hero); enemies = new Enemies(G);
-scarf = new Scarf(scene, 0xdc2626); trail = new Trail(scene, 0x9be7ff);
+skin = null; scarf = new Scarf(scene, 0xdc2626); trail = new Trail(scene, 0x9be7ff);
 
 /* ---------------- worlds ---------------- */
 function applyAtmo(c) {
@@ -212,7 +213,38 @@ function showDone() {
 }
 $('#doneBtn').onclick = () => { $('#done').classList.remove('on'); paused = false; fadeTo(() => loadWorld('hub', cfg.id)); };
 function fadeTo(fn) { const f = $('#fade'); f.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => f.classList.remove('on'), 80); }, 380); }
-function togglePause(v) { if (!started || $('#done').classList.contains('on')) return; paused = v ?? !paused; $('#pause').classList.toggle('on', paused); $('#pHub').hidden = worldId === 'hub'; }
+function togglePause(v) { if (!started || $('#done').classList.contains('on')) return; paused = v ?? !paused; $('#pause').classList.toggle('on', paused); $('#pHub').hidden = worldId === 'hub'; navIdx = 0; if (paused) setTimeout(() => menuNav(0), 30); }
+/* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
+let navIdx = 0, navCool = 0;
+function activeMenu() {
+  for (const s of ['#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
+  const t = document.getElementById('title'); if (t && !t.classList.contains('off')) return t;
+  return null;
+}
+const menuButtons = (m) => [...m.querySelectorAll('button')].filter((b) => b.offsetParent !== null && !b.hidden && b.style.display !== 'none');
+function menuNav(dir) {
+  const m = activeMenu(); if (!m) return; const bs = menuButtons(m); if (!bs.length) return;
+  navIdx = ((navIdx + dir) % bs.length + bs.length) % bs.length;
+  document.querySelectorAll('.navfocus').forEach((b) => b.classList.remove('navfocus'));
+  bs[navIdx].classList.add('navfocus'); try { bs[navIdx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
+}
+function menuSelect() { const m = activeMenu(); if (!m) return; const bs = menuButtons(m); const b = bs[Math.min(navIdx, bs.length - 1)]; if (b) { b.click(); setTimeout(() => { if (activeMenu()) menuNav(0); }, 60); } }
+function menuBack() { if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
+let gpPrev = {};
+function menuPoll(dt) {
+  navCool = Math.max(0, navCool - dt);
+  const m = activeMenu(); if (!m) { document.querySelectorAll('.navfocus').forEach((b) => b.classList.remove('navfocus')); return; }
+  let y = remote.on ? remote.my : 0;
+  const gp = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g) : null;
+  if (gp) {
+    const B = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed), ed = (k, v) => { const p = gpPrev[k]; gpPrev[k] = v; return v && !p; };
+    if (Math.abs(gp.axes[1]) > 0.5) y = -gp.axes[1]; if (B(12)) y = 1; if (B(13)) y = -1;
+    if (ed('a', B(0))) menuSelect(); if (ed('b', B(1))) menuBack();
+  }
+  if (Math.abs(y) > 0.55 && navCool <= 0) { menuNav(y > 0 ? -1 : 1); navCool = 0.26; }
+  if (Math.abs(y) < 0.3) navCool = 0;
+  if (!m.querySelector('.navfocus') && (remote.on || gp)) menuNav(0);
+}
 $('#pauseBtn').onclick = () => togglePause(true);
 $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
@@ -222,11 +254,9 @@ $('#pHelp').onclick = () => $('#help').classList.toggle('on');
 /* ---------- big-screen mode: this device renders, a phone is the controller ---------- */
 const tvHooks = {
   press: (k, n) => {
-    if (!started) { $('#startBtn').click(); return; }
-    if ($('#done').classList.contains('on')) { if (k === 'jump' || k === 'act') $('#doneBtn').click(); return; }
-    if (k === 'pause') { togglePause(); return; }
-    if (paused) { if (k === 'jump') togglePause(false); return; }
-    vin[k] = (vin[k] || 0) + n; if (k === 'jump') held.jump = remote.jumpH;
+    if (k === 'pause') { if ($('#tv').classList.contains('on')) closeTV(); else if (started) togglePause(); return; }
+    if (activeMenu()) { if (k === 'jump' || k === 'act' || k === 'atk') menuSelect(); else if (k === 'roll') menuBack(); return; }
+    vin[k] = (vin[k] || 0) + n;
   },
   look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
   onConnect: () => { document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
@@ -236,6 +266,24 @@ const openBig = () => { sfx.init(); openTV(tvHooks); };
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
 $('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
 $('#tvClose').onclick = () => closeTV();
+/* ---------- custom 3D character (.glb) ---------- */
+skin = new Skin(hero);
+async function applySkin(buf, announce) {
+  try {
+    const clips = await skin.load(buf); $('#pSkinOff').hidden = false;
+    if (announce) say('🧍 شخصيتك الجديدة جاهزة! الحركات اللي لقيتها: ' + (clips.length ? clips.join('، ') : 'ما فيه حركات — بتظهر واقفة') + ' 🎉');
+    return true;
+  } catch (e) { console.error(e); if (announce) say('⚠️ ما قدرت أقرأ الملف — لازم يكون GLB فيه هيكل (rig).'); return false; }
+}
+$('#pSkin').onclick = () => $('#skinFile').click();
+$('#skinFile').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (f.size > 60 * 1024 * 1024) return say('⚠️ الملف كبير مرة (أكثر من ٦٠ ميقا).');
+  const buf = await f.arrayBuffer(); togglePause(false);
+  if (await applySkin(buf, true)) saveSkinFile(buf).catch(() => {});
+};
+$('#pSkinOff').onclick = () => { skin.clear(); clearSkinFile(); $('#pSkinOff').hidden = true; togglePause(false); say('↩️ رجع النينجا المعصوب الأصلي.'); };
+loadSkinFile().then((buf) => { if (buf) applySkin(buf, false); });
 $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
 $('#pUpg').onclick = () => { const n = SAVE.shards.length; $('#upgList').innerHTML = UPG.map((u) => `<div class="${n >= u.n ? 'u on' : 'u'}"><b>${n >= u.n ? '✅' : '🔒'} ${u.name}</b><span>${n >= u.n ? u.desc : 'تنفتح عند ' + u.n + ' 💎 (عندك ' + n + ')'}</span></div>`).join(''); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
@@ -319,7 +367,7 @@ function touchMove(e) {
 function touchUp(e) { if (joy && e.pointerId === joy.id) { joy = null; virt.mx = virt.my = 0; $('#joy').classList.remove('on'); } if (look && e.pointerId === look.id) look = null; }
 document.querySelectorAll('[data-btn]').forEach((b) => {
   const k = b.dataset.btn;
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); vin[k]++; held[k] = true; b.classList.add('down'); });
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { b.setPointerCapture(e.pointerId); } catch (_) {} vin[k]++; held[k] = true; b.classList.add('down'); });
   const up = () => { held[k] = false; b.classList.remove('down'); };
   b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
 });
@@ -520,7 +568,8 @@ function frame(now) {
     // title: slow orbit around the plaza
     tNow += dt; cam.yaw += dt * 0.08; level.update(dt, player);
   }
-  player.animate(dt); animateNpc(dt);
+  menuPoll(dt); player.animate(dt); animateNpc(dt);
+  if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active);
   hero.root.updateMatrixWorld(true);
   const r = new V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   scarf.update(Math.min(dt, 1 / 30), hero.scarfAnchor.getWorldPosition(tmpA), r, player.vel, tNow);
@@ -539,7 +588,7 @@ requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
 window.__G = {
-  get player() { return player; }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
+  get player() { return player; }, get skin() { return skin; }, THREE, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
   manual: (v) => { manual = v; },
