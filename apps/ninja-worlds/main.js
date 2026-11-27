@@ -7,6 +7,7 @@ import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
 import { Stealth } from './stealth.js';
+import { icon } from './icons.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
 const V = THREE.Vector3, $ = (s) => document.querySelector(s);
@@ -210,7 +211,7 @@ function computeUpg() {
   if (player) { player.maxHp = BASE_HP + u.hearts; player.hp = Math.min(player.hp, player.maxHp); }
   if (trail) trail.c.setHex(G.upg.fastSpin ? 0x7df9ff : G.upg.fire ? 0xffa040 : 0x9be7ff);
   if (hero) hero.sword.traverse((o) => { if (o.material && o.material.color && o.geometry && o.geometry.parameters && o.geometry.parameters.depth > 0.8) { o.material.emissive && o.material.emissive.setHex(G.upg.fastSpin ? 0x0891b2 : G.upg.fire ? 0xc2410c : 0x000000); if (o.material.emissive) o.material.emissiveIntensity = 0.8; } });
-  const sp = document.getElementById('spBtn'); if (sp) sp.style.display = G.upg.spin ? '' : 'none';
+  const sp = document.getElementById('spBtn'); if (sp) sp.dataset.v = ''; // يتحدّث كل فريم حسب الأداة/الدوّامة
 }
 function addCoins(n, at) {
   if (!n) return; SAVE.coins = Math.max(0, (SAVE.coins || 0) + n); persist(); hudUpdate();
@@ -520,14 +521,15 @@ let knockCd = 0;
 const PISTOL_SVG = '<svg viewBox="0 0 64 40" width="34" height="22" aria-hidden="true"><path fill="#e5e7eb" d="M4 8h44l4-4h8v10h-6l-2 3H30l-3 4h-6l-4 15H7l5-17H4z"/><rect x="48" y="9" width="12" height="3" fill="#9ca3af"/><circle cx="24" cy="16" r="3" fill="#111827"/></svg>';
 const touchCache = {};
 function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (b) b.innerHTML = html; }
+const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
 function touchLabels() {
-  if (!TOUCH) return;
-  const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, edge = sh && !aim && player.hullEdge && player.hullEdge();
-  setBtn('atkBtn', aim ? '🎯<small>أطلق</small>' : hold ? '😵<small>اخنق</small>' : sh ? (canGrab() ? '🤫<small>امسكه</small>' : '👊<small>ضرب</small>') : '⚔️<small>ضرب</small>');
-  setBtn('aimBtn', aim ? '❌<small>إلغاء التصويب</small>' : PISTOL_SVG + '<small>مسدس</small>');
-  setBtn('actBtn', aim ? '🔁<small>' + (stealth.weapon === 'pistol' ? 'للقنّاصة' : 'للمسدس') + '</small>' : hold ? '🌊<small>ارمِ</small>' : player.state === 'hug' ? '🤜<small>طق</small>' : player.state === 'hang' && player.edgeHang ? '✋<small>—</small>' : '✋<small>شيل</small>');
-  setBtn('jumpBtn', aim ? '🫁<small>احبس نفسك</small>' : edge ? '🧗<small>تعلّق برّا</small>' : player.state === 'hang' && player.edgeHang ? '⬆️<small>اطلع</small>' : '🦘<small>قفز</small>');
-  setBtn('rollBtn', aim ? '↩️<small>رجوع</small>' : hold ? '💨<small>دفّه</small>' : player.state === 'hang' && player.edgeHang ? '🌀<small>—</small>' : player.state === 'hang' ? '⬇️<small>نزول</small>' : '🌀<small>تدحرج</small>');
+  const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();
+  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : lab('sword', 'ضرب'));
+  setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
+  setBtn('actBtn', aim ? lab(stealth.weapon === 'pistol' ? 'sniper' : 'pistol', stealth.weapon === 'pistol' ? 'قنّاصة' : 'مسدس') : hold ? lab('wave', 'ارمِ') : player.state === 'hug' ? lab('knock', 'طق') : hang ? lab('none', '—') : lab('hand', 'شيل'));
+  setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
+  setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
+  const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
 function canGrab() {
   for (const e of enemies.list) {
@@ -648,6 +650,7 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { if (mouse && mouse.moved < 8 && performance.now() - mouse.t < 300 && e.button === 0) vin.atk++; mouse = null; return; } touchUp(e); });
 canvas.addEventListener('pointercancel', touchUp);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+try { $('#zIn').innerHTML = icon('zin'); $('#zOut').innerHTML = icon('zout'); $('#zBreath').innerHTML = icon('breath') + '<small>مطوّل</small>'; } catch (e) {}
 document.querySelectorAll('#radio .rcmd').forEach((b) => (b.onclick = () => stealth.command(b.dataset.cmd))); $('#rClose').onclick = () => stealth.closeRadio();
 // قرص بإصبعين على الشاشة وقت التصويب = تكبير/تصغير
 { let pd = 0; const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -896,7 +899,7 @@ function worldLogic(dt) {
   }
   // prompt
   let label = '';
-  { const gl = stealth.gadgetLabel(), spb = $('#spBtn'); if (spb) { const want = gl || (G.upg.spin ? '✴️<small>دوّامة</small>' : null); const html = gl ? gl.split(' ')[0] + '<small>' + gl.split(' ').slice(1).join(' ') + '</small>' : want; if (spb.dataset.h !== String(html)) { spb.dataset.h = String(html); if (html) spb.innerHTML = html; spb.style.display = html ? '' : 'none'; } } }
+  { const spb = $('#spBtn'), want = !!(stealth.gadgetLabel() || G.upg.spin); if (spb && spb.dataset.v !== String(want)) { spb.dataset.v = String(want); spb.style.display = want ? '' : 'none'; } }
   touchLabels();
   const edgeN = stealth.on && stealth.seaEdge();
   if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
