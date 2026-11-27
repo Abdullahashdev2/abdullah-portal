@@ -378,6 +378,14 @@ function autoTV() {
   let pref = null; try { pref = localStorage.getItem('nw_tv'); } catch (e) {}
   if (false && !LITE && pref !== '0') { LITE = true; applyQuality(1); setTimeout(() => say('📺 فعّلت «وضع التلفزيون» عشان تكون اللعبة سلسة على الشاشة — تقدر تطفيه من ⏸'), 1500); }
 }
+let MIRROR = false; try { MIRROR = localStorage.getItem('nw_mirror') === '1'; } catch (e) {}
+function applyMirror() {
+  document.body.classList.toggle('mirror', MIRROR);
+  $('#pMirror').textContent = '🪞 وضع المرآة (لما تبث شاشة الجوال للتلفزيون): ' + (MIRROR ? 'شغّال ✅' : 'طافي');
+  if (MIRROR) { if (LITE) { LITE = false; try { localStorage.setItem('nw_tv', '0'); } catch (e) {} } try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }
+}
+applyMirror();
+$('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
 const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
