@@ -184,11 +184,13 @@
     $("#viewerTitle").textContent = a.name;
     $("#frame").src = a.url;
     $("#viewer").hidden = false;
+    window.PortalCast && window.PortalCast.setApp(a);
     document.body.style.overflow = "hidden";
     history.pushState({ viewer: true }, "");
   }
   function closeViewer() {
     $("#viewer").hidden = true; $("#frame").src = "about:blank";
+    window.PortalCast && window.PortalCast.clearApp();
     document.body.style.overflow = "";
   }
   $("#closeViewer").onclick = () => history.back();

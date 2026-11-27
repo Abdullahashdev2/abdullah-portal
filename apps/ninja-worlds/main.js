@@ -6,7 +6,7 @@ import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
-import { remote, openTV, closeTV, sendTV } from './tv.js';
+import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
 const V = THREE.Vector3, $ = (s) => document.querySelector(s);
 const angDiff = (a, b) => { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
@@ -262,7 +262,8 @@ const tvHooks = {
   onConnect: () => { document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
   onDisconnect: () => { $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
 };
-const openBig = () => { sfx.init(); openTV(tvHooks); };
+const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
+attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: '✋ شيل' }].concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
 $('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
 $('#tvClose').onclick = () => closeTV();

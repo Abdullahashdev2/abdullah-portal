@@ -48,4 +48,12 @@ function onData(d) {
   }
   if (d.dx || d.dy) hooks.look(clamp(+d.dx || 0, -400, 400), clamp(+d.dy || 0, -400, 400));
 }
-export function sendTV(o) { if (conn && conn.open) try { conn.send(o); } catch (e) {} }
+const portalCast = () => { try { return window.parent !== window && window.parent.PortalCast ? window.parent.PortalCast : null; } catch (e) { return null; } };
+export function sendTV(o) { if (conn && conn.open) { try { conn.send(o); } catch (e) {} return; } const pc = portalCast(); if (pc && remote.on) pc.send(o); }
+// inside the family portal: the portal owns the phone connection and forwards raw controller packets here
+export function attachPortal(h, layout) {
+  if (!portalCast()) return;
+  Object.defineProperty(window, '__castLayout', { configurable: true, get: layout });
+  window.__castInput = (d) => { if (!remote.on) { remote.on = true; last = {}; hooks = h; h.onConnect(); } hooks = h; onData({ ...d, j: !!(d.h && d.h.jump), r: !!(d.h && d.h.roll) }); };
+  window.__castLeave = () => { remote.on = false; remote.mx = remote.my = 0; remote.jumpH = remote.rollH = false; h.onDisconnect(); };
+}

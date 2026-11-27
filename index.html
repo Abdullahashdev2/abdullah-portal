@@ -19,6 +19,7 @@
     <div class="hero-top">
       <div class="logo">🏡</div>
       <div class="top-actions">
+        <button class="icon-btn cast-btn" id="castBtn" aria-label="الشاشة الكبيرة" title="الشاشة الكبيرة — الجوال يد تحكم">📺</button>
         <button class="icon-btn bell-btn" id="newsBtn" aria-label="الإشعارات" title="الإشعارات">🔔<span class="dot" id="newsDot" hidden></span></button>
         <button class="icon-btn" id="lbBtn" aria-label="المتصدرين" title="المتصدرين" hidden>🏆</button>
         <button class="icon-btn account-btn" id="accountBtn" aria-label="حسابي" title="حسابي" hidden>👤</button>
@@ -48,6 +49,7 @@
     <div class="viewer-bar">
       <button class="icon-btn" id="closeViewer" aria-label="رجوع">→</button>
       <strong id="viewerTitle"></strong>
+      <button class="icon-btn cast-btn" id="castViewerBtn" aria-label="الشاشة الكبيرة" title="الجوال يد تحكم">📺</button>
       <button class="icon-btn" id="fullViewer" aria-label="ملء الشاشة">⛶</button>
     </div>
     <iframe id="frame" title="التطبيق" allow="fullscreen; autoplay; gamepad; geolocation; screen-wake-lock" referrerpolicy="no-referrer"></iframe>
@@ -148,7 +150,20 @@
     <button class="link-btn" data-close type="button">إغلاق</button>
   </aside>
 
+  <div class="cast-sheet" id="castSheet" hidden>
+    <div class="cast-card">
+      <h2>📺 الشاشة الكبيرة</h2>
+      <p>الجهاز هذا يعرض الألعاب بأعلى جودة — والجوال يصير يد تحكم لكل الألعاب 🎮</p>
+      <div id="castQr"></div>
+      <div class="cast-lbl">الكود</div><div id="castCode">····</div>
+      <div id="castUrl"></div>
+      <div id="castStatus"></div>
+      <div class="cast-tip">💡 خلّ الجهازين على نفس الواي فاي • بالجوال: 🧭 قوائم = تتنقّل بين الأزرار، 🏠 = رجوع للبوابة</div>
+      <button class="cast-close" id="castClose">إغلاق</button>
+    </div>
+  </div>
   <script src="app.js"></script>
+  <script src="cast.js"></script>
   <script type="module" src="auth.js"></script>
 </body>
 </html>

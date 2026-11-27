@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b16">
+<title>يد التحكم — برامج وتطبيقات عبدالله</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#2a1e4b,#07070f 70%);color:#fff;font-family:system-ui,"Segoe UI",Tahoma,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#join{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;text-align:center;z-index:9;background:inherit}
+#join h1{margin:0;font-size:26px}#join p{margin:0;color:#cbd5e1;line-height:1.7}
+#code{font-size:40px;letter-spacing:.3em;text-align:center;width:220px;padding:10px;border-radius:16px;border:2px solid rgba(125,211,252,.5);background:rgba(255,255,255,.06);color:#fff;direction:ltr}
+.btnMain{border:0;border-radius:999px;padding:14px 40px;font-size:20px;font-weight:900;background:linear-gradient(180deg,#ffe08a,#f59e0b);color:#1a1200}
+#msg{min-height:22px;color:#fca5a5;font-weight:700}
+#top{position:fixed;top:calc(8px + env(safe-area-inset-top));left:12px;right:12px;display:flex;gap:8px;align-items:center;z-index:6}
+#title{font-weight:900;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw}
+.pill{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:5px 11px;font-weight:800;font-size:13px}
+.tb{height:40px;min-width:44px;padding:0 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:15px;font-weight:800}
+.tb.on{background:rgba(255,209,102,.25);border-color:#ffd166}
+#sp{flex:1}
+#hearts{color:#ff4d6d}
+#look{position:fixed;inset:0;z-index:1}
+#stickZone{position:fixed;left:0;top:56px;bottom:0;width:45%;z-index:2}
+#base{position:fixed;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:radial-gradient(circle,rgba(255,255,255,.08),rgba(255,255,255,.02));display:none;pointer-events:none;z-index:3}
+#knob{position:absolute;left:50%;top:50%;width:66px;height:66px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.65);transform:translate(-50%,-50%)}
+#hint{position:fixed;left:5%;bottom:14%;color:rgba(255,255,255,.3);font-size:13px;z-index:2;pointer-events:none}
+#pad{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));width:310px;height:250px;z-index:4}
+#pad button{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(15,23,42,.6);color:#fff;font-size:26px;display:grid;place-items:center;touch-action:none;line-height:1}
+#pad button small{position:absolute;bottom:-18px;font-size:11px;font-weight:800;color:rgba(255,255,255,.75);white-space:nowrap}
+#pad button.down{transform:scale(.9);background:rgba(125,211,252,.4)}
+#state{position:fixed;bottom:calc(6px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:12px;color:#94a3b8;z-index:3;pointer-events:none}
+#rot{display:none;position:fixed;inset:0;z-index:10;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
+@media (orientation:portrait){#rot.need{display:flex}}
+</style>
+</head>
+<body>
+<div id="join">
+  <div style="font-size:54px">🎮</div>
+  <h1>يد التحكم</h1>
+  <p>على الشاشة الكبيرة افتح البوابة واضغط 📺<br>واكتب الكود اللي يطلع لك:</p>
+  <input id="code" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+  <button class="btnMain" id="go">اتصل ▶</button>
+  <div id="msg"></div>
+</div>
+<div id="look"></div>
+<div id="stickZone"></div>
+<div id="base"><div id="knob"></div></div>
+<div id="hint">← العصا هنا</div>
+<div id="top">
+  <button class="tb" id="homeB" title="رجوع للبوابة">🏠</button>
+  <span id="title"></span>
+  <span class="pill" id="hearts" hidden></span><span class="pill" id="shards" hidden></span>
+  <span id="sp"></span>
+  <button class="tb" id="menuB">🧭 قوائم</button>
+  <button class="tb" id="pauseB" hidden>⏸</button>
+</div>
+<div id="pad"></div>
+<div id="state">غير متصل</div>
+<div id="rot">📱↔️<br>دوّر الجوال بالعرض</div>
+<script src="lib/peerjs.min.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+let peer = null, conn = null, layout = { buttons: [] }, menu = false;
+const st = { x: 0, y: 0, c: {}, h: {}, dx: 0, dy: 0 };
+const q = new URLSearchParams(location.search).get('c'); if (q) $('#code').value = q.replace(/\D/g, '').slice(0, 4);
+const msg = (t) => { $('#msg').textContent = t; };
+async function goFull() { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch (e) {} try { await screen.orientation.lock('landscape'); } catch (e) {} wake(); }
+async function wake() { try { await navigator.wakeLock.request('screen'); } catch (e) {} }
+function press(id) { st.c[id] = (st.c[id] || 0) + 1; send(true); }
+
+/* ---------- buttons are drawn from what the big screen says the current game needs ---------- */
+const SLOTS = [{ r: 0, b: 6, s: 104 }, { r: 120, b: 0, s: 86 }, { r: 134, b: 110, s: 70 }, { r: 18, b: 128, s: 72 }, { r: 222, b: 70, s: 66 }, { r: 226, b: 160, s: 60 }];
+const COLORS = ['rgba(125,211,252,.85)', 'rgba(255,120,120,.85)', 'rgba(255,255,255,.4)', 'rgba(255,209,102,.8)', 'rgba(167,139,250,.85)', 'rgba(52,211,153,.8)'];
+function render() {
+  const pad = $('#pad'); pad.innerHTML = '';
+  const menuOnly = !!layout.menuOnly, M = menu || menuOnly;
+  $('#title').textContent = layout.title || '';
+  $('#menuB').hidden = menuOnly; $('#menuB').classList.toggle('on', menu); $('#menuB').textContent = menu ? '🎮 رجوع للعب' : '🧭 قوائم';
+  $('#pauseB').hidden = !layout.pause || M; $('#homeB').hidden = !layout.title || menuOnly && !layout.native && layout.title === 'برامج وتطبيقات عبدالله';
+  $('#look').style.pointerEvents = layout.look && !M ? 'auto' : 'none';
+  $('#hint').textContent = M ? '← العصا تتنقّل بين الأزرار على الشاشة' : layout.look ? '← العصا هنا • اسحب بالنص للكاميرا' : '← العصا هنا';
+  const list = M ? [{ id: '__ok', label: '✅ اختيار' }] : (layout.buttons || []);
+  list.slice(0, 6).forEach((b, i) => {
+    const sl = SLOTS[i], el = document.createElement('button'), parts = String(b.label).split(' ');
+    const icon = parts.length > 1 && /\p{Extended_Pictographic}/u.test(parts[0]) ? parts[0] : (b.icon || parts[0].slice(0, 2));
+    const name = parts.length > 1 ? parts.slice(1).join(' ') : b.label;
+    el.innerHTML = `<span></span><small></small>`; el.firstChild.textContent = icon; el.lastChild.textContent = name;
+    Object.assign(el.style, { width: sl.s + 'px', height: sl.s + 'px', right: sl.r + 'px', bottom: sl.b + 'px', borderColor: COLORS[i] });
+    if (i === 0) el.style.fontSize = '36px';
+    const id = b.id;
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} st.c[id] = (st.c[id] || 0) + 1; st.h[id] = true; el.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
+    const up = () => { st.h[id] = false; el.classList.remove('down'); send(true); };
+    el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('lostpointercapture', up);
+    pad.appendChild(el);
+  });
+}
+$('#menuB').onclick = () => { menu = !menu; st.h = {}; render(); send(true); };
+$('#homeB').onclick = () => { press('__back'); menu = false; };
+$('#pauseB').onclick = () => press('pause');
+
+function connect() {
+  const code = $('#code').value.replace(/\D/g, ''); if (code.length !== 4) return msg('الكود ٤ أرقام');
+  msg(''); $('#go').disabled = true; $('#go').textContent = '⏳ جاري الاتصال…'; goFull();
+  if (peer) try { peer.destroy(); } catch (e) {}
+  peer = new Peer({ debug: 0 });
+  peer.on('open', () => {
+    conn = peer.connect('abdcast-' + code, { reliable: false, serialization: 'json' });
+    const to = setTimeout(() => { if (!conn || !conn.open) fail('ما قدرت أوصل — تأكد من الكود وإن الجهازين على نفس الواي فاي'); }, 12000);
+    conn.on('open', () => { clearTimeout(to); $('#join').style.display = 'none'; $('#rot').classList.add('need'); $('#state').textContent = '✅ متصل — ' + code; if (navigator.vibrate) navigator.vibrate(40); render(); });
+    conn.on('data', (d) => {
+      if (!d) return;
+      if (d.layout) { layout = d.layout; if (layout.native || !layout.menuOnly) menu = false; $('#hearts').hidden = $('#shards').hidden = true; render(); }
+      if (d.vib && navigator.vibrate) navigator.vibrate(d.vib);
+      if (d.hp != null) { $('#hearts').hidden = false; $('#hearts').textContent = '❤'.repeat(Math.max(0, d.hp)) + '♡'.repeat(Math.max(0, (d.max || 5) - d.hp)); }
+      if (d.sh) { $('#shards').hidden = false; $('#shards').textContent = d.sh; }
+    });
+    conn.on('close', () => { $('#state').textContent = '⚠️ انقطع الاتصال'; $('#join').style.display = ''; $('#go').disabled = false; $('#go').textContent = 'اتصل مرة ثانية ▶'; });
+  });
+  peer.on('error', (e) => fail(e.type === 'peer-unavailable' ? 'الكود غلط أو البوابة مو مفتوحة على الشاشة الكبيرة' : 'صار خطأ بالاتصال (' + e.type + ')'));
+}
+function fail(t) { msg(t); $('#go').disabled = false; $('#go').textContent = 'اتصل ▶'; }
+$('#go').onclick = connect;
+$('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect(); });
+
+/* ---------- stick + camera ---------- */
+let joy = null, look = null; const base = $('#base'), knob = $('#knob');
+$('#stickZone').addEventListener('pointerdown', (e) => { joy = { id: e.pointerId, x: e.clientX, y: e.clientY }; base.style.left = e.clientX + 'px'; base.style.top = e.clientY + 'px'; base.style.display = 'block'; e.target.setPointerCapture(e.pointerId); });
+$('#stickZone').addEventListener('pointermove', (e) => { if (!joy || e.pointerId !== joy.id) return; let dx = e.clientX - joy.x, dy = e.clientY - joy.y; const l = Math.hypot(dx, dy), m = 62; if (l > m) { dx = dx / l * m; dy = dy / l * m; } st.x = dx / m; st.y = -dy / m; knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; });
+const endJoy = (e) => { if (joy && e.pointerId === joy.id) { joy = null; st.x = st.y = 0; base.style.display = 'none'; knob.style.transform = 'translate(-50%,-50%)'; } };
+$('#stickZone').addEventListener('pointerup', endJoy); $('#stickZone').addEventListener('pointercancel', endJoy);
+$('#look').addEventListener('pointerdown', (e) => { look = { id: e.pointerId, x: e.clientX, y: e.clientY }; e.target.setPointerCapture(e.pointerId); });
+$('#look').addEventListener('pointermove', (e) => { if (!look || e.pointerId !== look.id) return; st.dx += (e.clientX - look.x) * 1.6; st.dy += (e.clientY - look.y) * 1.6; look.x = e.clientX; look.y = e.clientY; });
+const endLook = (e) => { if (look && e.pointerId === look.id) look = null; };
+$('#look').addEventListener('pointerup', endLook); $('#look').addEventListener('pointercancel', endLook);
+
+/* ---------- stream (press counters are cumulative, so a dropped packet never loses a press) ---------- */
+let lastSend = 0, lastStr = '';
+function send(force) {
+  if (!conn || !conn.open) return;
+  const o = { x: +st.x.toFixed(3), y: +st.y.toFixed(3), c: st.c, h: st.h, m: menu, dx: Math.round(st.dx), dy: Math.round(st.dy) };
+  const s = JSON.stringify(o), now = performance.now();
+  if (!force && s === lastStr && now - lastSend < 120) return;
+  try { conn.send(o); st.dx = 0; st.dy = 0; lastStr = s; lastSend = now; } catch (e) {}
+}
+(function loop() { send(false); requestAnimationFrame(loop); })();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+</script>
+</body>
+</html>
