@@ -62,6 +62,7 @@ export class Enemies {
     }
     if (boss) { Object.assign(e, { boss: true, hp: 40, maxHp: 40, reach: 4.4, speed: 2.4, summonT: 8 }); }
     if (rise) { m.inner.position.y = -2.2; this.g.fx.emit(new V(def.x, def.y + 0.3, def.z), { color: 0x8b5cf6, count: 40, speed: 4, up: 1, life: 0.9, size: 0.4, grav: -1 }); }
+    if (this.g.liteify) { this.g.liteify(m.g); if (m.bodyM) m.bodyM = this.g.liteMat(m.bodyM); }
     this.list.push(e); return e;
   }
   alive(group) { return this.list.filter((e) => e.alive && (!group || e.group === group)).length; }

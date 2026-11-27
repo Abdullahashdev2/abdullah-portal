@@ -41,6 +41,20 @@ const sunDir = new V(), lightDir = new V();
 const BREATH = 12; let breath = 12, normalFog = null; const waterFog = new THREE.FogExp2(0x0b5f7a, 0.06);
 /* ---------- lightweight bloom (HDR glow) ---------- */
 let post = null, HQ = !LOW, bloomSamples = 2;
+/* ---------- 📺 TV mode: built for weak smart-TV browsers (render small + upscale, cheap materials, no sky/shadows/glow, 30 fps lock) ---------- */
+const TVUA = /SMART-?TV|SmartTV|Tizen|Web0S|webOS|NetCast|BRAVIA|HbbTV|Android ?TV|AFT[A-Z]|CrKey|GoogleTV|VIDAA|Hisense|TV Safari|Opera TV|Viera|AQUOS|Philips|Roku/i.test(navigator.userAgent);
+let LITE = TVUA; try { const v = localStorage.getItem('nw_tv'); if (v != null) LITE = v === '1'; } catch (e) {}
+const LITE_W = [960, 800, 680, 560, 440]; let liteLvl = 1, lock30 = false, skipFrame = false;
+const liteCache = new Map();
+function liteMat(m) {
+  if (!m || !m.isMeshStandardMaterial) return m; let l = liteCache.get(m); if (l) return l;
+  l = new THREE.MeshLambertMaterial({ color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent, opacity: m.opacity, side: m.side, flatShading: m.flatShading, depthWrite: m.depthWrite });
+  liteCache.set(m, l); return l;
+}
+function liteify(root) {
+  if (!LITE) return;
+  root.traverse((o) => { if (o.userData && o.userData.far) o.visible = false; if (o.isMesh && o.material) { o.material = Array.isArray(o.material) ? o.material.map(liteMat) : liteMat(o.material); o.castShadow = o.receiveShadow = false; } if (o.isPointLight) o.visible = false; });
+}
 /* ---------- adaptive quality: keeps ~60 fps at the sharpest settings the device can hold ---------- */
 const QL = [
   { name: 'فائقة', dpr: 2.0, bloom: true, msaa: 4, shadow: 2048, soft: true, lights: true },
@@ -51,7 +65,18 @@ const QL = [
 ];
 let qMode = 'auto', qLevel = LOW ? 2 : 1, qChanged = 0, qBlock = {}, fpsAvg = 60, ftAcc = 0, ftN = 0;
 try { const m = localStorage.getItem('nw_q'); if (m != null && m !== 'auto') { qMode = +m; qLevel = +m; } } catch (e) {}
+function applyLite() {
+  document.body.classList.toggle('lite', LITE);
+  if (!LITE) return;
+  HQ = false; post = null; sun.castShadow = false; renderer.shadowMap.enabled = false; sky.visible = false; scene.environment = null;
+  camera.far = 260; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio, LITE_W[liteLvl] / Math.max(320, innerWidth)));
+  if (level) liteify(level.group); if (hero) liteify(hero.root); if (scarf) liteify(scarf.mesh); if (npc) liteify(npc.root);
+  for (const e of (enemies && enemies.list) || []) { liteify(e.m.g); if (e.m.bodyM) e.m.bodyM = liteMat(e.m.bodyM); }
+  qLabel();
+}
 function applyQuality(i) {
+  if (LITE) { liteLvl = Math.max(0, Math.min(LITE_W.length - 1, i)); applyLite(); qChanged = performance.now(); resize(); return; }
   qLevel = Math.max(0, Math.min(QL.length - 1, i)); const q = QL[qLevel];
   renderer.setPixelRatio(Math.min(devicePixelRatio, q.dpr)); HQ = q.bloom; bloomSamples = q.msaa;
   const wantShadow = q.shadow > 0;
@@ -64,13 +89,20 @@ function applyQuality(i) {
   if (level) { level.useLights = q.lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = q.lights; }); }
   qChanged = performance.now(); resize(); qLabel();
 }
-function qLabel() { const b = document.getElementById('pHQ'); if (b) b.textContent = `🎮 الجودة: ${qMode === 'auto' ? 'تلقائي (' + QL[qLevel].name + ')' : QL[qLevel].name} · ${Math.round(fpsAvg)} إطار`; }
+function qLabel() { const t = document.getElementById('pTVmode'); if (t) t.textContent = LITE ? `📺 وضع التلفزيون: شغّال (${LITE_W[liteLvl]}p${lock30 ? ' · ٣٠ إطار' : ''})` : '📺 وضع التلفزيون (للشاشات الضعيفة): طافي'; const b = document.getElementById('pHQ'); if (LITE && b) { b.textContent = `🎮 ${Math.round(fpsAvg)} إطار`; return; } if (b) b.textContent = `🎮 الجودة: ${qMode === 'auto' ? 'تلقائي (' + QL[qLevel].name + ')' : QL[qLevel].name} · ${Math.round(fpsAvg)} إطار`; }
 function qTick(dt) {
   ftAcc += dt; ftN++;
   if (ftAcc < 1.2) return;
   fpsAvg = ftN / ftAcc; ftAcc = 0; ftN = 0;
   if (qMode !== 'auto' || !started || paused || document.hidden) return;
   const since = performance.now() - qChanged;
+  if (LITE) {
+    // prefer a steady 60 at a lower internal resolution; if even that fails, lock to a steady 30
+    if (since < 2500) return;
+    if (!lock30) { if (fpsAvg < 50) { if (liteLvl < 3) applyQuality(liteLvl + 1); else { lock30 = true; qLabel(); } } else if (fpsAvg > 59 && liteLvl > 0 && since > 9000) applyQuality(liteLvl - 1); }
+    else if (fpsAvg < 55 && liteLvl < LITE_W.length - 1) applyQuality(liteLvl + 1);
+    return;
+  }
   if (fpsAvg < 50 && qLevel < QL.length - 1 && since > 2500) { qBlock[qLevel - 1] = performance.now(); applyQuality(qLevel + 1); }
   else if (fpsAvg > 58 && qLevel > 0 && since > 7000 && !(performance.now() - (qBlock[qLevel - 1] || -1e9) < 30000)) applyQuality(qLevel - 1);
 }
@@ -130,6 +162,7 @@ const G = {
   onDeath: () => respawn('death'),
   onEnemyKilled: (e) => { G.hitstop(0.08); addCoins(e.boss ? 150 : e.big ? 20 : e.archer ? 8 : e.guard ? 6 : 5, e.pos); if (Math.random() < (player.hp <= 1 ? 0.45 : 0.18)) enemies.dropHeart(e.pos); },
   dropItem: (forced) => dropItem(forced),
+  liteify: (r) => liteify(r), liteMat: (m) => liteMat(m),
   upg: {},
   waterAt: (p) => { if (!level || !level.waters) return null; for (const W of level.waters) if (p.x > W.x0 && p.x < W.x1 && p.z > W.z0 && p.z < W.z1 && p.y > W.y0 - 1 && p.y < W.y1 + 0.5) return W; return null; },
   splash: (p) => { sfx.noise(0.35, 900, 0.6, 0.22, 'bandpass', 0, 300); sparks.emit(p, { color: 0xd8f6ff, count: 26, speed: 4, up: 1.5, life: 0.6, size: 0.25, grav: 9 }); },
@@ -196,7 +229,7 @@ function applyAtmo(c) {
   renderer.toneMappingExposure = c.exposure; scene.fog = new THREE.FogExp2(c.fog[0], c.fog[1]);
   sun.color.set(c.sun[0]); sun.intensity = c.sun[1]; hemi.color.set(c.hemi[0]); hemi.groundColor.set(c.hemi[1]); hemi.intensity = c.hemi[2];
   const es = new THREE.Scene(), s2 = new Sky(); s2.scale.setScalar(1000); for (const k in u) if (s2.material.uniforms[k]) s2.material.uniforms[k].value = u[k].value.clone ? u[k].value.clone() : u[k].value;
-  es.add(s2); if (envRT) envRT.dispose(); envRT = pmrem.fromScene(es, 0.02); scene.environment = envRT.texture; s2.geometry.dispose(); s2.material.dispose();
+  es.add(s2); if (envRT) envRT.dispose(); envRT = pmrem.fromScene(es, 0.02); scene.environment = LITE ? null : envRT.texture; if (LITE) { sky.visible = false; scene.background = new THREE.Color(c.fog[0]); } s2.geometry.dispose(); s2.material.dispose();
 }
 let checkpoint = null, cfg = null;
 function loadWorld(id, from) {
@@ -217,7 +250,7 @@ function loadWorld(id, from) {
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
-  level.buildGrid(); level.keys = {}; freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
+  level.buildGrid(); level.keys = {}; liteify(level.group); freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
@@ -292,9 +325,14 @@ const tvHooks = {
     vin[k] = (vin[k] || 0) + n;
   },
   look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
-  onConnect: () => { window.KeepAwake && window.KeepAwake.on(); document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
+  onConnect: () => { window.KeepAwake && window.KeepAwake.on(); autoTV(); document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
   onDisconnect: () => { window.KeepAwake && window.KeepAwake.off(); $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
 };
+function autoTV() {
+  let pref = null; try { pref = localStorage.getItem('nw_tv'); } catch (e) {}
+  if (!LITE && pref !== '0') { LITE = true; applyQuality(1); setTimeout(() => say('📺 فعّلت «وضع التلفزيون» عشان تكون اللعبة سلسة على الشاشة — تقدر تطفيه من ⏸'), 1500); }
+}
+$('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
 attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -609,7 +647,7 @@ function animateNpc(dt) {
 }
 
 /* ---------------- main loop ---------------- */
-let last = performance.now(), acc = 0, manual = false, tvSendT = 0; const STEP = 1 / 120;
+let last = performance.now(), acc = 0, manual = false, tvSendT = 0; const STEP = LITE ? 1 / 60 : 1 / 120;
 function simulate(dt) {
   if (stopT > 0) { stopT -= dt; dt *= 0.06; }
   tNow += dt;
@@ -647,6 +685,7 @@ function frame(now) {
   if (remote.on && (tvSendT -= dt) <= 0) { tvSendT = 0.35; sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); }
   sun.position.copy(player.pos).addScaledVector(lightDir, 60); sun.target.position.copy(player.pos);
   sky.position.copy(camera.position);
+  if (LITE && lock30) { skipFrame = !skipFrame; if (skipFrame) return; }
   // underwater look
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
   scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw);
@@ -656,7 +695,7 @@ requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
 window.__G = {
-  get player() { return player; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
+  get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
   manual: (v) => { manual = v; },

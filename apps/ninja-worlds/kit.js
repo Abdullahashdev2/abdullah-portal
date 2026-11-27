@@ -195,14 +195,14 @@ export function makeKit(L) {
     const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.2, r = r0 + Math.random() * 120, hh = hmin + Math.random() * (hmax - hmin);
-      const c = new THREE.Mesh(new THREE.ConeGeometry(hh * 0.7, hh, 7, 3), mm); c.position.set(Math.cos(a) * r, y + hh / 2, Math.sin(a) * r + 80); c.rotation.y = Math.random() * 3; L.add(c);
+      const c = new THREE.Mesh(new THREE.ConeGeometry(hh * 0.7, hh, 7, 3), mm); c.userData.far = true; c.position.set(Math.cos(a) * r, y + hh / 2, Math.sin(a) * r + 80); c.rotation.y = Math.random() * 3; L.add(c);
     }
   };
   K.clouds = ({ y = -30, n = 70, color = 0xffffff, spread = 340, opacity = 0.85 }) => {
     const tex = cloudTex();
     for (let i = 0; i < n; i++) {
       const s = new THREE.Sprite(own(new THREE.SpriteMaterial({ map: tex, color, transparent: true, opacity, depthWrite: false })));
-      s.position.set((Math.random() - 0.5) * spread, y + Math.random() * 10, (Math.random() - 0.5) * spread + 70); s.scale.setScalar(50 + Math.random() * 70); L.add(s);
+      s.position.set((Math.random() - 0.5) * spread, y + Math.random() * 10, (Math.random() - 0.5) * spread + 70); s.scale.setScalar(50 + Math.random() * 70); s.userData.far = true; L.add(s);
     }
   };
   K.stars = (n = 1800) => {
@@ -217,7 +217,7 @@ export function makeKit(L) {
       g.position.set(center.x + Math.cos(a) * rr, center.y - 10 + Math.random() * 40, center.z + Math.sin(a) * rr);
       const rk = new THREE.Mesh(rockUnder(w, w, w * 0.9), own(new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }))); g.add(rk);
       const top = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.55, w * 0.6, 0.5, 9), own(new THREE.MeshStandardMaterial({ color: 0x6aa85a, roughness: 1, flatShading: true }))); top.position.y = 0.2; g.add(top);
-      L.add(g); g.userData.dyn = true; const ph = Math.random() * 6, y0 = g.position.y; L.anim.push((dt, t) => { g.position.y = y0 + Math.sin(t * 0.4 + ph) * 1.2; });
+      L.add(g); g.userData.dyn = true; g.userData.far = true; const ph = Math.random() * 6, y0 = g.position.y; L.anim.push((dt, t) => { g.position.y = y0 + Math.sin(t * 0.4 + ph) * 1.2; });
     }
   };
 
@@ -369,7 +369,7 @@ export function makeKit(L) {
   };
   K.dunes = ({ n = 26, color = 0xe0b87a, y = -30 }) => {
     const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 1 }));
-    for (let i = 0; i < n; i++) { const r = 40 + Math.random() * 60, m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); m.scale.y = 0.18 + Math.random() * 0.12; const a = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 260; m.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr + 60); m.receiveShadow = true; L.add(m); }
+    for (let i = 0; i < n; i++) { const r = 40 + Math.random() * 60, m = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mm); m.scale.y = 0.18 + Math.random() * 0.12; const a = Math.random() * Math.PI * 2, rr = 60 + Math.random() * 260; m.position.set(Math.cos(a) * rr, y, Math.sin(a) * rr + 60); m.receiveShadow = true; m.userData.far = true; L.add(m); }
   };
   /* -------- water, lava, stealth -------- */
   K.water = ({ x0, x1, z0, z1, y0, y1, color = 0x1aa3c4 }) => {

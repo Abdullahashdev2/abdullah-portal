@@ -98,6 +98,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
 #scope{position:fixed;inset:0;z-index:6;display:none;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 32vmin,rgba(0,0,0,.96) 32.5vmin)}#scope.on{display:block}#scope:before,#scope:after{content:"";position:absolute;background:rgba(0,0,0,.85)}#scope:before{left:50%;top:18%;bottom:18%;width:2px}#scope:after{top:50%;left:22%;right:22%;height:2px}
 #aimHint{position:fixed;z-index:7;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:13px;font-weight:800;background:rgba(0,0,0,.45);padding:5px 12px;border-radius:999px;display:none;white-space:nowrap}#aimHint.on{display:block}@media (pointer:coarse){#aimHint{bottom:auto;top:calc(110px + env(safe-area-inset-top))}}
 #aimBtn{width:58px;height:58px;right:190px;bottom:150px;border-color:rgba(74,222,128,.8);display:none}body.shipmode #aimBtn{display:grid}
+body.lite *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}body.lite .pill,body.lite #toast,body.lite .btns button{background:rgba(10,12,28,.88)!important}
 #help{display:none;text-align:right;font-size:14px;line-height:1.9;color:#cbd5e1;margin-top:6px}#help.on{display:block}
 #doneStats{display:flex;gap:10px;justify-content:center;margin:10px 0}
 #doneStats div{flex:1;background:rgba(255,255,255,.06);border-radius:14px;padding:10px 4px}#doneStats b{display:block;font-size:20px}#doneStats span{font-size:12px;color:#94a3b8}
@@ -169,6 +170,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
   <button id="pSkin">🧍 شخصيتي ثلاثية الأبعاد (ملف GLB)</button>
   <button id="pSkinOff" hidden>↩️ رجوع للنينجا الأصلي</button>
   <input type="file" id="skinFile" accept=".glb,model/gltf-binary" hidden>
+  <button id="pTVmode">📺 وضع التلفزيون</button>
   <button id="pHQ">🎮 الجودة: تلقائي</button>
   <button id="pHelp">🎮 طريقة اللعب</button>
   <div id="help">
