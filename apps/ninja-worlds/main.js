@@ -340,7 +340,76 @@ function showDone() {
   $('#doneMsg').textContent = cfg.id === 'w6' ? '🏆 خلّصت العوالم الستة كلها — أنت بطل بوابات العوالم! ارجع جمّع اللي فاتك 💎' : n < cfg.shardTotal ? 'باقي شظايا مخبّية — تقدر ترجع لهالعالم وتدوّرها 👀' : 'جمعت كل الشظايا! أسطورة 🌟';
   $('#done').classList.add('on'); paused = true;
 }
-$('#doneBtn').onclick = () => { $('#done').classList.remove('on'); paused = false; fadeTo(() => loadWorld('hub', cfg.id)); };
+$('#doneBtn').onclick = () => { $('#done').classList.remove('on'); paused = false; goWorld('hub', cfg.id); };
+/* ---------- شاشة التحميل: رسمة للعالم + اسم + جملة تشويقية + شريط — بدل الشاشة السوداء ---------- */
+const WMETA = {
+  hub: { sub: 'مركز العوالم', tease: 'البوابات تنتظرك… أي عالم بتدخل اليوم؟', sky: ['#1e1b4b', '#7c3aed', '#f59e0b'] },
+  w1: { sub: 'العالم الأول', tease: 'مكتبة قديمة… بلّوراتها تهمس بأسرار الظلال', sky: ['#1c1917', '#b45309', '#fde68a'] },
+  w2: { sub: 'العالم الثاني', tease: 'جزر معلّقة فوق الغيوم… لا تطالع تحت', sky: ['#0c4a6e', '#38bdf8', '#e0f2fe'] },
+  w3: { sub: 'العالم الثالث', tease: 'حصن رملي ذهبي… والفخاخ مدفونة تحت الرمل', sky: ['#451a03', '#d97706', '#fde68a'] },
+  w4: { sub: 'العالم الرابع', tease: 'تحت الماء… نفسك محدود، والأعماق ما ترحم', sky: ['#082f49', '#0e7490', '#67e8f9'] },
+  w5: { sub: 'العالم الخامس', tease: 'قلعة الظلال… الحراس ما ينامون، والقمر يفضحك', sky: ['#020617', '#1e3a8a', '#a5b4fc'] },
+  w6: { sub: 'العالم الأخير', tease: 'قلب البركان… العملاق صاحي', sky: ['#1c0a04', '#9a3412', '#fb923c'] },
+  w7: { sub: 'عالم التسلّل', tease: 'ليلة عاصفة… سفينة مليانة حراس، وبوصلة الظل مخبّاة فوق الجسر', sky: ['#020617', '#1e293b', '#64748b'] },
+};
+const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة' };
+const TIPS = ['💡 الجدار المضيء بالرونات تقدر تركض عليه.', '💡 اضغط قفز قدّام الجدار = تطلع عليه.', '💡 في السفينة: ادفع للجدار = تلتصق فيه وتطل من الزاوية.', '💡 السفينة: اقفز جنب الحاجز = تتعلّق برّا والحراس ما يشوفونك.', '💡 امسك الحارس من الخلف ⚔️ وارمه في البحر عند الحافة 🌊.', '💡 القنّاصة: احبس نفسك 🫁 عشان يثبت المنظار.', '💡 الموجة الكبيرة = الحراس يتمسكون وما يشوفون — استغلها!', '💡 اخنق حارس = تاخذ الراديو، وتقلّد صوت القائد 📻.', '💡 الكوينز تشتري فيها ترقيات من 🛒 المتجر.', '💡 لا تطوّل وأنت ماسك الحارس — بيفلت ويعلن الإنذار!'];
+function drawLoaderArt(id) {
+  const cv = $('#ldArt'), dpr = Math.min(2, devicePixelRatio || 1), W = cv.width = Math.round(innerWidth * dpr), H = cv.height = Math.round(innerHeight * dpr), g = cv.getContext('2d');
+  const m = WMETA[id] || WMETA.hub, R = (a, b) => a + Math.random() * (b - a);
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, m.sky[0]); sky.addColorStop(0.65, m.sky[1]); sky.addColorStop(1, m.sky[2]); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  const hz = H * 0.66, sil = 'rgba(2,4,10,.92)';
+  if (id === 'w7') {
+    g.fillStyle = 'rgba(148,163,184,.25)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(R(0, W), R(0, H * 0.35), R(W * 0.15, W * 0.35), R(H * 0.05, H * 0.12), 0, 0, 7); g.fill(); }
+    // برق
+    g.strokeStyle = 'rgba(224,242,254,.95)'; g.lineWidth = 3 * dpr; g.shadowColor = '#bae6fd'; g.shadowBlur = 25 * dpr; g.beginPath(); let x = W * 0.72, y = 0; g.moveTo(x, y); while (y < hz * 0.8) { x += R(-40, 40) * dpr; y += R(25, 55) * dpr; g.lineTo(x, y); } g.stroke(); g.shadowBlur = 0;
+    // بحر
+    g.fillStyle = '#020617'; g.fillRect(0, hz, W, H - hz); g.strokeStyle = 'rgba(148,163,184,.35)'; g.lineWidth = 2 * dpr; for (let i = 0; i < 14; i++) { const yy = hz + i * (H - hz) / 14; g.beginPath(); for (let xx = 0; xx <= W; xx += 20 * dpr) g.lineTo(xx, yy + Math.sin(xx * 0.01 + i) * 6 * dpr); g.stroke(); }
+    // السفينة
+    const sx = W * 0.12, sw = W * 0.72, sy = hz - H * 0.02; g.fillStyle = sil; g.beginPath(); g.moveTo(sx, sy - H * 0.08); g.lineTo(sx + sw, sy - H * 0.08); g.lineTo(sx + sw + W * 0.08, sy - H * 0.13); g.lineTo(sx + sw - W * 0.02, sy + H * 0.03); g.lineTo(sx + W * 0.02, sy + H * 0.03); g.closePath(); g.fill();
+    for (let i = 0; i < 9; i++) { const cw = sw * 0.06, ch = H * (0.03 + (i % 3) * 0.025); g.fillRect(sx + sw * 0.08 + i * cw * 1.15, sy - H * 0.08 - ch, cw, ch); }
+    g.fillRect(sx + sw * 0.62, sy - H * 0.26, sw * 0.13, H * 0.18); g.fillRect(sx + sw * 0.66, sy - H * 0.33, sw * 0.03, H * 0.08);
+    g.fillStyle = '#fde68a'; for (let i = 0; i < 4; i++) g.fillRect(sx + sw * (0.635 + i * 0.03), sy - H * 0.22, sw * 0.018, H * 0.02);
+    // كشّاف
+    const lg = g.createLinearGradient(sx + sw * 0.7, sy - H * 0.3, W * 0.2, H * 0.05); lg.addColorStop(0, 'rgba(254,249,195,.45)'); lg.addColorStop(1, 'rgba(254,249,195,0)'); g.fillStyle = lg; g.beginPath(); g.moveTo(sx + sw * 0.7, sy - H * 0.3); g.lineTo(W * 0.05, H * 0.02); g.lineTo(W * 0.3, -H * 0.05); g.closePath(); g.fill();
+    // مطر
+    g.strokeStyle = 'rgba(203,213,225,.35)'; g.lineWidth = 1.2 * dpr; for (let i = 0; i < 260; i++) { const rx = R(0, W), ry = R(0, H); g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx - 6 * dpr, ry + 22 * dpr); g.stroke(); }
+  } else {
+    g.fillStyle = 'rgba(255,255,255,.7)'; if (id === 'w5' || id === 'hub') for (let i = 0; i < 120; i++) g.fillRect(R(0, W), R(0, hz * 0.8), 1.5 * dpr, 1.5 * dpr);
+    if (id === 'w5') { g.fillStyle = '#e0e7ff'; g.beginPath(); g.arc(W * 0.75, H * 0.22, H * 0.09, 0, 7); g.fill(); }
+    if (id === 'w4') { g.fillStyle = 'rgba(224,242,254,.35)'; for (let i = 0; i < 60; i++) { g.beginPath(); g.arc(R(0, W), R(0, H), R(2, 9) * dpr, 0, 7); g.fill(); } }
+    g.fillStyle = sil;
+    if (id === 'w6') { g.beginPath(); g.moveTo(W * 0.15, hz); g.lineTo(W * 0.42, H * 0.25); g.lineTo(W * 0.58, H * 0.25); g.lineTo(W * 0.85, hz); g.fill(); g.fillStyle = '#f97316'; g.shadowColor = '#fb923c'; g.shadowBlur = 40 * dpr; g.fillRect(W * 0.44, H * 0.24, W * 0.12, H * 0.02); g.shadowBlur = 0; g.fillStyle = sil; }
+    else if (id === 'w2') { for (let i = 0; i < 5; i++) { const cx = W * (0.12 + i * 0.19), cy = H * R(0.35, 0.6), r = W * R(0.05, 0.09); g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r * 1.3); g.fill(); g.fillRect(cx - r, cy - H * 0.015, r * 2, H * 0.015); } }
+    else { // أبراج/بوابات/أطلال
+      for (let i = 0; i < 9; i++) { const w = W * R(0.05, 0.11), h = H * R(0.12, 0.34), x = (i / 9) * W + R(-10, 10); g.fillRect(x, hz - h, w, h + 2); if (id === 'hub' && i % 2) { g.fillStyle = m.sky[2]; g.globalAlpha = 0.5; g.beginPath(); g.ellipse(x + w / 2, hz - h * 0.55, w * 0.32, h * 0.32, 0, 0, 7); g.fill(); g.globalAlpha = 1; g.fillStyle = sil; } }
+    }
+    g.fillRect(0, hz, W, H - hz);
+  }
+}
+let loading = false;
+function goWorld(id, from) {
+  if (loading) return; loading = true;
+  const L = $('#loader'), m = WMETA[id] || WMETA.hub, name = WORLD_NAMES[id] || '';
+  L.classList.remove('boot', 'out'); drawLoaderArt(id);
+  $('#ldSub').textContent = m.sub; $('#ldTitle').textContent = name; $('#ldTease').textContent = m.tease; $('#ldTip').textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+  const bar = (p, t) => { $('#ldFill').style.width = p + '%'; $('#ldPct').textContent = t; };
+  bar(8, 'تجهيز العالم…'); L.classList.add('on'); const t0 = performance.now();
+  const raf2 = (fn) => requestAnimationFrame(() => requestAnimationFrame(fn));
+  setTimeout(() => raf2(() => {
+    bar(35, 'بناء المكان…');
+    raf2(() => {
+      try { loadWorld(id, from); } catch (e) { console.error(e); }
+      bar(75, 'تجهيز الإضاءة والظلال…');
+      raf2(() => {
+        try { renderer.compile(scene, camera); } catch (e) {}
+        bar(100, 'جاهز!');
+        const wait = Math.max(0, 1100 - (performance.now() - t0));
+        setTimeout(() => { L.classList.add('out'); setTimeout(() => { L.classList.remove('on', 'out'); loading = false; }, 460); }, wait);
+      });
+    });
+  }), 60);
+}
 function fadeTo(fn) { const f = $('#fade'); f.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => f.classList.remove('on'), 80); }, 380); }
 function togglePause(v) { if (!started || $('#done').classList.contains('on')) return; paused = v ?? !paused; $('#pause').classList.toggle('on', paused); $('#pHub').hidden = worldId === 'hub'; navIdx = 0; if (paused) setTimeout(() => menuNav(0), 30); }
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
@@ -378,7 +447,7 @@ function menuPoll(dt) {
 $('#pauseBtn').onclick = () => togglePause(true);
 $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
-$('#pHub').onclick = () => { togglePause(false); fadeTo(() => loadWorld('hub', null)); };
+$('#pHub').onclick = () => { togglePause(false); goWorld('hub', null); };
 $('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
 $('#pHelp').onclick = () => $('#help').classList.toggle('on');
 /* ---------- big-screen mode: this device renders, a phone is the controller ---------- */
@@ -437,7 +506,7 @@ $('#startBtn').onclick = () => {
   if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
   sfx.music(cfg.music); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
   try { if (TOUCH && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
-  if (RESUME && RESUME !== worldId) { const r = RESUME; RESUME = null; setTimeout(() => fadeTo(() => loadWorld(r, null)), 300); }
+  if (RESUME && RESUME !== worldId) { const r = RESUME; RESUME = null; setTimeout(() => goWorld(r, null), 300); }
   setTimeout(() => { const t = level.triggers.find((t) => !t.fired && Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z) < t.r); if (t) { t.fired = true; say(t.text); } }, 900);
 };
 
@@ -853,9 +922,9 @@ function enterPortal(P) {
     const first = !SAVE.done[cfg.id]; if (level.complete) addCoins(first ? 100 : 25); SAVE.done[cfg.id] = true; const sec = Math.round((performance.now() - startTime) / 1000);
     if (!SAVE.best[cfg.id] || sec < SAVE.best[cfg.id]) SAVE.best[cfg.id] = sec; persist();
     if (level.complete) { fading = true; setTimeout(() => { fading = false; showDone(); }, 300); return; }
-    fadeTo(() => loadWorld('hub', cfg.id)); return;
+    goWorld('hub', cfg.id); return;
   }
-  fadeTo(() => loadWorld(P.to, 'hub'));
+  goWorld(P.to, 'hub');
 }
 
 /* ---------------- animation helpers ---------------- */
@@ -887,6 +956,7 @@ function simulate(dt) {
 }
 loadWorld('hub', null);
 applyQuality(qLevel);
+setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => { const L = $('#loader'); L.classList.add('out'); setTimeout(() => L.classList.remove('on', 'out', 'boot'), 460); })), 200);
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = Math.min(0.1, (now - last) / 1000); last = now; qTick(dt);

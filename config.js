@@ -35,6 +35,17 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "loader-1",
+      date: "2026-11-28",
+      app: "ninja-worlds",
+      title: "🎬 شاشات تحميل للعوالم بدل الشاشة السوداء",
+      items: [
+        "🚢 لكل عالم شاشة تحميل برسمة خاصة فيه — السفينة: عاصفة، برق، كشّاف ومطر",
+        "📊 اسم العالم + جملة تشويقية + شريط تحميل + دائرة تدور + نصيحة من نصايح اللعبة",
+        "⚡ تجهيز الإضاءة قبل ما تبدأ — عشان ما تعلّق اللعبة أول ما تدخل",
+      ],
+    },
+    {
       id: "ship-captain-1",
       date: "2026-11-28",
       app: "ninja-worlds",
@@ -487,7 +498,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "4.6",
+      version: "4.7",
       leaderboard: { unit: "💎" },
     },
     {
