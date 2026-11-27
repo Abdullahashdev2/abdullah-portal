@@ -96,6 +96,8 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
 #ammo{position:fixed;z-index:6;left:12px;top:calc(204px + env(safe-area-inset-top));font-weight:900;font-size:15px;text-shadow:0 2px 4px #000;display:none}body.shipmode #ammo{display:block}
 #cross{position:fixed;z-index:6;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;display:none;pointer-events:none}#cross.on{display:block}#cross:before,#cross:after{content:"";position:absolute;background:#ff3030;box-shadow:0 0 6px #ff0000}#cross:before{left:12px;top:0;width:2px;height:26px}#cross:after{top:12px;left:0;height:2px;width:26px}
 #scope{position:fixed;inset:0;z-index:6;display:none;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 32vmin,rgba(0,0,0,.96) 32.5vmin)}#scope.on{display:block}#scope:before,#scope:after{content:"";position:absolute;background:rgba(0,0,0,.85)}#scope:before{left:50%;top:18%;bottom:18%;width:2px}#scope:after{top:50%;left:22%;right:22%;height:2px}
+body.scoped #toast{top:auto!important;bottom:calc(46px + env(safe-area-inset-bottom));opacity:.85;transform:translate(-50%,0) scale(.78)!important;transform-origin:50% 100%}body.scoped #aimHint{opacity:.55}
+#zoomBtns{position:fixed;z-index:8;right:calc(12px + env(safe-area-inset-right));top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:10px}#zoomBtns.on{display:flex}#zoomBtns button{width:58px;height:58px;border-radius:50%;border:2px solid rgba(255,255,255,.35);background:rgba(10,14,28,.6);color:#fff;font-size:17px;font-weight:800;touch-action:none;display:grid;place-items:center;line-height:1}#zoomBtns button small{display:block;font-size:8px;opacity:.8}#zoomBtns #zBreath{display:none}#zoomBtns.sn #zBreath{display:grid}#zoomBtns button.held{background:rgba(56,189,248,.45)}@media (pointer:fine){#zoomBtns{display:none!important}}
 #aimHint{position:fixed;z-index:7;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:13px;font-weight:800;background:rgba(0,0,0,.45);padding:5px 12px;border-radius:999px;display:none;white-space:nowrap}#aimHint.on{display:block}@media (pointer:coarse){#aimHint{bottom:auto;top:calc(110px + env(safe-area-inset-top))}}
 #aimBtn{width:58px;height:58px;right:190px;bottom:150px;border-color:rgba(74,222,128,.8);display:none}body.shipmode #aimBtn{display:grid}
 body.lite *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;text-shadow:none!important;box-shadow:none!important;filter:none!important;animation:none!important;transition:none!important}body.lite .pill,body.lite #toast,body.lite .btns button{background:rgba(10,12,28,.88)!important}
@@ -144,7 +146,8 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
 <div id="ammo"></div>
 <div id="cross"></div>
 <div id="scope"></div>
-<div id="aimHint">🎯 ضرب = أطلق • ✋/E = بدّل السلاح • 🌀 = إلغاء • اسحب للتصويب</div>
+<div id="zoomBtns"><button id="zIn" aria-label="تكبير">🔍＋</button><button id="zOut" aria-label="تصغير">🔍－</button><button id="zBreath" aria-label="احبس نفسك">🫁<small>اضغط مطوّل</small></button></div>
+<div id="aimHint">🎯 ضرب = أطلق • ✋/E = بدّل السلاح • 🔍 عجلة الماوس/＋－ = تكبير • 🫁 مسافة (مطوّل) = احبس نفسك • 🌀 = إلغاء</div>
 
 <div id="touch">
   <div class="joyhint">حرّك هنا</div>

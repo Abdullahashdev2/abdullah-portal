@@ -382,6 +382,7 @@ const tvHooks = {
   press: (k, n) => {
     if (k === 'pause') { if ($('#tv').classList.contains('on')) closeTV(); else if (started) togglePause(); return; }
     if (activeMenu()) { if (k === 'jump' || k === 'act' || k === 'atk') menuSelect(); else if (k === 'roll') menuBack(); return; }
+    if (k === 'zin' || k === 'zout') { stealth.zoomStep(k === 'zin' ? 1 : -1); return; }
     vin[k] = (vin[k] || 0) + n;
   },
   look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
@@ -402,7 +403,7 @@ applyMirror();
 $('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
 $('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
+const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 تصويب' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
 if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
@@ -544,6 +545,7 @@ addEventListener('keydown', (e) => {
     if (k === 'Enter' || k === 'NumpadEnter' || kc === 13) { menuSelect(); e.preventDefault(); return; }
     if (isBack) { menuBack(); e.preventDefault(); return; }
   } else if (isBack && started) { togglePause(true); e.preventDefault(); return; }
+  if (stealth.aiming) { if (['Equal', 'NumpadAdd', 'BracketRight', 'PageUp'].includes(e.code)) { stealth.zoomStep(1); e.preventDefault(); return; } if (['Minus', 'NumpadSubtract', 'BracketLeft', 'PageDown'].includes(e.code)) { stealth.zoomStep(-1); e.preventDefault(); return; } }
   keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); if (e.code === 'Enter' && !started) $('#startBtn').click(); });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -560,6 +562,11 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => { if (e.pointerType === 'mouse') { if (mouse && mouse.moved < 8 && performance.now() - mouse.t < 300 && e.button === 0) vin.atk++; mouse = null; return; } touchUp(e); });
 canvas.addEventListener('pointercancel', touchUp);
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('wheel', (e) => { if (!stealth.aiming) return; e.preventDefault(); stealth.zoomStep(e.deltaY < 0 ? 1 : -1); }, { passive: false });
+{ const zi = $('#zIn'), zo = $('#zOut'), zb = $('#zBreath');
+  const tap = (el, fn) => el && el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); });
+  tap(zi, () => stealth.zoomStep(1)); tap(zo, () => stealth.zoomStep(-1));
+  if (zb) { const on = (v) => (e) => { e.preventDefault(); e.stopPropagation(); stealth.touchBreath = v; zb.classList.toggle('held', v); }; zb.addEventListener('pointerdown', on(true)); ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => zb.addEventListener(t, on(false))); } }
 let joy = null, look = null;
 function touchDown(e) {
   if (!started) return;
@@ -591,6 +598,7 @@ function readInput() {
     ix += dz(gp.axes[0]); iy -= dz(gp.axes[1]); cam.dx += dz(gp.axes[2] || 0) * 14; cam.dy += dz(gp.axes[3] || 0) * 10;
     const B = (i) => gp.buttons[i] && gp.buttons[i].pressed; gj = B(0); ga = B(2) || B(5); gr = B(1) || B(4); gx = B(3); gs = B(7); gaim = B(6);
     if (edge('gstart', B(9))) togglePause();
+    if (stealth.aiming) { if (edge('gzi', B(12))) stealth.zoomStep(1); if (edge('gzo', B(13))) stealth.zoomStep(-1); }
   }
   if (__virt) { ix += __virt.mx || 0; iy += __virt.my || 0; }
   const m = Math.min(1, Math.hypot(ix, iy)); if (m > 0 && Math.hypot(ix, iy) > 1) { const k = 1 / Math.hypot(ix, iy); ix *= k; iy *= k; }

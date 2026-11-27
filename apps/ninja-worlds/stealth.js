@@ -7,10 +7,12 @@ const PHASE = {
   evasion: { label: '🔍 يدوّرون عليك', color: '#fb923c', time: 18 },
   caution: { label: '⚡ حذر', color: '#facc15', time: 25 },
 };
+const ZOOMS = { pistol: [1, 2], sniper: [4, 8, 12, 20] };
 export class Stealth {
   constructor(c) {
     this.c = c; this.on = false; this.aiming = false; this.weapon = 'pistol'; this.ammo = { pistol: 0, sniper: 0 };
     this.aimPitch = 0; this.noiseT = 0; this.radarT = 0; this.tracers = [];
+    this.zoomI = { pistol: 0, sniper: 1 }; this.breath = 1; this.tired = 0; this.recoil = 0; this.boltT = 0; this.pickT = 0; this.pick = null; this.touchBreath = false;
     // first-person tranquilizer pistol held in front of the camera
     const g = new THREE.Group(), M = (c2, m = 0.5) => new THREE.MeshStandardMaterial({ color: c2, roughness: 0.4, metalness: m });
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.32), M(0x1f2937)); g.add(body);
@@ -39,6 +41,7 @@ export class Stealth {
     }
     if (inp.aimP && !P.carry && !this.dragging && !this.holding && !P.inLocker) { this.aiming ? this.exitAim() : this.enterAim(); }
     if (this.aiming) {
+      this.holdBreath = !!(inp.jumpH || this.touchBreath);
       if (inp.atkP) { inp.atkP = false; this.shoot(); }
       if (inp.actP) { inp.actP = false; this.weapon = this.weapon === 'pistol' ? 'sniper' : 'pistol'; this.c.sfx.tone(500, 700, 0.08, 'square', 0.05); this.hud(); }
       if (inp.rollP) { inp.rollP = false; this.exitAim(); }
@@ -46,7 +49,17 @@ export class Stealth {
     }
   }
   enterAim() { this.aiming = true; this.aimPitch = 0; this.c.player.aiming = true; this.c.cam.yaw = this.c.player.yaw; this.hud(); }
-  exitAim() { if (!this.aiming && this.c.player) { this.c.player.aiming = false; } this.aiming = false; if (this.c.player) this.c.player.aiming = false; this.c.camera.fov = innerWidth < innerHeight ? 72 : 62; this.c.camera.updateProjectionMatrix(); this.gun.visible = false; this.hud(); }
+  zoomStep(d) {
+    if (!this.aiming) return; const w = this.weapon, Z = ZOOMS[w], i = Math.max(0, Math.min(Z.length - 1, this.zoomI[w] + d));
+    if (i === this.zoomI[w]) return; this.zoomI[w] = i; this.c.sfx.tone(d > 0 ? 1400 : 1100, d > 0 ? 1700 : 900, 0.04, 'square', 0.03);
+  }
+  get zoomX() { return ZOOMS[this.weapon][this.zoomI[this.weapon]]; }
+  optics(on) { // داخل المنظار: الضباب يخف والحراس البعيدين ينرسمون
+    const sc = this.c.scene, E = this.c.enemies;
+    if (on) { if (this.fogSave == null && sc.fog && sc.fog.density != null) { this.fogSave = sc.fog.density; this.fogObj = sc.fog; sc.fog.density *= 0.32; } if (this.cullSave == null && E) { this.cullSave = E.cullR; E.cullR = E.cullR ? 1e9 : E.cullR; } }
+    else { if (this.fogSave != null && this.fogObj) this.fogObj.density = this.fogSave; this.fogSave = null; this.fogObj = null; if (this.cullSave != null && E) E.cullR = this.cullSave; this.cullSave = null; }
+  }
+  exitAim() { if (!this.aiming && this.c.player) { this.c.player.aiming = false; } this.aiming = false; this.optics(false); { const glc = document.getElementById('gl'); if (glc) glc.style.filter = ''; document.body.classList.remove('scoped'); } this.holdBreath = false; this.touchBreath = false; if (this.farSave) { this.c.camera.far = this.farSave; this.farSave = 0; } if (this.c.player) this.c.player.aiming = false; this.c.camera.fov = innerWidth < innerHeight ? 72 : 62; this.c.camera.updateProjectionMatrix(); this.gun.visible = false; this.hud(); }
   interact() {
     if (!this.on) return false;
     const P = this.c.player, L = this.L;
@@ -134,10 +147,11 @@ export class Stealth {
   shoot() {
     const w = this.weapon;
     if (this.ammo[w] <= 0) { this.c.sfx.tone(300, 300, 0.05, 'square', 0.06); this.c.say(w === 'pistol' ? '🎯 خلصت أسهم المسدس — دوّر صناديق زرقاء' : '🎯 خلصت أسهم القنّاصة — دوّر صناديق خضراء'); return; }
-    this.ammo[w]--; this.hud();
+    if (w === 'sniper' && this.boltT > 0) return; // لسا يلقّم
+    this.ammo[w]--; this.hud(); this.recoil += w === 'sniper' ? 0.055 : 0.02; if (w === 'sniper') { this.boltT = 1.15; setTimeout(() => { this.c.sfx.noise(0.08, 2200, 3, 0.1, 'bandpass'); this.c.sfx.noise(0.07, 1600, 3, 0.1, 'bandpass', 0.18); }, 480); }
     const cam = this.c.camera, o = cam.getWorldPosition(new V()), dir = cam.getWorldDirection(new V());
     this.c.sfx.noise(0.12, w === 'sniper' ? 900 : 1500, 1.2, 0.22, 'bandpass', 0, 300); this.c.sfx.tone(w === 'sniper' ? 180 : 260, 90, 0.1, 'triangle', 0.08);
-    const ray = new THREE.Raycaster(o, dir, 0.1, 200), hits = ray.intersectObjects(this.L.camMeshes, false), wall = hits.length ? hits[0].distance : 200;
+    const far = w === 'sniper' ? 420 : 200, ray = new THREE.Raycaster(o, dir, 0.1, far), hits = ray.intersectObjects(this.L.camMeshes, false), wall = hits.length ? hits[0].distance : far;
     let best = null, bt = wall;
     for (const e of this.c.enemies.list) {
       if (!e.alive || e.st === 'dying') continue;
@@ -148,11 +162,11 @@ export class Stealth {
         if (disc < 0) continue; const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt) { bt = tt; best = { e, isHead }; }
       }
     }
-    const end = o.clone().addScaledVector(dir, Math.min(bt, 80));
+    const end = o.clone().addScaledVector(dir, Math.min(bt, far));
     this.tracer(o.clone().addScaledVector(dir, 0.6).add(new V(0, -0.08, 0)), end);
     if (best) {
       const e = best.e;
-      if (e.ship) { this.c.enemies.tranq(e, best.isHead); if (best.isHead) this.c.say('🎯 في الراس! نام على طول 😴'); }
+      if (e.ship) { this.c.enemies.tranq(e, best.isHead); const dm = Math.round(bt); if (best.isHead) this.c.say(dm > 25 ? `🎯 رأس من ${dm} متر! نام على طول 😴` : '🎯 في الراس! نام على طول 😴'); this.hitMark = { t: 0.6, head: best.isHead }; }
       else this.c.enemies.hurt(e, best.isHead ? 2 : 1, this.c.player.pos, 2);
       this.c.sparks.emit(end, { color: 0x93c5fd, count: 10, speed: 3, life: 0.3 });
     } else if (bt < 200) { this.c.sparks.emit(end, { color: 0xfde68a, count: 8, speed: 2, life: 0.25 }); this.c.enemies.noise(end, 4); }
@@ -219,23 +233,85 @@ export class Stealth {
   guardWoke() { if (this.L.phase === 'normal') this.setPhase('caution'); }
   /* ---------- camera ---------- */
   camera(dt, look) {
-    if (!this.aiming) return false;
-    const cam = this.c.cam, camera = this.c.camera, P = this.c.player, sn = this.weapon === 'sniper';
-    const k = sn ? 0.3 : 1;
+    if (!this.aiming) { if (this.scopeCv && this.scopeCv.style.display !== 'none') this.scopeCv.style.display = 'none'; return false; }
+    const cam = this.c.cam, camera = this.c.camera, P = this.c.player, sn = this.weapon === 'sniper', zx = this.zoomX;
+    const fov = (innerWidth < innerHeight ? 72 : 62) / zx * (sn ? 1 : 0.9);
+    this.optics(sn);
+    // التنفّس: حبس النفس يثبّت المنظار، والنفس يخلص — وإذا خلص ترجف يدك شوي
+    this.boltT = Math.max(0, this.boltT - dt); this.recoil *= Math.exp(-dt * 7); this.hitMark && (this.hitMark.t -= dt);
+    const holding = this.holdBreath && this.breath > 0 && this.tired <= 0;
+    if (holding) { this.breath = Math.max(0, this.breath - dt / 4.5); if (this.breath <= 0) { this.tired = 2.2; this.c.sfx.tone(300, 200, 0.4, 'sine', 0.06); } }
+    else this.breath = Math.min(1, this.breath + dt / (this.tired > 0 ? 6 : 3)); this.tired = Math.max(0, this.tired - dt);
+    const k = (fov / 62) * (sn ? 0.95 : 1);
     if (look.dx || look.dy) { cam.yaw -= look.dx * 0.0035 * k; this.aimPitch = Math.max(-1.2, Math.min(1.2, this.aimPitch - look.dy * 0.003 * k)); look.dx = look.dy = 0; }
-    const t = performance.now() / 1000, sway = sn ? 0.006 : 0.0015;
-    const yaw = cam.yaw + Math.sin(t * 1.3) * sway + Math.sin(t * 2.7) * sway * 0.5, pitch = this.aimPitch + Math.sin(t * 1.7) * sway;
+    const t = performance.now() / 1000, base = sn ? 0.0042 : 0.0016, sway = base * (holding ? 0.1 : this.tired > 0 ? 2.2 : 1) * (P.vel && Math.hypot(P.vel.x, P.vel.z) > 0.5 ? 2.5 : 1);
+    const yaw = cam.yaw + (Math.sin(t * 1.1) + Math.sin(t * 2.3 + 1) * 0.5) * sway, pitch = this.aimPitch + this.recoil + (Math.sin(t * 1.6) * 0.8 + Math.sin(t * 0.55) * 0.6) * sway;
     camera.position.copy(P.pos).add(new V(0, 1.62, 0));
-    camera.lookAt(camera.position.clone().add(new V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch))));
-    const fov = sn ? 15 : 55; if (Math.abs(camera.fov - fov) > 0.1) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 12); camera.updateProjectionMatrix(); }
+    const dir = new V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+    camera.lookAt(camera.position.clone().add(dir));
+    if (camera.far < 600) { this.farSave = camera.far; camera.far = 600; camera.updateProjectionMatrix(); }
+    if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 14); camera.updateProjectionMatrix(); }
+    // ماذا تحت مركز المنظار؟ (مسافة + هدف) — كل ١٠٠ مللي
+    this.pickT -= dt; if (this.pickT <= 0) { this.pickT = 0.1; this.pick = this.pickAt(camera.position.clone(), dir.clone().normalize(), sn ? 420 : 200); }
+    if (sn) this.drawScope(holding); else if (this.scopeCv) this.scopeCv.style.display = 'none';
+    document.body.classList.toggle('scoped', sn);
+    const glc = document.getElementById('gl'); if (glc) { const f = sn ? 'brightness(1.35) contrast(1.12) saturate(1.1)' : ''; if (glc.style.filter !== f) glc.style.filter = f; } // عدسة صافية
     return true;
+  }
+  pickAt(o, dir, far) {
+    const ray = new THREE.Raycaster(o, dir, 0.1, far), hits = ray.intersectObjects(this.L.camMeshes, false); let bt = hits.length ? hits[0].distance : Infinity, best = null;
+    for (const e of this.c.enemies.list) {
+      if (!e.alive || e.st === 'dying' || e.hidden) continue; const s = e.big ? 1.55 : 1;
+      for (const [c2, r, isHead] of [[e.pos.clone().add(new V(0, 1.65 * s, 0.1 * s)), 0.3 * s, true], [e.pos.clone().add(new V(0, 1.0 * s, 0)), 0.58 * s, false]]) {
+        const tv = o.clone().sub(c2), b = tv.dot(dir), cc = tv.lengthSq() - r * r, disc = b * b - cc; if (disc < 0) continue;
+        const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt) { bt = tt; best = { e, isHead }; }
+      }
+    }
+    return { dist: bt, target: best };
+  }
+  drawScope(holding) {
+    let cv = this.scopeCv;
+    if (!cv) { cv = this.scopeCv = document.createElement('canvas'); cv.id = 'scopeCv'; cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:6;pointer-events:none'; document.body.appendChild(cv); }
+    cv.style.display = 'block';
+    const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const g = cv.getContext('2d'), cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.46, u = R / 100;
+    g.clearRect(0, 0, W, H);
+    // الإطار الأسود + ظل العدسة
+    g.fillStyle = '#000'; g.beginPath(); g.rect(0, 0, W, H); g.arc(cx, cy, R, 0, Math.PI * 2, true); g.fill();
+    const vg = g.createRadialGradient(cx, cy, R * 0.72, cx, cy, R); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(0.85, 'rgba(0,0,0,.35)'); vg.addColorStop(1, 'rgba(0,0,0,.9)');
+    g.fillStyle = vg; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+    const tgt = this.pick && this.pick.target, onHead = tgt && tgt.isHead, ink = onHead ? '#ff3b3b' : '#050505';
+    // الخطوط السميكة من الأطراف + الرفيعة في الوسط
+    g.fillStyle = ink; const th = 4 * u, gap = 32 * u;
+    g.fillRect(cx - R, cy - th / 2, R - gap, th); g.fillRect(cx + gap, cy - th / 2, R - gap, th); g.fillRect(cx - th / 2, cy + gap, th, R - gap); g.fillRect(cx - th / 2, cy - R, th, R - gap);
+    g.fillRect(cx - gap, cy - 0.5 * u, gap * 2, 1 * u); g.fillRect(cx - 0.5 * u, cy - gap, 1 * u, gap * 2);
+    // نقاط القياس (mil-dots)
+    for (let i = 1; i <= 4; i++) { const d = i * 7.5 * u, r = 1.3 * u; [[cx + d, cy], [cx - d, cy], [cx, cy + d], [cx, cy - d]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }); }
+    // علامات تعويض المسافة تحت المركز
+    g.font = `${Math.round(5 * u)}px system-ui`; g.textAlign = 'left'; g.textBaseline = 'middle';
+    [[45, 6], [55, 4.5], [64, 3.2], [72, 2.2]].forEach(([y, w]) => g.fillRect(cx - w * u, cy + y * u, w * 2 * u, 0.9 * u)); // خطوط قياس الارتفاع
+    // النقطة المضيئة في المركز
+    g.fillStyle = onHead ? '#ff2a2a' : tgt ? '#ff8a00' : '#e11d48'; g.beginPath(); g.arc(cx, cy, 1.4 * u, 0, Math.PI * 2); g.fill();
+    // النصوص: التكبير، المسافة، الهدف، التلقيم
+    g.textAlign = 'center'; g.font = `800 ${Math.round(6 * u)}px system-ui`; g.fillStyle = 'rgba(190,255,190,.92)';
+    g.fillText('×' + this.zoomX, cx + R * 0.62, cy - R * 0.62);
+    const d = this.pick && isFinite(this.pick.dist) ? Math.round(this.pick.dist) + ' م' : '— م'; g.fillText('📏 ' + d, cx, cy + R * 0.84);
+    if (tgt) { const e = tgt.e, st = e.st === 'sleep' ? 'نايم 😴' : e.alert ? 'منتبه ⚠️' : e.st === 'inv' ? 'يفتّش ❓' : 'ما انتبه'; g.fillStyle = onHead ? 'rgba(255,120,120,.95)' : 'rgba(255,230,160,.95)'; g.fillText((onHead ? '🎯 رأس • ' : '👤 جسم • ') + st, cx, cy - R * 0.8); }
+    if (this.boltT > 0) { g.fillStyle = 'rgba(255,255,255,.85)'; g.fillText('🔄 يلقّم…', cx - R * 0.6, cy - R * 0.62); }
+    if (this.hitMark && this.hitMark.t > 0) { g.strokeStyle = this.hitMark.head ? 'rgba(255,60,60,' + this.hitMark.t + ')' : 'rgba(255,255,255,' + this.hitMark.t + ')'; g.lineWidth = 2 * u; const a = 6 * u, b = 11 * u; [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(([sx, sy]) => { g.beginPath(); g.moveTo(cx + sx * a, cy + sy * a); g.lineTo(cx + sx * b, cy + sy * b); g.stroke(); }); }
+    // عدّاد النفس (قوس يسار)
+    g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,.15)'; g.beginPath(); g.arc(cx, cy, R * 0.93, Math.PI * 0.8, Math.PI * 1.2); g.stroke();
+    g.strokeStyle = this.tired > 0 ? 'rgba(248,113,113,.9)' : holding ? 'rgba(125,211,252,.95)' : 'rgba(255,255,255,.6)';
+    g.beginPath(); g.arc(cx, cy, R * 0.93, Math.PI * 1.2 - Math.PI * 0.4 * this.breath, Math.PI * 1.2); g.stroke();
+    g.font = `${Math.round(4.6 * u)}px system-ui`; g.fillStyle = 'rgba(255,255,255,.75)'; g.fillText(this.tired > 0 ? 'تلهث…' : holding ? 'حابس نفسك' : '🫁', cx - R * 0.93, cy + R * 0.28);
   }
   /* ---------- HUD ---------- */
   hud(force) {
     const $ = (s) => document.querySelector(s);
     $('#ammo').textContent = this.on ? `${this.weapon === 'pistol' ? '🔫' : '🎯'} ${this.ammo[this.weapon]}  ·  ${this.weapon === 'pistol' ? '🎯 ' + this.ammo.sniper : '🔫 ' + this.ammo.pistol}` : '';
     $('#cross').classList.toggle('on', this.aiming && this.weapon === 'pistol');
-    $('#scope').classList.toggle('on', this.aiming && this.weapon === 'sniper');
+    $('#scope').classList.remove('on'); const zb = $('#zoomBtns'); if (zb) { zb.classList.toggle('on', this.aiming); zb.classList.toggle('sn', this.weapon === 'sniper'); }
     $('#aimHint').classList.toggle('on', this.aiming);
     if (force) $('#phase').classList.remove('on');
   }
