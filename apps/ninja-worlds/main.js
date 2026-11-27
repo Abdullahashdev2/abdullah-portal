@@ -6,6 +6,7 @@ import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
+import { Stealth } from './stealth.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
 const V = THREE.Vector3, $ = (s) => document.querySelector(s);
@@ -18,7 +19,7 @@ try { Object.assign(SAVE, JSON.parse(localStorage.getItem(SKEY)) || {}); } catch
 function persist() {
   try { localStorage.setItem(SKEY, JSON.stringify(SAVE)); } catch (e) {}
   const n = SAVE.shards.length, w = Object.keys(SAVE.done).filter((k) => SAVE.done[k]).length;
-  try { window.Game && Game.save('ninja-worlds', { ...SAVE, score: n, scores: { 'ninja-worlds': n }, summary: `🌍 ${w}/6 عوالم • 💎 ${n}/60` }); } catch (e) {}
+  try { window.Game && Game.save('ninja-worlds', { ...SAVE, score: n, scores: { 'ninja-worlds': n }, summary: `🌍 ${w} عوالم • 💎 ${n} • 🪙 ${SAVE.coins || 0}` }); } catch (e) {}
 }
 (async () => { try { const c = window.Game && (await Game.load('ninja-worlds')); if (c && c.shards && c.shards.length > SAVE.shards.length) { SAVE = { ...SAVE, ...c }; hudUpdate(); } } catch (e) {} })();
 
@@ -33,7 +34,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, 1, 0.1, 6000);
 const sky = new Sky(); sky.scale.setScalar(4500); scene.add(sky);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffffff, 3); sun.castShadow = true; scene.add(sun); scene.add(sun.target);
+const sun = new THREE.DirectionalLight(0xffffff, 3); sun.castShadow = true; scene.add(sun); scene.add(sun.target); scene.add(camera);
 sun.shadow.mapSize.set(LOW ? 1024 : 2048, LOW ? 1024 : 2048); Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 140 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
 const pmrem = new THREE.PMREMGenerator(renderer); let envRT = null;
 const sunDir = new V(), lightDir = new V();
@@ -127,31 +128,61 @@ const G = {
   hud: () => hudUpdate(),
   onFall: () => respawn('fall'),
   onDeath: () => respawn('death'),
-  onEnemyKilled: (e) => { G.hitstop(0.08); if (Math.random() < (player.hp <= 2 ? 0.7 : 0.35)) enemies.dropHeart(e.pos); },
+  onEnemyKilled: (e) => { G.hitstop(0.08); addCoins(e.boss ? 150 : e.big ? 20 : e.archer ? 8 : e.guard ? 6 : 5, e.pos); if (Math.random() < (player.hp <= 1 ? 0.45 : 0.18)) enemies.dropHeart(e.pos); },
   dropItem: (forced) => dropItem(forced),
   upg: {},
   waterAt: (p) => { if (!level || !level.waters) return null; for (const W of level.waters) if (p.x > W.x0 && p.x < W.x1 && p.z > W.z0 && p.z < W.z1 && p.y > W.y0 - 1 && p.y < W.y1 + 0.5) return W; return null; },
   splash: (p) => { sfx.noise(0.35, 900, 0.6, 0.22, 'bandpass', 0, 300); sparks.emit(p, { color: 0xd8f6ff, count: 26, speed: 4, up: 1.5, life: 0.6, size: 0.25, grav: 9 }); },
-  playerHidden: () => { if (!level.shadows) return false; const p = player.pos, hs = Math.hypot(player.vel.x, player.vel.z); return hs < 4.8 && level.shadows.some((z) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && Math.abs(p.y - z.y) < 0.6); },
+  playerHidden: () => { if (player.inLocker) return 'locker'; if (!level.shadows) return false; const p = player.pos, hs = Math.hypot(player.vel.x, player.vel.z); return hs < 4.8 && level.shadows.some((z) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && Math.abs(p.y - z.y) < 0.6); },
   onAlarm: () => { level.alarms = (level.alarms || 0) + 1; sfx.tone(880, 660, 0.25, 'square', 0.12); sfx.tone(880, 660, 0.25, 'square', 0.12, 0.3); if (level.alarms <= 3) say('🚨 انكشفت! الحارس شافك — حاربه أو اهرب للظل.'); },
+  onRadio: (e) => stealth.radioDone(e),
+  onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.12); stealth.spotted(e, search); },
+  onBodyFound: () => stealth.bodyFound(),
+  onGuardWoke: () => stealth.guardWoke(),
+  onGuardSlept: (e) => { if (!e.sleptOnce) { e.sleptOnce = true; addCoins(4, e.pos); } },
   onTakedown: (e) => { level.takedowns = (level.takedowns || 0) + 1; sfx.tone(300, 120, 0.3, 'triangle', 0.15); sparks.emit(e.pos.clone().add(new V(0, 1.2, 0)), { color: 0xa78bfa, count: 30, speed: 4, life: 0.6 }); if (level.takedowns <= 2) say('🤫 ضربة صامتة! محد سمع شي.'); },
   onBossPhase: (ph) => { G.shake(0.5); say(ph === 2 ? '🔥 العملاق عصّب! صار يرمي كرات نار — ردّها عليه بالسيف!' : '🌋 المرحلة الأخيرة! يستدعي ظلال — ركّز وخلّصه!'); },
 };
-const UPG = [
-  { n: 6, key: 'spin', name: 'الضربة الدوّامة', desc: 'زر ✴️ (أو L): لفّة سيف تضرب كل اللي حولك' },
-  { n: 12, key: 'heart1', name: 'قلب إضافي ❤', desc: 'صار عندك ٦ قلوب' },
-  { n: 18, key: 'fire', name: 'سيف اللهب 🔥', desc: 'ضرباتك صارت أقوى (+١ ضرر)' },
-  { n: 24, key: 'heart2', name: 'قلب إضافي ❤', desc: 'صار عندك ٧ قلوب' },
-  { n: 30, key: 'dash', name: 'الاندفاع الجوي 💨', desc: 'وأنت في الهوا اضغط تدحرج = تندفع لقدّام' },
-  { n: 40, key: 'bolt', name: 'سيف البرق ⚡', desc: 'الدوّامة تشحن أسرع بمرتين' },
+/* ---------- economy: coins are earned, upgrades are bought (nothing comes free) ---------- */
+const SHOP = [
+  { key: 'hearts', name: 'قلب إضافي ❤', desc: 'قلب زيادة بشريط حياتك', prices: [80, 160, 280, 450, 700] },
+  { key: 'dmg', name: 'سيف أقوى 🔥', desc: '+١ ضرر لكل ضربة', prices: [220, 550] },
+  { key: 'spin', name: 'الضربة الدوّامة ✴️', desc: 'زر ✴️ (أو L): لفّة سيف تضرب كل اللي حولك', prices: [250] },
+  { key: 'dash', name: 'الاندفاع الجوي 💨', desc: 'وأنت في الهوا اضغط تدحرج = تندفع لقدّام', prices: [300] },
+  { key: 'bolt', name: 'شحن البرق ⚡', desc: 'الدوّامة تشحن بنص الوقت', prices: [420], need: 'spin' },
+  { key: 'darts', name: 'جعبة أسهم أكبر 🎯', desc: '+٤ أسهم مسدس و+٢ قنّاصة', prices: [120, 260] },
 ];
+if (SAVE.coins == null) SAVE.coins = SAVE.shards.length * 15;
+SAVE.upg = Object.assign({ hearts: 0, dmg: 0, spin: 0, dash: 0, bolt: 0, darts: 0 }, SAVE.upg || {});
+const BASE_HP = 3;
 function computeUpg() {
-  const n = SAVE.shards.length, has = (k) => n >= UPG.find((u) => u.key === k).n;
-  Object.assign(G.upg, { spin: has('spin'), fire: has('fire'), dash: has('dash'), fastSpin: has('bolt'), dmg: has('fire') ? 1 : 0, hearts: (has('heart1') ? 1 : 0) + (has('heart2') ? 1 : 0) });
-  if (player) player.maxHp = 5 + G.upg.hearts;
+  const u = SAVE.upg;
+  Object.assign(G.upg, { spin: u.spin > 0, fire: u.dmg > 0, dash: u.dash > 0, fastSpin: u.bolt > 0, dmg: u.dmg, hearts: u.hearts, darts: u.darts });
+  if (player) { player.maxHp = BASE_HP + u.hearts; player.hp = Math.min(player.hp, player.maxHp); }
   if (trail) trail.c.setHex(G.upg.fastSpin ? 0x7df9ff : G.upg.fire ? 0xffa040 : 0x9be7ff);
   if (hero) hero.sword.traverse((o) => { if (o.material && o.material.color && o.geometry && o.geometry.parameters && o.geometry.parameters.depth > 0.8) { o.material.emissive && o.material.emissive.setHex(G.upg.fastSpin ? 0x0891b2 : G.upg.fire ? 0xc2410c : 0x000000); if (o.material.emissive) o.material.emissiveIntensity = 0.8; } });
   const sp = document.getElementById('spBtn'); if (sp) sp.style.display = G.upg.spin ? '' : 'none';
+}
+function addCoins(n, at) {
+  if (!n) return; SAVE.coins = Math.max(0, (SAVE.coins || 0) + n); persist(); hudUpdate();
+  if (n > 0) { sfx.tone(1320, 1760, 0.12, 'square', 0.05); if (at) sparks.emit(at.clone().add(new V(0, 1.2, 0)), { color: 0xffd23f, count: Math.min(30, 6 + n), speed: 3, up: 1.5, life: 0.6, size: 0.22, grav: 5 }); }
+  const c = $('#coins'); c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
+}
+function renderShop() {
+  const u = SAVE.upg;
+  $('#upgList').innerHTML = `<div class="shopHead">🪙 عندك ${SAVE.coins} عملة — تجمعها من الأعداء والشظايا وإنهاء العوالم</div>` + SHOP.map((it) => {
+    const lv = u[it.key] | 0, price = it.prices[lv], max = price == null, locked = it.need && !(u[it.need] > 0);
+    const tag = it.prices.length > 1 ? ` (${lv}/${it.prices.length})` : lv ? ' ✅' : '';
+    return `<div class="u ${lv ? 'on' : ''}"><b>${it.name}${tag}</b><span>${it.desc}</span>${max ? '<em>✅ مكتمل</em>' : locked ? '<em>🔒 يحتاج الدوّامة أول</em>' : `<button class="buy" data-k="${it.key}" ${SAVE.coins < price ? 'data-poor="1"' : ''}>اشترِ — ${price} 🪙</button>`}</div>`;
+  }).join('');
+  $('#upgList').querySelectorAll('.buy').forEach((b) => (b.onclick = () => buy(b.dataset.k)));
+}
+function buy(key) {
+  const it = SHOP.find((x) => x.key === key), lv = SAVE.upg[key] | 0, price = it.prices[lv];
+  if (price == null) return;
+  if (SAVE.coins < price) { say(`🪙 تحتاج ${price - SAVE.coins} عملة زيادة — حارب واجمع الشظايا!`); sfx.tone(200, 150, 0.2, 'square', 0.08); return; }
+  SAVE.coins -= price; SAVE.upg[key] = lv + 1; computeUpg(); if (key === 'hearts') player.hp = Math.min(player.maxHp, player.hp + 1);
+  persist(); hudUpdate(); renderShop(); sfx.win(); say('🎁 اشتريت: ' + it.name);
 }
 hero = buildHero('ninja'); scene.add(hero.root);
 player = new Player(G, hero); enemies = new Enemies(G);
@@ -186,7 +217,7 @@ function loadWorld(id, from) {
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
-  freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate();
+  freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
@@ -198,6 +229,7 @@ function say(text) { $('#toastText').textContent = text; $('#toast').classList.a
 function banner(name, sub) { $('#bName').textContent = name; $('#bSub').textContent = sub || ''; const b = $('#banner'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); }
 function hudUpdate() {
   if (!player) return;
+  $('#coins').textContent = '🪙 ' + (SAVE.coins || 0);
   $('#hearts').innerHTML = Array.from({ length: player.maxHp }, (_, i) => `<span class="${i < player.hp ? 'h on' : 'h'}">❤</span>`).join('');
   if (!cfg) return;
   if (cfg.shardTotal) { const n = SAVE.shards.filter((s) => s.startsWith(cfg.id + '-')).length; $('#shards').textContent = `💎 ${n}/${cfg.shardTotal}`; }
@@ -264,7 +296,7 @@ const tvHooks = {
   onDisconnect: () => { window.KeepAwake && window.KeepAwake.off(); $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
 };
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
-attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: '✋ شيل' }].concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
+attachPortal(tvHooks, () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: '🔫 تصويب' }] : []).concat(G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) }));
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
 $('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
 $('#tvClose').onclick = () => closeTV();
@@ -287,7 +319,7 @@ $('#skinFile').onchange = async (e) => {
 $('#pSkinOff').onclick = () => { skin.clear(); clearSkinFile(); $('#pSkinOff').hidden = true; togglePause(false); say('↩️ رجع النينجا المعصوب الأصلي.'); };
 loadSkinFile().then((buf) => { if (buf) applySkin(buf, false); });
 $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
-$('#pUpg').onclick = () => { const n = SAVE.shards.length; $('#upgList').innerHTML = UPG.map((u) => `<div class="${n >= u.n ? 'u on' : 'u'}"><b>${n >= u.n ? '✅' : '🔒'} ${u.name}</b><span>${n >= u.n ? u.desc : 'تنفتح عند ' + u.n + ' 💎 (عندك ' + n + ')'}</span></div>`).join(''); $('#upgList').classList.toggle('on'); };
+$('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
   sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
   sfx.music(cfg.music); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
@@ -300,6 +332,7 @@ function nearItem() { let best = null, bd = 1.7; for (const it of level.items) {
 function nearPed() { if (!player.carry) return null; for (const p of level.pedestals) { if (p.filled >= p.need || p.accept !== player.carry.kind) continue; if (Math.hypot(p.pos.x - player.pos.x, p.pos.z - player.pos.z) < 2.6 && Math.abs(p.pos.y - player.pos.y) < 1.5) return p; } return null; }
 function nearNpc() { return npc && player.pos.distanceTo(npc.root.position) < 3 ? npc : null; }
 function interact() {
+  if (stealth.interact()) return;
   if (player.carry) { const p = nearPed(); if (p) placeItem(p); else dropItem(false); return; }
   const it = nearItem(); if (it && player.onGround) { it.carried = true; it.follow = null; player.carry = it; sfx.pickup(); sparks.emit(it.pos, { color: it.color, count: 20, speed: 3, life: 0.5 }); if (it.onPick) it.onPick(); return; }
   if (nearNpc()) talk();
@@ -328,7 +361,7 @@ function respawn(why) {
   const f = $('#fade'); f.classList.add('on');
   setTimeout(() => {
     player.spawn(checkpoint.pos.clone().add(new V(0, 0.05, 0)), checkpoint.yaw); player.inv = 1; breath = BREATH;
-    if (why === 'death') { player.hp = player.maxHp; say('لا تشيل هم 💪 رجعناك لآخر نقطة بكامل قلوبك.'); }
+    if (why === 'death') { player.hp = player.maxHp; const lost = Math.floor((SAVE.coins || 0) * 0.2); if (lost) addCoins(-lost); say(lost ? `💀 طحت! خسرت ${lost} 🪙 ورجعت لآخر نقطة — ركّز أكثر.` : '💀 طحت! رجعت لآخر نقطة.'); }
     else if (why === 'fall' && worldFalls % 4 === 3) say('السقوط جزء من التدريب 🥷 — خذ نفس وجرّب مرة ثانية.');
     cam.yaw = checkpoint.yaw; scarf.init = false; hudUpdate();
     setTimeout(() => { f.classList.remove('on'); fading = false; }, 120);
@@ -338,14 +371,17 @@ function respawn(why) {
 /* ---------------- input ---------------- */
 const TOUCH = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const keys = {}, prev = {};
-const vin = { jump: 0, atk: 0, roll: 0, act: 0, sp: 0 }, held = { jump: false, roll: false };
+const vin = { jump: 0, atk: 0, roll: 0, act: 0, sp: 0, aim: 0 }, held = { jump: false, roll: false };
 const virt = { mx: 0, my: 0 }; // joystick
 const cam = { yaw: 0, pitch: 0.32, dist: 6.4, want: 6.4, target: new V(), lastManual: -9, dx: 0, dy: 0 };
+const stealth = new Stealth({ camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
+let stormT = 4, flash = 0;
 addEventListener('keydown', (e) => { keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' || e.code === 'KeyP') togglePause(); if (e.code === 'Enter' && !started) $('#startBtn').click(); });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 let mouse = null;
 canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' && e.button === 2) { vin.aim++; return; }
   if (e.pointerType === 'mouse') { mouse = { x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 }; canvas.setPointerCapture(e.pointerId); return; }
   touchDown(e);
 });
@@ -379,13 +415,13 @@ function readInput() {
   if (keys.KeyW || keys.ArrowUp) iy += 1; if (keys.KeyS || keys.ArrowDown) iy -= 1; if (keys.KeyD || keys.ArrowRight) ix += 1; if (keys.KeyA || keys.ArrowLeft) ix -= 1;
   const l = Math.hypot(ix, iy); if (l > 1) { ix /= l; iy /= l; }
   ix += virt.mx; iy += virt.my;
-  let gj = false, ga = false, gr = false, gx = false, gs = false;
+  let gj = false, ga = false, gr = false, gx = false, gs = false, gaim = false;
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find((g) => g) : null;
   if (remote.on) { ix += remote.mx; iy += remote.my; }
   if (gp) {
     const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
     ix += dz(gp.axes[0]); iy -= dz(gp.axes[1]); cam.dx += dz(gp.axes[2] || 0) * 14; cam.dy += dz(gp.axes[3] || 0) * 10;
-    const B = (i) => gp.buttons[i] && gp.buttons[i].pressed; gj = B(0); ga = B(2) || B(5); gr = B(1) || B(4); gx = B(3); gs = B(7) || B(6);
+    const B = (i) => gp.buttons[i] && gp.buttons[i].pressed; gj = B(0); ga = B(2) || B(5); gr = B(1) || B(4); gx = B(3); gs = B(7); gaim = B(6);
     if (edge('gstart', B(9))) togglePause();
   }
   if (__virt) { ix += __virt.mx || 0; iy += __virt.my || 0; }
@@ -399,10 +435,11 @@ function readInput() {
     rollP: edge('roll', !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC)) || edge('gr', gr) || vin.roll > 0,
     actP: edge('act', !!(keys.KeyE || keys.KeyF)) || edge('gx', gx) || vin.act > 0,
     spP: edge('sp', !!(keys.KeyL || keys.KeyQ)) || edge('gs', gs) || vin.sp > 0,
+    aimP: edge('aim', !!keys.KeyR) || edge('gaim', gaim) || vin.aim > 0,
     jumpH: !!keys.Space || held.jump || gj || remote.jumpH || !!(__virt && __virt.jumpH),
     rollH: !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC) || held.roll || gr || remote.rollH || !!(__virt && __virt.rollH),
   };
-  vin.jump = vin.atk = vin.roll = vin.act = vin.sp = 0;
+  vin.jump = vin.atk = vin.roll = vin.act = vin.sp = vin.aim = 0;
   return inp;
 }
 let __virt = null, gpAwake = false;
@@ -410,6 +447,7 @@ let __virt = null, gpAwake = false;
 /* ---------------- camera ---------------- */
 const ray = new THREE.Raycaster(); let tNow = 0;
 function updateCamera(dt) {
+  if (stealth.camera(dt, cam)) { if (shakeAmt > 0) { camera.position.x += (Math.random() - 0.5) * shakeAmt * 0.3; shakeAmt = Math.max(0, shakeAmt - dt * 1.6); } return; }
   const p = player.pos, tgt = new V(p.x, p.y + 1.5, p.z);
   // keep the camera off the wall while wall-running / climbing
   const wallOff = (player.state === 'wallrun' || player.state === 'wallup' || player.state === 'hang') && (player.wall || player.hang);
@@ -442,6 +480,10 @@ function updateCamera(dt) {
 let promptKind = '';
 function worldLogic(dt) {
   const p = player.pos;
+  stealth.update(dt);
+  if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.noise(2.2, 90, 0.4, 0.5, 'lowpass', 0, 40), 400 + Math.random() * 900); }
+    flash = Math.max(0, flash - dt * 5); hemi.intensity = cfg.hemi[2] * (1 + 4 * flash * (flash > 0.6 || flash < 0.35 ? 1 : 0.3));
+    if (level.rainMesh) level.rainMesh.position.set(p.x, p.y - 4, p.z); }
   // checkpoints
   for (const c of level.checkpoints) if (!c.on && Math.hypot(c.pos.x - p.x, c.pos.z - p.z) < 1.8 && Math.abs(c.pos.y - p.y) < 2) {
     level.checkpoints.forEach((o) => (o.cur = false)); c.on = true; c.cur = true; checkpoint = { pos: c.pos.clone(), yaw: c.yaw };
@@ -518,15 +560,13 @@ function worldLogic(dt) {
   if (Math.random() < dt * 18) { const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 14; motes.emit(new V(p.x + Math.cos(a) * r, p.y + Math.random() * 6, p.z + Math.sin(a) * r), { color: cfg.motes, count: 1, speed: 0.3, life: 4, size: 0.12, grav: -0.06, drag: 0.2 }); }
   if (level.petalTrees && Math.random() < dt * 4) { const t = level.petalTrees[Math.floor(Math.random() * level.petalTrees.length)]; dust.emit(t.pos.clone().add(new V((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), { color: t.color, count: 1, speed: 0.6, life: 4.5, size: 0.14, grav: 0.35, drag: 0.6 }); }
 }
-function unlockCheck(before) {
-  const n = SAVE.shards.length, u = UPG.find((x) => before < x.n && n >= x.n);
-  if (u) { computeUpg(); hudUpdate(); banner('✨ ترقية جديدة: ' + u.name, u.desc); say('🎁 ' + u.name + ' — ' + u.desc); sfx.win(); }
-}
+function unlockCheck() { addCoins(25, player.pos); }
 function enterPortal(P) {
   sfx.portal(); sparks.emit(P.pos.clone().add(new V(0, 1.7, 0)), { color: P.color, count: 60, speed: 6, life: 0.9, size: 0.35 });
   if (P.to === 'hub') {
+    if (cfg.ship && level.complete && !level.alarms) { addCoins(150); if (!SAVE.shards.includes('w7-10')) SAVE.shards.push('w7-10'); say('👻 شبح السفينة! ما انكشفت ولا مرة: +١٥٠ 🪙 وشظية الشبح 💎'); }
     if (cfg.id === 'w5' && !level.alarms && !SAVE.shards.includes('w5-10')) { const b = SAVE.shards.length; SAVE.shards.push('w5-10'); unlockCheck(b); say('🥷 تسلّلت بدون ولا إنذار! جايزة: شظية الظل 💎'); }
-    const first = !SAVE.done[cfg.id]; SAVE.done[cfg.id] = true; const sec = Math.round((performance.now() - startTime) / 1000);
+    const first = !SAVE.done[cfg.id]; if (level.complete) addCoins(first ? 100 : 25); SAVE.done[cfg.id] = true; const sec = Math.round((performance.now() - startTime) / 1000);
     if (!SAVE.best[cfg.id] || sec < SAVE.best[cfg.id]) SAVE.best[cfg.id] = sec; persist();
     if (level.complete) { fading = true; setTimeout(() => { fading = false; showDone(); }, 300); return; }
     fadeTo(() => loadWorld('hub', cfg.id)); return;
@@ -550,6 +590,7 @@ function simulate(dt) {
   if (stopT > 0) { stopT -= dt; dt *= 0.06; }
   tNow += dt;
   const inp = readInput();
+  stealth.preInput(inp);
   if (inp.actP) interact();
   acc += dt; let n = 0;
   while (acc >= STEP && n < 14) {
@@ -590,7 +631,7 @@ requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
 window.__G = {
-  get player() { return player; }, get skin() { return skin; }, THREE, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
+  get player() { return player; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
   manual: (v) => { manual = v; },

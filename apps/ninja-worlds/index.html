@@ -89,6 +89,15 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 body.tvmode #touch{display:none!important}
 #titleTV{margin-top:4px;border:1px solid rgba(125,211,252,.5);background:rgba(14,116,144,.25);color:#e0f2fe;border-radius:999px;padding:10px 22px;font-size:15px;font-weight:800;cursor:pointer}
 button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shadow:0 0 22px rgba(255,209,102,.75)!important;transform:scale(1.03)}
+#coins{color:#ffd23f}#coins.pop{animation:cp .35s}@keyframes cp{50%{transform:scale(1.25)}}
+.shopHead{font-weight:900;color:#ffd23f;margin:4px 0 8px}#upgList .u{display:flex;flex-direction:column;gap:3px}#upgList .buy{margin:6px 0 0;padding:9px;border-radius:12px;background:linear-gradient(180deg,#ffe08a,#f59e0b);color:#1a1200;border:0;font-weight:900}#upgList .buy[data-poor]{background:rgba(255,255,255,.08);color:#94a3b8}#upgList em{font-style:normal;color:#86efac;font-weight:800;font-size:13px}
+#radar{position:fixed;z-index:6;top:calc(64px + env(safe-area-inset-top));left:12px;width:132px;height:132px;display:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}body.shipmode #radar{display:block}
+#phase{position:fixed;z-index:7;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:22px;font-weight:900;text-shadow:0 0 14px currentColor,0 3px 6px #000;display:none;white-space:nowrap}#phase.on{display:block}
+#ammo{position:fixed;z-index:6;left:12px;top:calc(204px + env(safe-area-inset-top));font-weight:900;font-size:15px;text-shadow:0 2px 4px #000;display:none}body.shipmode #ammo{display:block}
+#cross{position:fixed;z-index:6;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;display:none;pointer-events:none}#cross.on{display:block}#cross:before,#cross:after{content:"";position:absolute;background:#ff3030;box-shadow:0 0 6px #ff0000}#cross:before{left:12px;top:0;width:2px;height:26px}#cross:after{top:12px;left:0;height:2px;width:26px}
+#scope{position:fixed;inset:0;z-index:6;display:none;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 0,transparent 32vmin,rgba(0,0,0,.96) 32.5vmin)}#scope.on{display:block}#scope:before,#scope:after{content:"";position:absolute;background:rgba(0,0,0,.85)}#scope:before{left:50%;top:18%;bottom:18%;width:2px}#scope:after{top:50%;left:22%;right:22%;height:2px}
+#aimHint{position:fixed;z-index:7;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:13px;font-weight:800;background:rgba(0,0,0,.45);padding:5px 12px;border-radius:999px;display:none;white-space:nowrap}#aimHint.on{display:block}@media (pointer:coarse){#aimHint{bottom:auto;top:calc(110px + env(safe-area-inset-top))}}
+#aimBtn{width:58px;height:58px;right:190px;bottom:150px;border-color:rgba(74,222,128,.8);display:none}body.shipmode #aimBtn{display:grid}
 #help{display:none;text-align:right;font-size:14px;line-height:1.9;color:#cbd5e1;margin-top:6px}#help.on{display:block}
 #doneStats{display:flex;gap:10px;justify-content:center;margin:10px 0}
 #doneStats div{flex:1;background:rgba(255,255,255,.06);border-radius:14px;padding:10px 4px}#doneStats b{display:block;font-size:20px}#doneStats span{font-size:12px;color:#94a3b8}
@@ -107,7 +116,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
   <button id="titleTV">📺 العب على الشاشة الكبيرة والجوال يد تحكم</button>
   <div class="thint">🕹️ العصا يسار للحركة • الأزرار يمين • اسحب بإصبعك يمين الشاشة عشان تلف الكاميرا</div>
   <div class="keys">
-    <span>WASD / الأسهم: حركة</span><span>مسافة: قفز</span><span>J أو كليك: ضرب</span><span>K أو Shift: تدحرج</span><span>E: شيل / تفاعل</span><span>اسحب بالماوس: الكاميرا</span><span>🎮 يد تحكم مدعومة</span>
+    <span>WASD / الأسهم: حركة</span><span>مسافة: قفز</span><span>J أو كليك: ضرب</span><span>K أو Shift: تدحرج</span><span>E: شيل / تفاعل</span><span>اسحب بالماوس: الكاميرا</span><span>R أو كليك يمين: تصويب (عالم السفينة)</span><span>🎮 يد تحكم مدعومة</span>
   </div>
 </div>
 
@@ -115,6 +124,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
   <div id="topbar">
     <div id="hearts"></div>
     <div class="pill" id="shards">💎 0</div>
+    <div class="pill" id="coins">🪙 0</div>
     <div class="pill" id="wname"></div>
     <button id="pauseBtn" aria-label="إيقاف">⏸</button>
   </div>
@@ -127,6 +137,12 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
 <div id="bossbar">🌋 عملاق الحمم<div class="bar"><div id="bossFill"></div></div></div>
 <div id="uw"></div>
 <div id="hurt"></div>
+<canvas id="radar" width="132" height="132"></canvas>
+<div id="phase"></div>
+<div id="ammo"></div>
+<div id="cross"></div>
+<div id="scope"></div>
+<div id="aimHint">🎯 ضرب = أطلق • ✋/E = بدّل السلاح • 🌀 = إلغاء • اسحب للتصويب</div>
 
 <div id="touch">
   <div class="joyhint">حرّك هنا</div>
@@ -136,6 +152,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
     <button id="atkBtn" data-btn="atk">⚔️<small>ضرب</small></button>
     <button id="rollBtn" data-btn="roll">🌀<small>تدحرج</small></button>
     <button id="actBtn" data-btn="act">✋<small>شيل</small></button>
+    <button id="aimBtn" data-btn="aim">🔫<small>تصويب</small></button>
     <button id="spBtn" data-btn="sp" style="display:none">✴️<small>دوّامة</small></button>
   </div>
 </div>
@@ -146,7 +163,7 @@ button.navfocus{outline:3px solid #ffd166!important;outline-offset:2px;box-shado
   <button id="pCheck">🔄 ارجع لآخر نقطة حفظ</button>
   <button id="pHub">🏛️ الرجوع لساحة البوابات</button>
   <button id="pSound">🔊 الصوت: شغّال</button>
-  <button id="pUpg">🎁 الترقيات</button>
+  <button id="pUpg">🛒 المتجر (الترقيات)</button>
   <div id="upgList"></div>
   <button id="pTV">📺 الشاشة الكبيرة (الجوال يد تحكم)</button>
   <button id="pSkin">🧍 شخصيتي ثلاثية الأبعاد (ملف GLB)</button>

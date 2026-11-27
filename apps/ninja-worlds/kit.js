@@ -437,6 +437,77 @@ export function makeKit(L) {
     L.anim.push((dt, t) => { scroll.position.y = 1.3 + Math.sin(t * 2) * 0.08; scroll.rotation.y = t; });
     return g;
   };
+  /* -------- ship world: ocean, storm, containers, lockers, searchlights, ammo -------- */
+  K.ocean = ({ y = -3, size = 900, cz = 40 }) => {
+    const geo = new THREE.PlaneGeometry(size, size, 120, 120); geo.rotateX(-Math.PI / 2);
+    const um = own(new THREE.ShaderMaterial({
+      uniforms: { t: { value: 0 }, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0 } }, fog: true,
+      vertexShader: '#include <fog_pars_vertex>\nuniform float t;varying float h;varying vec3 wp;void main(){vec3 p=position;float a=sin(p.x*.05+t*.9)*1.1+sin(p.z*.07-t*1.2)*.9+sin((p.x+p.z)*.13+t*1.7)*.35;p.y+=a;h=a;vec4 w=modelMatrix*vec4(p,1.);wp=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;\n#include <fog_vertex>\n}',
+      fragmentShader: '#include <fog_pars_fragment>\nuniform float t;varying float h;varying vec3 wp;void main(){float f=smoothstep(1.2,2.3,h+sin(wp.x*.8+t*3.)*.3);vec3 c=mix(vec3(.02,.05,.08),vec3(.07,.15,.2),clamp(h*.3+.5,0.,1.));c=mix(c,vec3(.7,.8,.85),f*.6);gl_FragColor=vec4(c,1.);\n#include <fog_fragment>\n}',
+    }));
+    const m = new THREE.Mesh(geo, um); m.position.set(0, y, cz); L.add(m); L.anim.push((dt, t) => { um.uniforms.t.value = t; });
+  };
+  K.rain = () => {
+    const n = 1400, g = new THREE.BufferGeometry(), p = new Float32Array(n * 6);
+    for (let i = 0; i < n; i++) { const x = (Math.random() - 0.5) * 50, y = Math.random() * 30, z = (Math.random() - 0.5) * 50; p.set([x, y, z, x + 0.15, y - 0.9, z + 0.1], i * 6); }
+    g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+    const rm = new THREE.LineSegments(g, own(new THREE.LineBasicMaterial({ color: 0x9fb8c9, transparent: true, opacity: 0.35 }))); rm.frustumCulled = false; rm.userData.dyn = true; L.add(rm); L.rainMesh = rm;
+    L.anim.push((dt) => { const a = g.attributes.position.array; for (let i = 0; i < a.length; i += 6) { a[i + 1] -= 26 * dt; a[i + 4] -= 26 * dt; if (a[i + 4] < -2) { a[i + 1] += 30; a[i + 4] += 30; } } g.attributes.position.needsUpdate = true; });
+  };
+  const CONT = [0x9b2c2c, 0x1e4e8c, 0x2f6b3a, 0xb7791f, 0x4a4e69, 0x7c2d12];
+  K.container = ({ x, y = 0, z, rot = 0, color, stack = 1 }) => {
+    for (let k = 0; k < stack; k++) {
+      const w = rot ? 6 : 2.5, d = rot ? 2.5 : 6, h = 2.6, yy = y + h * (k + 1);
+      const b = K.plat({ x, y: yy, z, w, d, h, rock: false, m: own(new THREE.MeshStandardMaterial({ color: color ?? CONT[(Math.abs(Math.round(x * 3 + z + k)) % CONT.length)], roughness: 0.55, metalness: 0.45 })) });
+      // corrugation ribs
+      const rib = own(new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6, metalness: 0.5, transparent: true, opacity: 0.35 }));
+      const along = rot ? w : d; for (let i = -along / 2 + 0.4; i < along / 2; i += 0.55) { const r = new THREE.Mesh(new THREE.BoxGeometry(rot ? 0.06 : w + 0.02, h - 0.2, rot ? d + 0.02 : 0.06), rib); r.position.set(rot ? i : 0, 0, rot ? 0 : i); b.mesh.add(r); }
+    }
+  };
+  K.railing = ({ x0, x1, z0, z1, y = 0 }) => {
+    const len = Math.hypot(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, alongX = Math.abs(x1 - x0) > Math.abs(z1 - z0);
+    K.plat({ x: cx, y: y + 1.1, z: cz, w: alongX ? len : 0.12, d: alongX ? 0.12 : len, h: 1.1, rock: false, hidden: true, ledge: false }).active = true;
+    const mm = mat('dark', { metalness: 0.7, roughness: 0.4 });
+    const top = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : 0.08, 0.08, alongX ? 0.08 : len), mm); top.position.set(cx, y + 1.05, cz); L.add(top);
+    const mid = top.clone(); mid.position.y = y + 0.55; L.add(mid);
+    for (let i = 0; i <= len; i += 2) { const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.1, 0.07), mm); post.position.set(alongX ? x0 + Math.sign(x1 - x0) * i : cx, y + 0.55, alongX ? cz : z0 + Math.sign(z1 - z0) * i); L.add(post); }
+  };
+  K.locker = ({ x, y = 0, z, rot = 0 }) => {
+    L.lockers = L.lockers || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; L.add(g);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.1, 0.8), own(new THREE.MeshStandardMaterial({ color: 0x5b6b7a, roughness: 0.5, metalness: 0.6 }))); body.position.y = 1.05; body.castShadow = true; g.add(body);
+    for (let i = 0; i < 4; i++) { const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.02), mat('dark')); v.position.set(0, 1.6 + i * 0.08, 0.41); g.add(v); }
+    const lab = textSprite('خزانة', { size: 40, scale: 0.35, glow: '#94a3b8' }); lab.position.y = 2.5; g.add(lab);
+    const fwd = new V(Math.sin(rot), 0, Math.cos(rot));
+    const b = K.plat({ x, y: y + 2.1, z, w: rot % Math.PI ? 0.8 : 1.1, d: rot % Math.PI ? 1.1 : 0.8, h: 2.1, rock: false, hidden: true }); b.active = true;
+    const Lk = { pos: new V(x, y, z), front: new V(x, y, z).addScaledVector(fwd, 0.95), yaw: rot, body: null, g };
+    L.lockers.push(Lk); return Lk;
+  };
+  K.searchlight = ({ x, y, z, from = -1, to = 1, speed = 0.5, range = 16, tilt = 0.45 }) => {
+    L.searchlights = L.searchlights || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g);
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 0.4, 10), mat('dark')); g.add(base);
+    const head = new THREE.Group(); head.position.y = 0.45; g.add(head); head.userData.dyn = true;
+    const lamp = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.25, 0.6, 12), mat('dark', { metalness: 0.6 })); lamp.rotation.x = Math.PI / 2; head.add(lamp);
+    const geo = new THREE.ConeGeometry(Math.tan(0.22) * range, range, 24, 1, true); geo.translate(0, -range / 2, 0); geo.rotateX(-Math.PI / 2);
+    const cone = new THREE.Mesh(geo, own(new THREE.MeshBasicMaterial({ color: 0xfffbe0, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending }))); head.add(cone);
+    const S = { pos: new V(x, y + 0.45, z), head, cone, yaw: 0, tilt, range, cos: Math.cos(0.22) };
+    L.anim.push((dt, t) => { S.yaw = from + (to - from) * (0.5 + 0.5 * Math.sin(t * speed)); head.rotation.set(tilt, S.yaw, 0, 'YXZ'); });
+    L.searchlights.push(S); return S;
+  };
+  K.ammo = (id, x, y, z, kind = 'pistol', taken) => {
+    if (taken) return; L.ammo = L.ammo || [];
+    const g = new THREE.Group(); g.position.set(x, y, z); L.add(g); g.userData.dyn = true;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.35), own(new THREE.MeshStandardMaterial({ color: kind === 'sniper' ? 0x14532d : 0x1e3a8a, roughness: 0.5, metalness: 0.4, emissive: kind === 'sniper' ? 0x16a34a : 0x2563eb, emissiveIntensity: 0.4 }))); g.add(box);
+    g.add(glowSprite(kind === 'sniper' ? 0x4ade80 : 0x60a5fa, 1.4, 0.6));
+    const A = { id, g, pos: new V(x, y, z), kind, taken: false }; L.ammo.push(A);
+    L.anim.push((dt, t) => { g.rotation.y += dt; g.position.y = y + Math.sin(t * 2 + x) * 0.08; });
+  };
+  K.funnel = ({ x, y, z, r = 1.6, h = 7 }) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.1, h, 20), own(new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.6, metalness: 0.4 }))); m.position.set(x, y + h / 2, z); m.castShadow = true; L.add(m);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, 0.9, 20), own(new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.5 }))); band.position.set(x, y + h * 0.7, z); L.add(band);
+    K.plat({ x, y: y + h, z, w: r * 1.6, d: r * 1.6, h, rock: false, hidden: true }).active = true;
+  };
   K.trigger = (o) => { L.triggers.push({ r: 3, dy: 4, once: true, fired: false, ...o, pos: new V(o.x, o.y ?? 0, o.z) }); };
   K.enemy = (o) => { L.enemyDefs.push(o); };
   return K;

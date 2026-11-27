@@ -13,7 +13,7 @@ export class Player {
   constructor(game, hero) {
     this.g = game; this.h = hero; this.pos = new V(); this.vel = new V(); this.yaw = 0;
     this.state = 'air'; this.onGround = false; this.ground = null; this.t = 0; this.coyote = 0; this.jumpBuf = 0; this.noGrab = 0;
-    this.hp = 5; this.maxHp = 5; this.inv = 0; this.carry = null; this.combo = 0; this.lastAtkEnd = -9; this.lastWall = null;
+    this.hp = 3; this.maxHp = 3; this.inv = 0; this.carry = null; this.combo = 0; this.lastAtkEnd = -9; this.lastWall = null;
     this.phase = 0; this.flip = 0; this.landT = 0; this.stepT = 0; this.contacts = []; this.st = {};
   }
   get fwd() { return new V(Math.sin(this.yaw), 0, Math.cos(this.yaw)); }
@@ -79,6 +79,7 @@ export class Player {
 
   /* ---------- main update ---------- */
   update(dt, inp) {
+    if (this.inLocker) { this.t += dt; this.vel.set(0, 0, 0); this.state = 'ground'; return; }
     this.t += dt; this.inv = Math.max(0, this.inv - dt); this.noGrab = Math.max(0, this.noGrab - dt); this.flip = Math.max(0, this.flip - dt); this.landT = Math.max(0, this.landT - dt);
     if (inp.jumpP) this.jumpBuf = 0.14; else this.jumpBuf = Math.max(0, this.jumpBuf - dt);
     this.inp = inp;
@@ -110,11 +111,12 @@ export class Player {
   locomotion(dt, inp) {
     const { v, m } = this.moveInput(inp);
     this.onBeam = this.onGround && this.ground && this.ground.beam;
-    const max = this.carry ? C.carry : this.onBeam ? C.beam : C.run;
+    const max = this.carry ? C.carry : this.dragging ? 2.6 : this.aiming ? 2.4 : this.onBeam ? C.beam : C.run;
     this.airLock = Math.max(0, (this.airLock || 0) - dt);
     if (this.onGround) this.airLock = 0;
     if (this.airLock <= 0) this.steer(dt, v.clone().multiplyScalar(max), this.onGround ? C.accel : C.airAccel);
-    if (m > 0.1 && this.airLock <= 0) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * (this.onGround ? 14 : 5));
+    if (this.dragging || this.aiming) this.jumpBuf = 0;
+    if (m > 0.1 && this.airLock <= 0 && !this.aiming) this.yaw += angDiff(this.yaw, Math.atan2(v.x, v.z)) * Math.min(1, dt * (this.onGround ? 14 : 5));
     this.coyote = Math.max(0, this.coyote - dt);
     if (this.jumpBuf > 0 && (this.onGround || this.coyote > 0)) {
       this.jumpBuf = 0; this.coyote = 0;
@@ -132,8 +134,8 @@ export class Player {
       if (this.vel.y < 2 && this.noGrab <= 0) { const L = this.findLedge(); if (L) return this.startHang(L); }
       const bar = this.findBar(); if (bar) return this.startSwing(bar);
     }
-    if (inp.atkP && !this.carry) { if (this.onGround || this.coyote > 0) return this.startAttack(); if (this.vel.y < 5) return this.startSlam(); }
-    if (inp.rollP && this.onGround && !this.carry) return this.startRoll(v, m);
+    if (inp.atkP && !this.carry && !this.dragging && !this.aiming) { if (this.onGround || this.coyote > 0) return this.startAttack(); if (this.vel.y < 5) return this.startSlam(); }
+    if (inp.rollP && this.onGround && !this.carry && !this.dragging) return this.startRoll(v, m);
     if (inp.rollP && !this.onGround && !this.carry && this.g.upg.dash && !this.dashed) {
       this.dashed = true; const d = m > 0.2 ? v.clone().normalize() : this.fwd; this.yaw = Math.atan2(d.x, d.z);
       this.vel.set(d.x * 15, 2, d.z * 15); this.airLock = 0.22; this.inv = Math.max(this.inv, 0.25); this.g.sfx.roll();
@@ -394,6 +396,8 @@ export class Player {
       P.shLx = 2.4 + sw * 0.9 * mv; P.shRx = 2.4 - sw * 0.9 * mv; P.shLz = P.shRz = 0.4 + 0.3 * (1 - mv); P.elL = P.elR = 0.4;
       P.thLx = Math.sin(t * 9) * 0.4; P.thRx = -Math.sin(t * 9) * 0.4; P.knL = P.knR = 0.3; P.spineX = 0.1; P.headX = -0.5 * mv; rate = 10;
     } else if (st === 'spin') { P.shRz = 1.5; P.shRx = 1.2; P.elR = 0.1; P.shLz = 1.3; P.thLz = P.thRz = 0.35; P.knL = P.knR = 0.5; P.hipY = -0.15; rate = 30; }
+    if (this.aiming) { P.shRx = 1.5; P.elR = 0.1; P.shLx = 1.35; P.shLz = -0.25; P.elL = 0.5; P.spineY = 0; rate = 22; }
+    if (this.dragging) { P.shLx = P.shRx = -0.7; P.elL = P.elR = 0.3; P.spineX = 0.4; P.hipY -= 0.12; }
     if (this.carry) { P.shLx = P.shRx = 2.75; P.elL = P.elR = 0.55; P.shLz = P.shRz = 0.25; P.spineY = 0; }
     if (this.landT > 0) { const k = this.landT / 0.16; P.hipY -= 0.22 * k; P.knL += 0.9 * k; P.knR += 0.9 * k; P.thLx += 0.5 * k; P.thRx += 0.5 * k; }
     blendPose(h, P, dt, rate, fast);

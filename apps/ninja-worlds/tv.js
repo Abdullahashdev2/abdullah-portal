@@ -41,7 +41,7 @@ function render() {
 function onData(d) {
   if (!d || typeof d !== 'object') return;
   remote.mx = clamp(+d.x || 0, -1, 1); remote.my = clamp(+d.y || 0, -1, 1); remote.jumpH = !!d.j; remote.rollH = !!d.r;
-  if (d.c && typeof d.c === 'object') for (const k of ['jump', 'atk', 'roll', 'act', 'sp', 'pause']) {
+  if (d.c && typeof d.c === 'object') for (const k of ['jump', 'atk', 'roll', 'act', 'sp', 'pause', 'aim']) {
     const v = d.c[k] | 0, p = last[k];
     if (p != null && v > p && v - p < 20) hooks.press(k, v - p);
     last[k] = v;
