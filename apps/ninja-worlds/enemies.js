@@ -116,10 +116,12 @@ export class Enemies {
     return n;
   }
   hitRadius(p, r, dmg, knock) { let n = 0; for (const e of this.list) { if (!e.alive) continue; if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.boss ? 2 : e.big ? 0.6 : 0) && Math.abs(e.pos.y - p.y) < 2.5) if (this.hurt(e, dmg, p, knock)) n++; } if (this.g.crowd && this.g.crowd.on) n += this.g.crowd.hitRadius(p, r, dmg, knock); return n; }
-  update(dt, pl) {
-    const attackers = this.list.filter((e) => e.st === 'windup' || e.st === 'strike').length;
+  update(dt, plMain) {
+    const attackers = this.list.filter((e) => e.st === 'windup' || e.st === 'strike').length, P2 = this.pl2 && this.pl2.active ? this.pl2 : null;
     for (const e of this.list) {
       e.t += dt; e.cd -= dt;
+      // 👥 مع صديق: كل حارس يتعامل مع أقرب لاعب له
+      const pl = P2 && Math.hypot(P2.pos.x - e.pos.x, P2.pos.z - e.pos.z) < Math.hypot(plMain.pos.x - e.pos.x, plMain.pos.z - e.pos.z) ? P2 : plMain;
       const m = e.m, dx = pl.pos.x - e.pos.x, dz = pl.pos.z - e.pos.z, d = Math.hypot(dx, dz), dy = pl.pos.y - e.pos.y;
       // الجندي البعيد ما ينرسم (يوفّر عشرات أوامر الرسم لكل جندي) — المنطق يكمّل عادي
       if (!e.hidden) { const far = this.cullR || 1e9; let vis = d < far || e.st === 'alert' && d < far * 1.6;
@@ -134,6 +136,10 @@ export class Enemies {
       // knockback + zone clamp
       e.pos.x += e.kb.x * dt; e.pos.z += e.kb.z * dt; e.kb.multiplyScalar(Math.exp(-7 * dt));
       let anim = 'idle';
+      if (this.puppet) { // الضيف: الحارس دمية يتحرك حسب جهاز صاحب العالم
+        const n = e.net; if (n && e.st !== 'held' && e.st !== 'dragged') { const k = Math.min(1, dt * 10); e.pos.x += (n.x - e.pos.x) * k; e.pos.y += (n.y - e.pos.y) * k; e.pos.z += (n.z - e.pos.z) * k; e.yaw += angDiff(e.yaw, n.yaw) * k;
+          if (e.st !== n.st) { e.st = n.st; e.t = 0; } e.alive = n.alive; e.alert = n.alert; if (n.hidden && !e.hidden) { e.hidden = true; e.m.g.visible = false; } anim = n.anim; }
+      } else {
       const shipAnim = e.ship && e.alive ? this.shipThink(e, dt, pl, d, dy, dx, dz, toYaw) : null;
       if (shipAnim) anim = shipAnim;
       else if (e.guard && !e.alert && e.alive && (e.st === 'idle' || e.st === 'chase')) { anim = this.patrol(e, dt, pl, d, dy, dx, dz); }
@@ -180,6 +186,8 @@ export class Enemies {
           break;
         }
       }
+      }
+      e.anim = anim;
       const z = e.zone; e.pos.x = Math.max(z.x0, Math.min(z.x1, e.pos.x)); e.pos.z = Math.max(z.z0, Math.min(z.z1, e.pos.z));
       // separation
       for (const o of this.list) { if (o === e || !o.alive || o.st === 'sleep' || o.st === 'dragged' || e.st === 'dragged' || o.st === 'held' || e.st === 'held') continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.boss || o.boss) ? 4 : (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
@@ -206,6 +214,7 @@ export class Enemies {
       e.flash = Math.max(0, e.flash - dt); if (m.human) { m.bodyM.emissive.setHex(e.flash > 0 ? 0x777777 : 0x000000); m.bodyM.emissiveIntensity = 1; } else m.bodyM.emissive.setHex(e.flash > 0 ? 0xffffff : e.big ? 0x6b0f0f : 0x3b0d66); m.bodyM.emissiveIntensity = e.flash > 0 ? 1.2 : e.st === 'windup' ? 1.0 : 0.55;
     }
     this.list = this.list.filter((e) => !e.gone);
+    const pl = plMain;
     this.updateShots(dt, pl);
     // heart pickups
     for (const p of this.pickups) {
@@ -410,6 +419,7 @@ export class Enemies {
           b.mine = true; b.life = 2; this.g.sfx.hit(); this.g.hitstop(0.05); this.g.fx.emit(p, { color: 0xffd166, count: 16, speed: 5, life: 0.3 }); continue;
         }
         if (p.distanceTo(chest) < 0.6) { pl.damage(1, p); b.life = 0; }
+        else if (this.pl2 && this.pl2.active && p.distanceTo(this.pl2.pos.clone().add(new V(0, this.pl2.prone ? 0.3 : 1.1, 0))) < 0.6) { this.pl2.damage(1, p); b.life = 0; }
       } else for (const e of this.list) if (e.alive && e.pos.clone().add(new V(0, e.boss ? 3 : 1.1, 0)).distanceTo(p) < (e.boss ? 2.6 : 1.0)) { this.hurt(e, 2, p, 5); b.life = 0; break; }
       for (const x of this.g.level.nearR(p.x, p.z, 1)) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) { b.life = 0; break; }
       if (b.life <= 0) { this.g.fx.emit(p, { color: 0x22d3ee, count: 10, speed: 3, life: 0.3 }); b.m.removeFromParent(); }

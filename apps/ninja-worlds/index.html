@@ -65,6 +65,7 @@ body.m-hang.m-pull #atkBtn{display:grid!important;animation:pullGlow 1s infinite
 #proneBtn{display:none;--c:148,163,184;width:50px;height:50px;right:186px;bottom:86px}body.shipmode #proneBtn{display:grid}body.m-hang #proneBtn,body.m-hold #proneBtn,body.m-drive #proneBtn{display:none!important}body.m-aim #proneBtn{right:112px;bottom:96px}body.bs-sym #proneBtn{right:236px;bottom:94px}
 #throwBtn{display:none;--c:226,232,240;width:50px;height:50px;right:186px;bottom:168px}body.shipmode #throwBtn{display:grid}body.m-hang #throwBtn,body.m-hold #throwBtn,body.m-drive #throwBtn,body.m-aim #throwBtn{display:none!important}body.bs-sym #throwBtn{right:236px;bottom:236px}
 #noiseM{display:none;position:fixed;z-index:6;left:12px;top:calc(232px + env(safe-area-inset-top));font-size:13px;font-weight:700;color:#e5e7eb;background:#0009;border-radius:999px;padding:3px 10px;align-items:center;gap:3px;pointer-events:none}body.shipmode #noiseM{display:flex}#noiseM i{display:inline-block;width:6px;height:12px;border-radius:2px;background:#334155}#noiseM i.on{background:#facc15}#noiseM i.on:nth-child(n+4){background:#ef4444}#noiseM b{color:#f87171}#noiseM span{color:#86efac}
+#coopBody{font-size:14px;line-height:1.7;margin:6px 0;text-align:center}#coopBody .code{font-size:40px;font-weight:900;color:#ffd166;letter-spacing:10px}#coopReq{position:fixed;z-index:40;left:50%;top:calc(8px + env(safe-area-inset-top));transform:translateX(-50%);display:none}#coopReq.on{display:block}#coopReq .card2{background:linear-gradient(135deg,#0f172a,#1e1b4b);border:2px solid #38bdf8;border-radius:16px;padding:10px 14px;box-shadow:0 10px 30px #000a}#coopReq h3{margin:0 0 8px;font-size:15px}#coopReq button{font:inherit;font-weight:800;border-radius:10px;border:0;padding:8px 16px}#coopYes{background:#22c55e;color:#04110a}#coopNo{background:#334155;color:#fff}#coopPill{position:fixed;z-index:7;right:12px;top:calc(60px + env(safe-area-inset-top));display:none;background:rgba(2,132,199,.85);color:#fff;font-weight:800;font-size:12.5px;border-radius:999px;padding:4px 12px;pointer-events:none}#coopPill.on{display:block}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -284,6 +285,7 @@ body:not(.shipmode) #phase{left:12px!important}
   <button id="pBtnStyle">🎮 شكل الأزرار: كلاسيكي ▾</button>
   <button id="pHQ">🎮 الجودة: تلقائي</button>
   <button id="pVol">🎚️ ضبط الأصوات</button>
+  <button id="pCoop">👥 العب مع صديق</button>
   <button id="pProg">📊 تقدّمك</button>
   <button id="pHelp">🎮 طريقة اللعب</button>
   <div id="help">
@@ -327,6 +329,14 @@ body:not(.shipmode) #phase{left:12px!important}
   <label class="vrow"><span>🌧️ الطبيعة والأجواء (مطر، رياح، بحر)</span><input type="range" min="0" max="1" step="0.05" data-k="amb"></label>
   <label class="vrow"><span>🗣️ أصوات الأشخاص (الحراس)</span><input type="range" min="0" max="2" step="0.05" data-k="voice"></label>
   <button id="volTest">🔈 جرّب الأصوات</button><button id="volClose">تمام ✓</button></div></div>
+<div class="sheet" id="coop"><div class="card"><h2 style="margin:0 0 8px">👥 العب مع صديق</h2>
+  <label class="vrow"><span>اسمك (يطلع فوق راسك)</span><input id="coopName" maxlength="16" style="height:38px;border-radius:10px;border:1px solid #334155;background:#0b1020;color:#fff;padding:0 10px;font:inherit"></label>
+  <div id="coopBody"></div>
+  <button id="coopHost">📡 ادعُ صديق لعالمي</button>
+  <div style="display:flex;gap:8px;margin-top:8px"><input id="coopCode" inputmode="numeric" maxlength="4" placeholder="الكود" style="flex:1;height:44px;border-radius:12px;border:1px solid #334155;background:#0b1020;color:#ffd166;font-size:22px;text-align:center;letter-spacing:6px"><button id="coopJoin" style="margin:0;flex:1">🔑 ادخل عالمه</button></div>
+  <button id="coopLeave" hidden>🚪 إنهاء اللعب الجماعي</button><button id="coopClose">رجوع</button></div></div>
+<div id="coopReq"><div class="card2"><h3 id="coopReqT"></h3><div style="display:flex;gap:10px"><button id="coopYes">✅ اسمح</button><button id="coopNo">❌ ارفض</button></div></div></div>
+<div id="coopPill"></div>
 <div class="sheet" id="prog"><div class="card"><h2 style="margin:0 0 6px">📊 تقدّمك</h2><div id="progTotal"></div><div id="progList"></div><button id="progClose">رجوع</button></div></div>
 <div id="installSheet"><div class="card2"><h3>📲 ثبّت النينجا كتطبيق</h3><div id="installSteps"></div><button id="installGo">تمام 👍</button></div></div>
 <div id="loader" class="on boot"><canvas id="ldArt"></canvas><div class="ldShade"></div>

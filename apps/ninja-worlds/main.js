@@ -11,6 +11,7 @@ import { Stealth } from './stealth.js';
 import { Cars } from './cars.js';
 import { Crowd } from './battle/crowd.js';
 import { BattleCombat } from './battle/combat.js';
+import { Net } from './net.js';
 import { icon } from './icons.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
@@ -286,6 +287,7 @@ function loadWorld(id, from) {
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
   level.buildGrid(); level.keys = {}; liteify(level.group); if (cfg.ship || cfg.batch) { try { level.batch(); } catch (e) { console.warn('batch failed', e); } } freezeStatic(level.group); buildDrawDist(); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
+  net.onWorldLoaded(id);
 }
 /* 👁️ مدى الرؤية (مثل ببجي): القطع الصغيرة والكتابات البعيدة ما تنرسم — تظهر لما تقرّب. الكبيرة (جدران/أرضيات) دايماً ظاهرة */
 let drawList = [], drawT = 0; const _dv = new V();
@@ -444,7 +446,8 @@ function drawLoaderArt(id) {
   }
 }
 let loading = false;
-function goWorld(id, from) {
+function goWorld(id, from, viaNet) {
+  if (net.role === 'guest' && net.on && !viaNet) { say('👥 صاحب العالم هو اللي يختار العالم — انتظر لين يتنقّل'); return; }
   if (loading) return; loading = true;
   const L = $('#loader'), m = WMETA[id] || WMETA.hub, name = WORLD_NAMES[id] || '';
   L.classList.remove('boot', 'out'); drawLoaderArt(id);
@@ -508,6 +511,26 @@ $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); goWorld('hub', null); };
 $('#pSound').onclick = () => dropdown($('#pSound'), [[true, '🔊 شغّال'], [false, '🔇 مطفي']], sfx.on, (v) => { if (v !== sfx.on) sfx.toggle(); $('#pSound').textContent = sfx.on ? '🔊 الصوت: شغّال ▾' : '🔇 الصوت: مطفي ▾'; });
+/* 👥 اللعب مع صديق */
+const net = new Net({ get player() { return player; }, get hero() { return hero; }, get enemies() { return enemies; }, get stealth() { return stealth; }, scene, sfx, say: (t) => say(t), level: () => level, cfg: () => cfg, worldId: () => worldId,
+  loadNet: (id) => goWorld(id || 'hub', null, true), netUI: (st, x, n) => coopUI(st, x, n) });
+try { $('#coopName').value = localStorage.getItem('nw_name') || ''; } catch (e) {}
+$('#coopName').oninput = () => { try { localStorage.setItem('nw_name', $('#coopName').value.trim() || 'لاعب'); } catch (e) {} };
+$('#pCoop').onclick = () => { coopUI(net.role ? (net.on ? 'connected' : net.role === 'host' ? 'host-ready' : 'joining') : 'idle', null, net); $('#coop').classList.add('on'); };
+$('#coopClose').onclick = () => $('#coop').classList.remove('on');
+$('#coopHost').onclick = () => { if (!$('#coopName').value.trim()) $('#coopName').value = 'لاعب'; $('#coopName').oninput(); net.host(); };
+$('#coopJoin').onclick = () => { const c = $('#coopCode').value.replace(/\D/g, ''); if (c.length !== 4) { $('#coopBody').textContent = 'اكتب الكود ٤ أرقام اللي عند صديقك'; return; } $('#coopName').oninput(); net.join(c); };
+$('#coopLeave').onclick = () => { if (net.role === 'host' && net.on) net.kick(); else net.drop(net.role === 'guest' ? 'host-left' : 'left'); $('#coop').classList.remove('on'); };
+$('#coopYes').onclick = () => { $('#coopReq').classList.remove('on'); net.accept(); };
+$('#coopNo').onclick = () => { $('#coopReq').classList.remove('on'); net.deny(); };
+function coopUI(st, x, n) {
+  const B = $('#coopBody'), pill = $('#coopPill'); $('#coopLeave').hidden = !n.role; $('#coopHost').hidden = !!n.role; $('#coopJoin').parentElement.style.display = n.role ? 'none' : 'flex';
+  const T = { idle: 'تلعب مع أخوك أو صديقك عن بعد: واحد «يدعو» ويعطي الكود، والثاني يكتبه ويدخل.', 'host-wait': '⏳ يجهّز الغرفة…', 'host-ready': 'أرسل هالكود لصديقك:<div class="code">' + n.code + '</div>⏳ ننتظره يدخل — بيطلع لك تنبيه «اسمح / ارفض»', joining: '⏳ يدوّر على عالم صديقك…', waiting: '⏳ وصلنا! ننتظر صاحب العالم يسمح لك…', connected: '✅ متصلين! ' + (n.other ? '👥 ' + n.other.name : ''), denied: x === 'full' ? '❌ العالم فيه لاعب ثاني الحين' : '❌ صاحب العالم رفض الدخول', closed: 'انتهى اللعب الجماعي', err: '⚠️ ما قدرنا نتصل (' + (x || '') + ') — تأكد من الكود والإنترنت وجرّب مرة ثانية' };
+  B.innerHTML = T[st] || '';
+  if (st === 'request') { $('#coopReqT').textContent = '👥 «' + x + '» يبي يدخل عالمك'; $('#coopReq').classList.add('on'); }
+  pill.classList.toggle('on', st === 'connected'); if (st === 'connected') pill.textContent = '👥 ' + (n.other ? n.other.name : '') + (n.role === 'host' ? ' في عالمك' : ' (صاحب العالم)');
+  if (st === 'connected') setTimeout(() => $('#coop').classList.remove('on'), 900);
+}
 $('#pVol').onclick = () => { document.querySelectorAll('#volSheet input').forEach((r) => { r.value = sfx.vol[r.dataset.k]; }); $('#volSheet').classList.add('on'); };
 document.querySelectorAll('#volSheet input').forEach((r) => { r.addEventListener('input', () => sfx.setVol(r.dataset.k, +r.value)); r.addEventListener('pointerdown', (e) => e.stopPropagation()); });
 $('#volClose').onclick = () => $('#volSheet').classList.remove('on');
@@ -1152,6 +1175,7 @@ function simulate(dt) {
     inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = inp.proneP = inp.throwP = false; acc -= STEP; n++;
   }
   if (n === 14) acc = 0;
+  net.update(dt);
   worldLogic(dt);
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('#toast').classList.remove('on'); }
 }
@@ -1191,7 +1215,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get charge() { return G.charge; }, get camera() { return camera; },
+window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get net() { return net; }, get charge() { return G.charge; }, get camera() { return camera; },
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, get heroObj() { return hero; }, handIK: () => handIK(), THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
