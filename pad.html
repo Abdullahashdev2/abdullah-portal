@@ -36,7 +36,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 #hintBar{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:7;max-width:92vw;background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 14px;font:800 14px system-ui;display:none;text-align:center}#hintBar.on{display:block}
 #rot{display:none;position:fixed;inset:0;z-index:10;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
 @media (orientation:portrait){#rot.need{display:flex}}
-#pad button{opacity:var(--padA,.9)}.shoulder[hidden]{display:none!important}
+#pad button{opacity:var(--padA,.9)}
+#pad button.gm{border:2px solid rgba(var(--gc),.8);background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.16),rgba(var(--gc),.12) 45%,rgba(8,11,24,.7) 75%);color:rgb(var(--gc));box-shadow:0 0 16px rgba(var(--gc),.25),inset 0 0 12px rgba(var(--gc),.15)}
+#pad button.gm::before{content:"";position:absolute;inset:5px;border-radius:inherit;border:1px solid rgba(var(--gc),.3);pointer-events:none}
+#pad button.gm svg{width:58%;height:58%;filter:drop-shadow(0 0 4px rgba(var(--gc),.7))}
+#pad button.gm small{bottom:-20px;background:rgba(8,11,24,.75);border:1px solid rgba(var(--gc),.35);border-radius:999px;padding:1px 8px;color:#e5e7eb}
+#pad button.gm.down{transform:scale(.9);background:radial-gradient(circle at 50% 40%,rgba(var(--gc),.55),rgba(var(--gc),.18) 60%,rgba(8,11,24,.6))}
+#pad button.gm.off{opacity:.3;filter:grayscale(1)}.shoulder[hidden]{display:none!important}
 body.nolab #pad button small,body.nolab .shoulder span{display:none}
 /* ✨ ثيم الزجاج الشفاف — تصميمنا الخاص */
 body.glass #pad button{border-radius:30%;border:1.5px solid var(--c);background:linear-gradient(150deg,rgba(255,255,255,.22),rgba(255,255,255,.04) 45%,rgba(0,0,0,.18));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 0 18px -4px var(--c),inset 0 1px 0 rgba(255,255,255,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
@@ -107,7 +113,7 @@ body.psp.joying .nubRest{opacity:.15}
 </div>
 <div id="hintBar"></div>
 <div id="setSheet"><div class="sbox"><h3>⚙️ إعدادات يد التحكم</h3>
-  <div class="srow"><b>🎨 الثيم</b><div class="chips" id="thChips"><button data-v="classic">كلاسيكي (وصف الوظيفة)</button><button data-v="glass">زجاج شفاف ✨</button><button data-v="shapes">أشكال ✕○□△</button></div></div>
+  <div class="srow"><b>🎨 الثيم</b><div class="chips" id="thChips"><button data-v="game">مثل اللعبة ⭐</button><button data-v="classic">كلاسيكي (وصف الوظيفة)</button><button data-v="glass">زجاج شفاف ✨</button><button data-v="shapes">أشكال ✕○□△</button></div></div>
   <div class="srow"><b>📏 حجم الأزرار</b><div class="chips" id="szChips"><button data-v="0.7">صغير</button><button data-v="0.82">وسط</button><button data-v="1">كبير</button></div></div>
   <div class="srow"><b>👁️ الوضوح</b><input type="range" id="alphaR" min="0.3" max="1" step="0.05"></div>
   <div class="srow"><label><input type="checkbox" id="labC"> 🏷️ أظهر وصف كل زر تحته</label></div>
@@ -132,9 +138,10 @@ const FACE = [{ r: 96, b: 8, s: 78, sym: 'x', col: '#60a5fa' }, { r: 188, b: 92,
 const SYM = { x: '<path d="M14 14L50 50M50 14L14 50"/>', sq: '<rect x="14" y="14" width="36" height="36" rx="2"/>', o: '<circle cx="32" cy="32" r="19"/>', tri: '<path d="M32 12L54 50H10z"/>' };
 const svgSym = (k) => '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">' + SYM[k] + '</svg>';
 /* ⚙️ تفضيلات يد التحكم: الثيم، الحجم، الشفافية، الوصف، وربط الأزرار لكل لعبة */
-const PREF = Object.assign({ theme: 'classic', size: 0.82, alpha: 0.9, labels: true, map: {} }, (() => { try { return JSON.parse(localStorage.getItem('pad_pref') || '{}'); } catch (e) { return {}; } })());
+const PREF = Object.assign({ theme: 'game', size: 0.82, alpha: 0.9, labels: true, map: {} }, (() => { try { return JSON.parse(localStorage.getItem('pad_pref') || '{}'); } catch (e) { return {}; } })());
 const savePref = () => { try { localStorage.setItem('pad_pref', JSON.stringify(PREF)); } catch (e) {} };
 let PSP = false;
+if (!PREF.v2) { if (PREF.theme === 'classic') PREF.theme = 'game'; PREF.v2 = 1; try { localStorage.setItem('pad_pref', JSON.stringify(PREF)); } catch (e) {} }
 function applyTheme() { PSP = PREF.theme === 'shapes'; document.body.classList.toggle('psp', PSP); document.body.classList.toggle('glass', PREF.theme === 'glass'); document.body.classList.toggle('nolab', !PREF.labels); document.documentElement.style.setProperty('--padA', PREF.alpha); }
 applyTheme();
 function orderButtons(list) { const m = PREF.map[layout.title || '?']; if (!m) return list; const out = []; for (const id of m) { const b = list.find((x) => x.id === id); if (b && !out.includes(b)) out.push(b); } for (const b of list) if (!out.includes(b)) out.push(b); return out; }
@@ -181,6 +188,8 @@ function render() {
     const name = parts.length > 1 ? parts.slice(1).join(' ') : b.label;
     el.innerHTML = `<span></span><small></small>`; el.firstChild.textContent = icon; el.lastChild.textContent = name;
     Object.assign(el.style, { width: sl.s * K + 'px', height: sl.s * K + 'px', right: sl.r * K + 'px', bottom: sl.b * K + 'px', borderColor: COLORS[i], fontSize: (i === 0 ? 34 : 24) * K + 'px' }); el.style.setProperty('--c', COLORS[i]);
+    if (!PSP && PREF.theme === 'game' && b.svg) { // نفس شكل أزرار اللعبة: أيقونة مرسومة + حلقة ملونة + وصف تحت
+      el.classList.add('gm'); el.style.setProperty('--gc', b.c || '226,232,240'); if (b.br) el.style.borderRadius = b.br; el.style.borderColor = ''; el.innerHTML = b.svg + '<small></small>'; el.lastChild.textContent = b.name || name; if (b.off) el.classList.add('off'); }
     if (PSP) { el.classList.add('face'); el.style.color = sl.col; el.firstChild.outerHTML; el.innerHTML = svgSym(sl.sym) + '<small></small>'; el.lastChild.textContent = name; }
 
     const id = b.id;

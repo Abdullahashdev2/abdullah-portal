@@ -541,8 +541,12 @@ $('#pMirror').onclick = () => dropdown($('#pMirror'), [[false, 'طافي'], [tru
 $('#pTVmode').onclick = () => dropdown($('#pTVmode'), [[false, 'طافي (عادي)'], [true, 'شغّال (للشاشات الضعيفة)']], LITE, (v) => { if (v === LITE) return; LITE = v; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); });
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
 const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : player && player.hullEdge && player.hullEdge() ? '🧗 تعلّق برّا' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 مسدس' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(stealth.gadgetLabel() ? [{ id: 'sp', label: stealth.gadgetLabel() }] : G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
-attachPortal(tvHooks, ninjaLayout);
-if (STREAM) attachPortal(tvHooks, ninjaLayout, true);
+// 🎮 يد التحكم بالجوال تاخذ نفس أيقونات وألوان أزرار اللعبة بالضبط
+const padLayout = () => { const L2 = ninjaLayout(); for (const b of L2.buttons) { const el = document.getElementById(b.id + 'Btn'), h = touchCache[b.id + 'Btn'];
+  if (el && h) { const sv = h.match(/<svg[\s\S]*<\/svg>/), sm = h.match(/<small>([\s\S]*?)<\/small>/); if (sv) b.svg = sv[0]; if (sm) b.name = sm[1]; const cs = getComputedStyle(el); b.c = cs.getPropertyValue('--c').trim(); b.br = cs.borderRadius; b.off = el.classList.contains('off'); } }
+  return L2; };
+attachPortal(tvHooks, padLayout);
+if (STREAM) attachPortal(tvHooks, padLayout, true);
 $('#pTV').onclick = () => { togglePause(false); openBig(); };
 $('#titleTV').onclick = (e) => { e.stopPropagation(); openBig(); };
 $('#tvClose').onclick = () => closeTV();

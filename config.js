@@ -35,6 +35,17 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "pad-game-look",
+      date: "2026-11-28",
+      app: "ninja-worlds",
+      title: "🎮 يد التحكم بنفس شكل اللعبة",
+      items: [
+        "🎮 أزرار يد التحكم بالجوال صارت نفس أزرار اللعبة بالضبط: نفس الأيقونات والألوان والشكل",
+        "💡 الزر اللي ما يشتغل الحين يطلع باهت في يد التحكم بعد",
+        "⚙️ تقدر ترجع للأشكال الثانية من إعدادات يد التحكم ← الثيم",
+      ],
+    },
+    {
       id: "toast-top",
       date: "2026-11-28",
       app: "ninja-worlds",
@@ -755,7 +766,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "8.1.1",
+      version: "8.2",
       leaderboard: { unit: "💎" },
     },
     {
