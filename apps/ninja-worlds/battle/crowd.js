@@ -14,7 +14,7 @@ export class Crowd {
   /* opts: { max, camps:[{x,z,team}], goals:[{x,z}], reserve:[ally, enemy], ui } */
   setup(o) {
     this.clear(); this.on = true; const N = this.n = o.max || 200;
-    this.camps = o.camps; this.goals = o.goals; this.obst = o.obst || []; this.pens = o.pens || []; this.reserve = o.reserve.slice(); this.total = o.reserve.slice(); this.ko = 0; this.combo = 0; this.comboT = 0; this.windups = 0;
+    this.launch = 0; this.camps = o.camps; this.goals = o.goals; this.obst = o.obst || []; this.pens = o.pens || []; this.reserve = o.reserve.slice(); this.total = o.reserve.slice(); this.ko = 0; this.combo = 0; this.comboT = 0; this.windups = 0;
     const F = (k) => new Float32Array(N), I = (k) => new Int16Array(N);
     Object.assign(this, { rt: F(), x: F(), z: F(), y: F(), vx: F(), vy: F(), vz: F(), yaw: F(), hp: F(), t: F(), cd: F(), ph: F(), spin: F(), team: I(), st: I(), tgt: I(), lod: I() });
     const g = this.group = new THREE.Group(); g.userData.dyn = true; this.scene.add(g);
@@ -61,7 +61,7 @@ export class Crowd {
   /* ---------- شبكة مكانية بخلايا ٣م ---------- */
   buildGrid() {
     const G = this.grid; G.clear();
-    for (let i = 0; i < this.n; i++) { if (!this.alive(i)) continue; const k = ((Math.floor(this.x[i] / 3) + 512) << 10) | (Math.floor(this.z[i] / 3) + 512); let a = G.get(k); if (!a) G.set(k, (a = [])); a.push(i); }
+    for (let i = 0; i < this.n; i++) { if (this.st[i] === ST.DEAD) continue; const k = ((Math.floor(this.x[i] / 3) + 512) << 10) | (Math.floor(this.z[i] / 3) + 512); let a = G.get(k); if (!a) G.set(k, (a = [])); a.push(i); }
   }
   near(x, z, r, fn) {
     const G = this.grid, c0 = Math.floor((x - r) / 3), c1 = Math.floor((x + r) / 3), d0 = Math.floor((z - r) / 3), d1 = Math.floor((z + r) / 3);
@@ -69,19 +69,21 @@ export class Crowd {
   }
   /* ---------- ضربات اللاعب ---------- */
   hurt(i, dmg, from, knock) {
-    if (!this.alive(i) || this.team[i] === 0) return false;
+    if (this.team[i] === 0 || this.st[i] === ST.DEAD) return false;
+    if (this.st[i] === ST.FLY) { // 🤹 ضربة وهو بالهوا = يرتفع زيادة (جَغل) وتكمل السلسلة
+      if (this.y[i] < 0.35) return false; this.vy[i] = Math.max(this.vy[i], 3.5 + this.launch * 0.35); this.vx[i] *= 0.4; this.vz[i] *= 0.4; this.addCombo(); this.g.onCrowdHit && this.g.onCrowdHit(); return true; }
     this.hp[i] -= dmg; const dx = this.x[i] - from.x, dz = this.z[i] - from.z, l = Math.hypot(dx, dz) || 1;
     const hp = this._v.set(this.x[i], 1.2, this.z[i]);
     this.g.fx.emit(hp, { color: 0xffffff, count: 6, speed: 6, life: 0.2, size: 0.16, grav: 4 });
-    if (this.hp[i] <= 0) {
+    if (this.hp[i] <= 0 || this.launch > 0) { // الرفع للهوا يطيّره حتى لو باقي فيه نفَس
       const k = 0.7 + knock * 0.75;
-      this.st[i] = ST.FLY; this.t[i] = 0; this.vx[i] = (dx / l) * k; this.vz[i] = (dz / l) * k; this.vy[i] = 3.5 + knock * 0.35; this.spin[i] = (Math.random() - 0.5) * 14;
+      this.st[i] = ST.FLY; this.t[i] = 0; const up = this.launch > 0; this.vx[i] = (dx / l) * (up ? k * 0.25 : k); this.vz[i] = (dz / l) * (up ? k * 0.25 : k); this.vy[i] = up ? this.launch : 3.5 + knock * 0.35; this.spin[i] = (Math.random() - 0.5) * 14;
       this.g.fx.emit(hp, { color: 0xff3b2f, count: 10, speed: 4, life: 0.45, size: 0.26, grav: 6 });
       this.ko++; this.addCombo(); if (this.g.onCrowdKO) this.g.onCrowdKO(this.ko);
     } else { this.st[i] = ST.STAGGER; this.t[i] = 0; this.vx[i] = (dx / l) * knock * 0.6; this.vz[i] = (dz / l) * knock * 0.6; this.addCombo(); }
     return true;
   }
-  addCombo() { this.combo++; this.comboT = 2.2; this._hudDirty = true; }
+  addCombo() { this.combo++; this.comboT = 2.2; this._hudDirty = true; this.g.onCrowdHit && this.g.onCrowdHit(); }
   hitArc(p, yaw, range, cosMin, dmg, knock) {
     if (!this.on) return 0; let n = 0; const fx = Math.sin(yaw), fz = Math.cos(yaw), R = range + 0.35;
     this.near(p.x, p.z, R, (i) => { const dx = this.x[i] - p.x, dz = this.z[i] - p.z, d = Math.hypot(dx, dz); if (d > R || Math.abs(this.y[i] - p.y) > 2.2) return; if (d > 0.5 && (dx * fx + dz * fz) / d < cosMin) return; if (this.hurt(i, dmg, p, knock)) n++; });
@@ -90,7 +92,7 @@ export class Crowd {
   hitRadius(p, r, dmg, knock) { if (!this.on) return 0; let n = 0; this.near(p.x, p.z, r + 0.35, (i) => { if (Math.hypot(this.x[i] - p.x, this.z[i] - p.z) < r + 0.35 && Math.abs(this.y[i] - p.y) < 2.5 && this.hurt(i, dmg, p, knock)) n++; }); return n; }
   nearest(p, maxD) {
     if (!this.on) return null; let best = -1, bd = maxD;
-    this.near(p.x, p.z, maxD, (i) => { if (this.team[i] !== 1) return; const d = Math.hypot(this.x[i] - p.x, this.z[i] - p.z); if (d < bd) { bd = d; best = i; } });
+    this.near(p.x, p.z, maxD, (i) => { if (this.team[i] !== 1 || !this.alive(i)) return; const d = Math.hypot(this.x[i] - p.x, this.z[i] - p.z); if (d < bd) { bd = d; best = i; } });
     return best < 0 ? null : { pos: new V(this.x[best], this.y[best], this.z[best]), d: bd };
   }
   /* ---------- الذكاء ---------- */
@@ -117,7 +119,7 @@ export class Crowd {
       if ((this.rt[i] -= dtx) <= 0 || this.tgt[i] === -1) {
         this.rt[i] = 0.5 + Math.random() * 0.3;
         if (tm === 1 && far < 196 && (onPl < 9 || this.tgt[i] === -2)) { if (this.tgt[i] !== -2) onPl++; this.tgt[i] = -2; }
-        else { let best = -1, bd = 11; this.near(this.x[i], this.z[i], 11, (j) => { if (this.team[j] === tm) return; const d = Math.hypot(this.x[j] - this.x[i], this.z[j] - this.z[i]); if (d < bd) { bd = d; best = j; } }); this.tgt[i] = best >= 0 ? best : -3; }
+        else { let best = -1, bd = 11; this.near(this.x[i], this.z[i], 11, (j) => { if (this.team[j] === tm || !this.alive(j)) return; const d = Math.hypot(this.x[j] - this.x[i], this.z[j] - this.z[i]); if (d < bd) { bd = d; best = j; } }); this.tgt[i] = best >= 0 ? best : -3; }
       }
       let tx, tz, ring = 1.4;
       if (this.tgt[i] === -2) { tx = px; tz = pz; ring = 1.7 + (i % 5) * 0.28; }
@@ -146,7 +148,7 @@ export class Crowd {
         }
       }
       // تباعد (ما يتراكبون)
-      this.near(this.x[i], this.z[i], 1.2, (j) => { if (j === i) return; const ex = this.x[i] - this.x[j], ez = this.z[i] - this.z[j], e2 = ex * ex + ez * ez; if (e2 < 0.7 && e2 > 1e-4) { const e = Math.sqrt(e2), k = (0.84 - e) * 0.5; this.x[i] += ex / e * k; this.z[i] += ez / e * k; } });
+      this.near(this.x[i], this.z[i], 1.2, (j) => { if (j === i || !this.alive(j)) return; const ex = this.x[i] - this.x[j], ez = this.z[i] - this.z[j], e2 = ex * ex + ez * ez; if (e2 < 0.7 && e2 > 1e-4) { const e = Math.sqrt(e2), k = (0.84 - e) * 0.5; this.x[i] += ex / e * k; this.z[i] += ez / e * k; } });
       // تصادم مع السياج والتلال والقلعة: يندفع لأقرب حافة (ويمشي على طولها لين يلقى البوابة)
       for (const r of this.obst) { const x = this.x[i], z = this.z[i]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) { const a = x - r[0], b = r[1] - x, c = z - r[2], d2 = r[3] - z, m = Math.min(a, b, c, d2); if (m === a) this.x[i] = r[0]; else if (m === b) this.x[i] = r[1]; else if (m === c) this.z[i] = r[2]; else this.z[i] = r[3]; } }
       // ما يدخلون جوّا اللاعب

@@ -140,6 +140,7 @@ export class Player {
     if (this.ground && this.ground.active && (this.onGround || this.state === 'hang')) this.pos.add(this.ground.delta);
     const W = this.g.waterAt && this.g.waterAt(this.pos);
     if (W && this.state !== 'swim' && this.state !== 'climb' && this.state !== 'hang' && this.pos.y + 1.0 < W.y1 && this.vel.y <= 0 && this.t > (this.leapT || 0)) this.startSwim(W);
+    if (inp.spP && this.battle && !this.carry && (this.state === 'ground' || this.state === 'air')) { inp.spP = false; this.startCharge(0); }
     if (inp.spP && !this.carry && (this.state === 'ground' || this.state === 'air' || this.state === 'attack')) this.startSpin();
     switch (this.state) {
       case 'ground': case 'air': this.locomotion(dt, inp); break;
@@ -154,6 +155,7 @@ export class Player {
       case 'swim': this.swimUpd(dt, inp); break;
       case 'hug': this.hugUpd(dt, inp); break;
       case 'spin': this.spinUpd(dt); break;
+      case 'charge': this.chargeUpd(dt, inp); break;
       case 'hurt': this.st.hurtT -= dt; this.phys(dt); if (this.st.hurtT <= 0) this.state = this.onGround ? 'ground' : 'air'; break;
     }
     if (this.pos.y < this.g.level.cfg.killY) this.g.onFall();
@@ -291,21 +293,21 @@ export class Player {
   /* ---------- combat ---------- */
   startAttack() {
     if (this.spy && this.g.tryGrab && this.g.tryGrab()) return; // وراه وما انتبه؟ امسكه
-    this.combo = this.t - this.lastAtkEnd < 0.45 && this.combo < 3 ? this.combo + 1 : 1;
+    this.combo = this.t - this.lastAtkEnd < 0.45 && this.combo < this.maxC ? this.combo + 1 : 1;
     this.state = 'attack'; this.st.aT = 0; this.st.hit = false; this.st.queued = false;
     const e = this.g.enemies.nearest(this.pos, 4.5); this.st.tgt = e || null; if (e) this.yaw = Math.atan2(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
     if (this.spy) { this.g.sfx.noise(0.08, 500, 1, 0.12, 'bandpass'); } else this.g.sfx.slash(this.combo);
   }
   attackUpd(dt, inp) {
-    this.st.aT += dt; const dur = ATK[this.combo], k = this.st.aT / dur, f = this.fwd; this.atkK = k;
-    let lunge = k < 0.35 ? (this.combo === 3 ? 7 : 5) * (1 - k / 0.35) * (this.spy ? 0.55 : 1) : 0;
+    this.st.aT += dt; const dur = this.atkDur(this.combo), k = this.st.aT / dur, f = this.fwd; this.atkK = k;
+    let lunge = k < 0.35 ? (this.combo === this.maxC ? 7 : 5) * (1 - k / 0.35) * (this.spy ? 0.55 : 1) : 0;
     // 🎯 نقرّب للمسافة الصحيحة بالضبط عشان الضربة توصل للوجه/الصدر (مو في الهوا ولا داخل جسمه)
     const T = this.st.tgt;
     if (T && k < 0.4 && (T.alive !== false)) { const dx = T.pos.x - this.pos.x, dz = T.pos.z - this.pos.z, dd = Math.hypot(dx, dz), want = this.spy ? (this.combo === 3 ? 1.0 : 0.62) : 1.25;
       this.yaw += angDiff(this.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 20); lunge = Math.max(-3, Math.min(16, (dd - want) / Math.max(1 / 60, dur * (0.36 - k)))); }
     this.vel.x = f.x * lunge; this.vel.z = f.z * lunge; this.phys(dt);
     if (!this.st.hit && k >= 0.38) {
-      this.st.hit = true; const big = this.combo === 3;
+      this.st.hit = true; const big = this.combo === this.maxC;
       // بدلة التجسس: لكمة، لكمة، ركلة دوّارة — مدى أقصر من السيف
       const n = this.spy ? this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.0 : 1.75, 0.35, big ? 2 : 1, big ? 7 : 1.2) : this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
       if (n) { this.g.hitstop(big ? 0.09 : 0.055); this.g.shake(big ? 0.3 : 0.14); this.g.sfx.hit(); }
@@ -313,7 +315,8 @@ export class Player {
     if (inp.atkP) this.st.queued = true;
     if (this.jumpBuf > 0 && k > 0.45) { this.state = 'ground'; this.lastAtkEnd = this.t; return; }
     if (inp.rollP && k > 0.3) { this.lastAtkEnd = -9; const { v, m } = this.moveInput(inp); return this.startRoll(v, m); }
-    if (k >= 1) { this.lastAtkEnd = this.t; if (this.st.queued && this.combo < 3) return this.startAttack(); this.state = this.onGround ? 'ground' : 'air'; if (this.combo >= 3) this.combo = 0; }
+    if (inp.spP && this.battle && k > 0.3) { inp.spP = false; return this.startCharge(this.combo); } // ضربة قوية تكمّل السلسلة (C1..C6)
+    if (k >= 1) { this.lastAtkEnd = this.t; if (this.st.queued && this.combo < this.maxC) return this.startAttack(); this.state = this.onGround ? 'ground' : 'air'; if (this.combo >= this.maxC) this.combo = 0; }
   }
   /* ---------- swing bars ---------- */
   findBar() {
@@ -352,6 +355,24 @@ export class Player {
     if (inp.rollP) { this.state = 'air'; this.noBar = this.t; this.vel.set(0, 0, 0); }
   }
   /* ---------- spin special (unlocked by shards) ---------- */
+  get battle() { const c = this.g.level && this.g.level.cfg; return !!(c && c.battle); }
+  get maxC() { return this.battle ? 6 : 3; }
+  atkDur(c) { return this.battle ? (c === 6 ? 0.42 : 0.24) : ATK[c] || ATK[1]; }
+  /* ⚔️ الضربة القوية: نوعها حسب كم ضربة خفيفة قبلها — 0 رفع للهوا، 1 طعنة تكسر الدفاع، 2 دوران، 3 موجة، 4 سلسلة سريعة، 5 ضربة أرضية */
+  startCharge(n) {
+    if (this.g.charge && this.g.charge.busy && this.g.charge.busy()) return;
+    const D = [0.5, 0.5, 0.62, 0.55, 0.78, 0.66][n] || 0.5, H = { 2: [0.25, 0.55], 4: [0.3, 0.5, 0.7] }[n] || [0.45];
+    const e = this.g.enemies.nearest(this.pos, 5); if (e) this.yaw = Math.atan2(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
+    this.state = 'charge'; this.st.cT = 0; this.st.cN = n; this.st.cD = D; this.st.cH = H; this.st.cI = 0; this.combo = 0; this.g.sfx.slash(3);
+  }
+  chargeUpd(dt, inp) {
+    const s = this.st; s.cT += dt; const k = s.cT / s.cD, f = this.fwd;
+    const lunge = s.cN === 1 ? (k < 0.45 ? 11 : 0) : s.cN === 5 ? 0 : k < 0.3 ? 4 : 0;
+    this.vel.x = f.x * lunge; this.vel.z = f.z * lunge; this.phys(dt);
+    if (s.cI < s.cH.length && k >= s.cH[s.cI]) { this.g.charge && this.g.charge.hit(s.cN, s.cI, this); s.cI++; }
+    if (inp.rollP && k > 0.6) { const { v, m } = this.moveInput(inp); return this.startRoll(v, m); }
+    if (k >= 1) { this.state = this.onGround ? 'ground' : 'air'; this.lastAtkEnd = -9; }
+  }
   startSpin() {
     if (!this.g.upg.spin || this.t < (this.spinReady || 0)) return false;
     this.state = 'spin'; this.st.spT = 0; this.st.hit = 0; this.spinReady = this.t + (this.g.upg.fastSpin ? 1.5 : 3);
@@ -456,15 +477,15 @@ export class Player {
     } else if (st === 'roll') {
       const k = clamp(this.st.rT / 0.46, 0, 1); P.rootPitch = k * Math.PI * 2; P.thLx = P.thRx = 1.9; P.knL = P.knR = 2.3; P.shLx = P.shRx = 0.9; P.elL = P.elR = 1.6; P.spineX = 0.6; P.hipY = -0.3; fast.rootPitch = 80; rate = 30;
     } else if (st === 'attack') {
-      const k = clamp(this.st.aT / ATK[this.combo || 1], 0, 1), w = k < 0.25 ? k / 0.25 : 1, e = easeOut((k - 0.25) / 0.6);
+      const k = clamp(this.st.aT / this.atkDur(this.combo || 1), 0, 1), w = k < 0.25 ? k / 0.25 : 1, e = easeOut((k - 0.25) / 0.6), pc = this.battle ? (this.combo === 6 ? 3 : ((this.combo - 1) % 2) + 1) : this.combo;
       P.thLx = 0.55; P.knL = 0.55; P.thRx = -0.45; P.knR = 0.35; P.spineX = 0.2; P.shLx = 0.6; P.shLz = 0.5; P.elL = 1.2; P.hipY = -0.08;
       if (this.spy) { // قتال بالأيدي: جاب يمين، هوك يسار، ركلة
         P.shLz = 0.25; P.shRz = 0.25; P.shLx = 1.1; P.shRx = 1.1; P.elL = 1.9; P.elR = 1.9; P.spineX = 0.12; P.thLx = 0.35; P.knL = 0.4; P.thRx = -0.2; P.knR = 0.3; // حراسة
         if (this.combo === 1) { P.shRx = 1.1 + 0.45 * e; P.elR = 1.9 - 1.8 * e; P.spineY = -0.45 * e; P.shRz = 0.1; }
         else if (this.combo === 2) { P.shLx = 1.1 + 0.3 * e; P.elL = 1.9 - 1.2 * e; P.shLz = 0.25 + 0.6 * e; P.spineY = 0.55 * e; }
         else { P.thRx = k < 0.25 ? 0.6 * w : 0.6 + 1.0 * e; P.knR = k < 0.25 ? 1.6 : 1.6 - 1.5 * e; P.spineX = -0.15 - 0.2 * e; P.spineY = -0.5 * e; P.thLx = 0.05; P.knL = 0.25; }
-      } else if (this.combo === 1) { P.shRz = k < 0.25 ? 1.4 * w : 1.4 - 1.9 * e; P.shRx = k < 0.25 ? 0.9 : 0.9 + 0.6 * e; P.elR = 0.25; P.spineY = k < 0.25 ? -0.6 * w : -0.6 + 1.3 * e; }
-      else if (this.combo === 2) { P.shRz = k < 0.25 ? -0.4 : -0.4 + 1.9 * e; P.shRx = k < 0.25 ? 1.6 : 1.6 - 0.7 * e; P.elR = 0.3; P.spineY = k < 0.25 ? 0.7 * w : 0.7 - 1.3 * e; P.thLx = -0.3; P.thRx = 0.5; }
+      } else if (pc === 1) { P.shRz = k < 0.25 ? 1.4 * w : 1.4 - 1.9 * e; P.shRx = k < 0.25 ? 0.9 : 0.9 + 0.6 * e; P.elR = 0.25; P.spineY = k < 0.25 ? -0.6 * w : -0.6 + 1.3 * e; }
+      else if (pc === 2) { P.shRz = k < 0.25 ? -0.4 : -0.4 + 1.9 * e; P.shRx = k < 0.25 ? 1.6 : 1.6 - 0.7 * e; P.elR = 0.3; P.spineY = k < 0.25 ? 0.7 * w : 0.7 - 1.3 * e; P.thLx = -0.3; P.thRx = 0.5; }
       else { P.shRx = k < 0.25 ? 3.0 : 3.0 - 2.5 * e; P.elR = k < 0.25 ? 0.5 : 0.1; P.spineX = k < 0.25 ? -0.2 : -0.2 + 0.75 * e; P.hipY = k < 0.25 ? 0.05 : -0.25 * e; P.knL = 0.4 + 0.6 * e; P.knR = 0.3 + 0.6 * e; P.shRz = 0.1; }
       rate = 30;
     } else if (st === 'swing') {
@@ -477,6 +498,14 @@ export class Player {
       const sw = Math.sin(t * 7), mv = Math.min(1, hs / 3);
       P.shLx = 2.4 + sw * 0.9 * mv; P.shRx = 2.4 - sw * 0.9 * mv; P.shLz = P.shRz = 0.4 + 0.3 * (1 - mv); P.elL = P.elR = 0.4;
       P.thLx = Math.sin(t * 9) * 0.4; P.thRx = -Math.sin(t * 9) * 0.4; P.knL = P.knR = 0.3; P.spineX = 0.1; P.headX = -0.5 * mv; rate = 10;
+    } else if (st === 'charge') {
+      const n = this.st.cN, k = clamp(this.st.cT / this.st.cD, 0, 1), up = k < 0.35 ? k / 0.35 : 1, e = easeOut((k - 0.35) / 0.4);
+      P.thLx = 0.6; P.knL = 0.6; P.thRx = -0.5; P.knR = 0.4; P.hipY = -0.12; rate = 32;
+      if (n === 0) { P.shRx = 0.2 + 2.8 * e; P.shRz = 0.3; P.elR = 0.2; P.spineX = 0.3 - 0.6 * e; P.hipY = -0.25 + 0.3 * e; } // من تحت لفوق (رفع)
+      else if (n === 1) { P.shRx = 1.5; P.elR = up < 1 ? 1.4 : 0.05; P.shRz = 0.05; P.spineX = 0.35; P.thLx = 1.0; P.knL = 0.9; P.thRx = -0.8; } // طعنة
+      else if (n === 2 || n === 99) { P.shRz = 1.5; P.shRx = 1.2; P.elR = 0.1; P.shLz = 1.3; P.thLz = P.thRz = 0.35; P.knL = P.knR = 0.5; P.hipY = -0.15; } // دوران
+      else if (n === 5) { P.shRx = k < 0.35 ? 3.0 : 3.0 - 2.7 * e; P.shLx = P.shRx; P.elR = P.elL = 0.2; P.spineX = k < 0.35 ? -0.3 : 0.7 * e; P.hipY = k < 0.35 ? 0.1 : -0.45 * e; P.knL = P.knR = 0.4 + 1.0 * e; } // ضربة أرضية
+      else { const w2 = Math.sin(k * Math.PI * (n === 4 ? 6 : 2)); P.shRz = 1.4 * w2; P.shRx = 1.2; P.elR = 0.25; P.spineY = -0.7 * w2; } // موجة / سلسلة
     } else if (st === 'spin') { P.shRz = 1.5; P.shRx = 1.2; P.elR = 0.1; P.shLz = 1.3; P.thLz = P.thRz = 0.35; P.knL = P.knR = 0.5; P.hipY = -0.15; rate = 30; }
     if (this.aiming) { P.shRx = 1.5; P.elR = 0.1; P.shLx = 1.35; P.shLz = -0.25; P.elL = 0.5; P.spineY = 0; rate = 22; }
     if (this.dragging) { P.shLx = P.shRx = -0.7; P.elL = P.elR = 0.3; P.spineX = 0.4; P.hipY -= 0.12; }
@@ -487,7 +516,7 @@ export class Player {
     const tiltT = this.state === 'swing' ? -this.st.th : this.state === 'swim' ? (hs > 1.2 ? 1.2 : 0.15) : 0;
     this.rootTilt = (this.rootTilt || 0) + (tiltT - (this.rootTilt || 0)) * (this.state === 'swing' ? 1 : Math.min(1, dt * (this.state === 'swim' ? 4 : 12)));
     if (this.state === 'swim') h.root.position.y += 0.9 * Math.sin(this.rootTilt);
-    h.root.rotation.x = this.rootTilt; h.root.rotation.y += this.state === 'spin' ? (this.st.spT / 0.55) * Math.PI * 4 : 0;
+    h.root.rotation.x = this.rootTilt; h.root.rotation.y += this.state === 'spin' ? (this.st.spT / 0.55) * Math.PI * 4 : this.state === 'charge' && (this.st.cN === 2 || this.st.cN === 99) ? (this.st.cT / this.st.cD) * Math.PI * 4 : 0;
     h.root.visible = !(this.inv > 0 && this.hp > 0 && this.state !== 'roll' && Math.floor(this.t * 16) % 2 === 0 && this.inv < 1.15);
     h.sword.visible = !this.carry && !h.spy;
   }

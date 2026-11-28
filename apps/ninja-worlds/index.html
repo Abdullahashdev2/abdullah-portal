@@ -61,6 +61,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 .dd{display:grid;gap:6px;margin:-4px 0 8px;padding:8px;border-radius:14px;background:#0b1020;border:1px solid #334155;animation:ddIn .15s}.dd button{margin:0!important;padding:10px!important;font-size:15px!important;background:#111827!important}.dd button.cur{border-color:#ffd166!important;color:#ffd166}.ddOpen{border-color:#ffd166!important}@keyframes ddIn{from{opacity:0;transform:translateY(-6px)}}
 #touch .btns button.off{opacity:.28!important;filter:grayscale(1) brightness(.7);box-shadow:none!important}#touch .btns button:not(.off){filter:none}
 body.m-hang.m-pull #atkBtn{display:grid!important;animation:pullGlow 1s infinite}@keyframes pullGlow{50%{box-shadow:0 0 22px #ffd166}}
+#rageBar{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));width:min(46vw,300px);height:20px;border-radius:999px;background:#0009;border:2px solid #b45309;overflow:hidden;display:none;pointer-events:none}#rageBar.on{display:block}#rageBar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#f59e0b,#ffd166);transition:width .15s}#rageBar b{position:relative;display:block;text-align:center;font-size:12px;line-height:16px;color:#fff;text-shadow:0 1px 3px #000}#rageBar.full{border-color:#ffd166;box-shadow:0 0 18px #ffb020;animation:rpulse .8s infinite}#rageBar.red i{background:linear-gradient(90deg,#b91c1c,#ff4d4d)}@keyframes rpulse{50%{box-shadow:0 0 30px #ff7a00}}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -174,6 +175,15 @@ body.bs-sym #actBtn{width:62px;height:62px;right:86px;bottom:170px;--c:163,230,5
 body.bs-sym #aimBtn{right:236px;bottom:20px;width:52px;height:52px;--c:125,211,252}
 body.bs-sym #spBtn{right:236px;bottom:168px;width:52px;height:52px;--c:244,114,182}
 body.bs-sym.m-aim #atkBtn{width:76px;height:76px}
+
+/* 🎨 ثيمات الأزرار */
+body.th-royal .btns button{--c:255,209,102!important}
+body.th-crimson .btns button{--c:239,68,68!important;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.08),rgba(60,5,5,.78) 70%)!important}
+body.th-neon #jumpBtn{--c:34,211,238!important}body.th-neon #atkBtn{--c:236,72,153!important}body.th-neon #rollBtn{--c:163,230,53!important}body.th-neon #actBtn{--c:250,204,21!important}body.th-neon #aimBtn{--c:168,85,247!important}body.th-neon #spBtn{--c:251,146,60!important}
+body.th-neon .btns button{box-shadow:0 0 16px rgba(var(--c),.55),inset 0 0 12px rgba(var(--c),.25)!important}
+body.th-ice .btns button{--c:186,230,253!important;background:linear-gradient(160deg,rgba(255,255,255,.2),rgba(14,40,64,.6))!important}
+body.th-mono .btns button{--c:241,245,249!important;background:rgba(0,0,0,.6)!important}
+body.th-custom .btns button{--c:var(--mine)!important}
 </style>
 <script type="importmap">{"imports":{"three":"../saeq-albatal/lib/three.module.min.js","sky":"../saeq-albatal/lib/Sky.js","gltf":"../saeq-albatal/lib/loaders/GLTFLoader.js"}}</script>
 </head>
@@ -205,7 +215,7 @@ body.bs-sym.m-aim #atkBtn{width:76px;height:76px}
 <div id="banner"><div id="bSub"></div><div id="bName"></div></div>
 <div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div></div>
 <div id="prompt"></div>
-<div id="timer"></div><div id="battleHud"></div>
+<div id="timer"></div><div id="battleHud"></div><div id="rageBar"></div>
 <div id="breath"><div id="breathFill"></div></div>
 <div id="bossbar">🌋 عملاق الحمم<div class="bar"><div id="bossFill"></div></div></div>
 <div id="uw"></div>
@@ -254,6 +264,7 @@ body.bs-sym.m-aim #atkBtn{width:76px;height:76px}
   <input type="file" id="skinFile" accept=".glb,model/gltf-binary" hidden>
   <button id="pMirror">🪞 وضع المرآة (لما تبث شاشة الجوال للتلفزيون): طافي</button>
   <button id="pTVmode">📺 وضع التلفزيون</button>
+  <button id="pBtnTheme">🎨 ثيم الأزرار: تلقائي ▾</button>
   <button id="pBtnStyle">🎮 شكل الأزرار: كلاسيكي ▾</button>
   <button id="pHQ">🎮 الجودة: تلقائي</button>
   <button id="pVol">🎚️ ضبط الأصوات</button>

@@ -10,6 +10,7 @@ import { WORLDS } from './worlds.js';
 import { Stealth } from './stealth.js';
 import { Cars } from './cars.js';
 import { Crowd } from './battle/crowd.js';
+import { BattleCombat } from './battle/combat.js';
 import { icon } from './icons.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
@@ -174,10 +175,11 @@ const G = {
   shake: (a) => { shakeAmt = Math.max(shakeAmt, a); if (a > 0.25 && navigator.vibrate) try { navigator.vibrate(30); } catch (e) {} },
   hitstop: (t) => { stopT = Math.max(stopT, t); },
   dust: (p, n) => dust.emit(new V(p.x, p.y + 0.1, p.z), { color: 0xd9c8aa, count: n, speed: 2.2, life: 0.6, size: 0.55, grav: -0.8, drag: 3, spread: 0.5, up: 0.4 }),
-  flashHurt: () => { sendTV({ vib: [70, 40, 70] }); const f = $('#hurt'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
+  flashHurt: () => { if (cfg && cfg.battle) G.charge.addRage(6); sendTV({ vib: [70, 40, 70] }); const f = $('#hurt'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
   hud: () => hudUpdate(),
   onFall: () => respawn('fall'),
   onDeath: () => respawn('death'),
+  onCrowdHit: () => G.charge && G.charge.addRage(0.9),
   onCrowdKO: (n) => { if (n % 10 === 0) addCoins(2, player.pos); if (n % 40 === 0 && player.hp < player.maxHp) { player.hp++; hudUpdate(); say('❤️ ' + n + ' قتيل! رجع لك قلب'); } if (n === 100 || n === 250 || n === 500 || n === 1000) { banner('⚔️ ' + n + ' قتيل!', n >= 1000 ? 'أسطورة الميدان' : 'الجيش يهابك'); sfx.win(); } },
   onEnemyKilled: (e) => { G.hitstop(0.08); addCoins(e.boss ? 150 : e.big ? 20 : e.archer ? 8 : e.guard ? 6 : 5, e.pos); if (Math.random() < (player.hp <= 1 ? 0.45 : 0.18)) enemies.dropHeart(e.pos); },
   dropItem: (forced) => dropItem(forced),
@@ -243,7 +245,7 @@ function buy(key) {
   persist(); hudUpdate(); renderShop(); sfx.win(); say('🎁 اشتريت: ' + it.name);
 }
 hero = buildHero('ninja'); scene.add(hero.root);
-player = new Player(G, hero); enemies = new Enemies(G); cars = new Cars(G); G.crowd = new Crowd(G, scene);
+player = new Player(G, hero); enemies = new Enemies(G); cars = new Cars(G); G.crowd = new Crowd(G, scene); G.charge = new BattleCombat(G);
 skin = null; scarf = new Scarf(scene, 0xdc2626); trail = new Trail(scene, 0x9be7ff);
 
 /* ---------------- worlds ---------------- */
@@ -271,7 +273,8 @@ function loadWorld(id, from) {
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
   enemies.cullR = cfg.ship ? 55 : 0; for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
-  if (level.battle) { G.crowd.setup({ ...level.battle, ui: $('#battleHud') }); $('#battleHud').classList.add('on'); }
+  if (level.battle) { G.crowd.setup({ ...level.battle, ui: $('#battleHud') }); $('#battleHud').classList.add('on'); G.charge.reset($('#rageBar')); }
+  $('#rageBar').classList.toggle('on', !!level.battle); document.body.classList.toggle('battle', !!level.battle);
   for (const it of level.items) it.origin = it.home.clone();
   applyAtmo(cfg);
   if (level.npcDef) { const d = level.npcDef; npc = buildHero('calm'); npc.root.position.set(d.x, d.y, d.z); npc.root.rotation.y = d.yaw; scene.add(npc.root); npc.line = 0; }
@@ -551,6 +554,15 @@ function dropdown(btn, opts, cur, pick) {
   opts.forEach(([v, label]) => { const o = document.createElement('button'); o.textContent = (v === cur ? '✓ ' : '') + label; if (v === cur) o.className = 'cur'; o.onclick = (ev) => { ev.stopPropagation(); d.remove(); btn.classList.remove('ddOpen'); pick(v); sfx.click && sfx.click(); }; d.appendChild(o); });
   btn.after(d); const m = activeMenu(); if (m) { const bs = menuButtons(m); navIdx = Math.max(0, bs.indexOf(d.querySelector('.cur') || d.firstChild)); menuNav(0); }
 }
+const THEMES = [['auto', 'تلقائي (حسب العالم)'], ['royal', 'ذهبي ملكي'], ['crimson', 'ساموراي أحمر'], ['neon', 'نيون'], ['ice', 'جليدي'], ['mono', 'أبيض وأسود'], ['custom', '🎨 لوني الخاص…']];
+let BTHEME = 'auto', BMINE = '#ffd166'; try { BTHEME = localStorage.getItem('nw_btheme') || 'auto'; BMINE = localStorage.getItem('nw_bmine') || BMINE; } catch (e) {}
+function applyBTheme() { const c = document.body.classList; THEMES.forEach(([k]) => c.toggle('th-' + k, k === BTHEME && k !== 'auto')); const h = BMINE.replace('#', ''); document.body.style.setProperty('--mine', [0, 2, 4].map((i) => parseInt(h.substr(i, 2), 16)).join(',')); const b = $('#pBtnTheme'); if (b) b.textContent = '🎨 ثيم الأزرار: ' + (THEMES.find((t) => t[0] === BTHEME) || THEMES[0])[1].replace('…', '') + ' ▾'; }
+applyBTheme();
+$('#pBtnTheme').onclick = () => dropdown($('#pBtnTheme'), THEMES, BTHEME, (v) => {
+  const save = () => { try { localStorage.setItem('nw_btheme', BTHEME); localStorage.setItem('nw_bmine', BMINE); } catch (e) {} applyBTheme(); };
+  if (v === 'custom') { const inp = document.createElement('input'); inp.type = 'color'; inp.value = BMINE; inp.style.cssText = 'position:fixed;opacity:0;pointer-events:none'; document.body.appendChild(inp); inp.oninput = inp.onchange = () => { BMINE = inp.value; BTHEME = 'custom'; save(); }; inp.click(); setTimeout(() => inp.remove(), 60000); BTHEME = 'custom'; save(); return; }
+  BTHEME = v; save();
+});
 $('#pBtnStyle').onclick = () => dropdown($('#pBtnStyle'), [['classic', 'كلاسيكي (أيقونة + وصف)'], ['sym', 'رموز ✕ ○ □ △ (تصميمنا)'], ['symlab', 'رموز + وصف صغير']], BSTYLE, (v) => { BSTYLE = v; try { localStorage.setItem('nw_bstyle', v); } catch (e) {} applyBStyle(); say(v === 'classic' ? '🎮 رجعت الأزرار الكلاسيكية' : '🎮 ✕ قفز • □ ضرب • ○ تدحرج • △ تفاعل — والأزرار تتغير حسب الموقف بنفس الرمز'); });
 $('#pHQ').onclick = () => dropdown($('#pHQ'), [['auto', 'تلقائي (حسب جوالك)'], ...QL.map((q, i) => [i, q.name])], qMode, (v) => { qMode = v; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); });
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
@@ -607,6 +619,7 @@ function touchLabels() {
   const ammoOK = !stealth.on || stealth.ammo.pistol > 0 || stealth.ammo.sniper > 0;
   setOff('actBtn', !actOK || (hang && !player.driving)); setOff('aimBtn', !aim && !ammoOK); setOff('rollBtn', hang && !player.driving && !swim);
   setOff('atkBtn', aim && stealth.ammo[stealth.weapon] <= 0);
+  if (cfg && cfg.battle) { setBtn('spBtn', lab('spin', 'قوية')); setBtn('actBtn', lab('spin', 'إعصار')); setOff('actBtn', G.charge.rage < 100 && !G.charge.busy()); setOff('spBtn', false); return; }
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
 let kpCur = null, kpVal = '';
@@ -660,6 +673,7 @@ function makeSenseMark() {
   s.scale.set(1.6, 2.6, 1); s.renderOrder = 999; s.userData.k = 0; s.visible = false; return s;
 }
 function interact() {
+  if (cfg && cfg.battle) { G.charge.tryRage(player); return; }
   if (cfg && cfg.city) {
     if (player.driving) { cars.exit(player); sfx.tone(140, 90, 0.2, 'triangle', 0.08); return; }
     const c = cars.nearest(player.pos, 3.3); if (c && !player.carry) { cars.enter(c, player); if (!level._driveTip) { level._driveTip = true; say('🚗 العصا: فوق = بنزين، تحت = فرامل/رجوع، يمين/يسار = دركسون • 🅿️ = فرامل يد (تفحيط) • 💨 = نيترو • 📯 = بوري • ✋ = انزل'); } return; }
@@ -1026,7 +1040,7 @@ function worldLogic(dt) {
   }
   // prompt
   let label = '';
-  { const spb = $('#spBtn'), want = !!(stealth.gadgetLabel() || G.upg.spin); if (spb && spb.dataset.v !== String(want)) { spb.dataset.v = String(want); spb.style.display = want ? '' : 'none'; } }
+  { const spb = $('#spBtn'), want = !!(stealth.gadgetLabel() || G.upg.spin || (cfg && cfg.battle)); if (spb && spb.dataset.v !== String(want)) { spb.dataset.v = String(want); spb.style.display = want ? '' : 'none'; } }
   touchLabels();
   if (cfg.city && !stealth.on) {
     let cl = '';
@@ -1107,7 +1121,7 @@ function simulate(dt) {
     else player.update(STEP, inp);
     if (cars.list.length) cars.update(STEP, player, inp);
     enemies.update(STEP, player);
-    if (G.crowd.on) G.crowd.update(STEP, player);
+    if (G.crowd.on) { G.crowd.update(STEP, player); G.charge.update(STEP, player); }
     inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = false; acc -= STEP; n++;
   }
   if (n === 14) acc = 0;
@@ -1132,7 +1146,7 @@ function frame(now) {
   hero.root.updateMatrixWorld(true);
   const r = new V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   scarf.update(Math.min(dt, 1 / 30), hero.scarfAnchor.getWorldPosition(tmpA), r, player.vel, tNow);
-  if (hero.sword.visible) { const b = hero.sword.localToWorld(tmpA.set(0, 0, 0.2)), t = hero.sword.localToWorld(tmpB.set(0, 0, 1.05)); trail.update(b, t, player.state === 'attack' || player.state === 'slam', dt); } else trail.update(tmpA, tmpA, false, dt);
+  if (hero.sword.visible) { const b = hero.sword.localToWorld(tmpA.set(0, 0, 0.2)), t = hero.sword.localToWorld(tmpB.set(0, 0, 1.05)); trail.update(b, t, player.state === 'attack' || player.state === 'slam' || player.state === 'charge', dt); } else trail.update(tmpA, tmpA, false, dt);
   sparks.update(dt); dust.update(dt); motes.update(dt);
   updateCamera(dt); applySwell(dt);
   if (remote.on && (tvSendT -= dt) <= 0) { tvSendT = 0.35; sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); }
@@ -1149,7 +1163,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get camera() { return camera; },
+window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get charge() { return G.charge; }, get camera() { return camera; },
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, get heroObj() { return hero; }, handIK: () => handIK(), THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
