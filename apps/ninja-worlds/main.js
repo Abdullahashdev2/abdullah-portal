@@ -551,6 +551,7 @@ function dropdown(btn, opts, cur, pick) {
   opts.forEach(([v, label]) => { const o = document.createElement('button'); o.textContent = (v === cur ? '✓ ' : '') + label; if (v === cur) o.className = 'cur'; o.onclick = (ev) => { ev.stopPropagation(); d.remove(); btn.classList.remove('ddOpen'); pick(v); sfx.click && sfx.click(); }; d.appendChild(o); });
   btn.after(d); const m = activeMenu(); if (m) { const bs = menuButtons(m); navIdx = Math.max(0, bs.indexOf(d.querySelector('.cur') || d.firstChild)); menuNav(0); }
 }
+$('#pBtnStyle').onclick = () => dropdown($('#pBtnStyle'), [['classic', 'كلاسيكي (أيقونة + وصف)'], ['sym', 'رموز ✕ ○ □ △ (تصميمنا)'], ['symlab', 'رموز + وصف صغير']], BSTYLE, (v) => { BSTYLE = v; try { localStorage.setItem('nw_bstyle', v); } catch (e) {} applyBStyle(); say(v === 'classic' ? '🎮 رجعت الأزرار الكلاسيكية' : '🎮 ✕ قفز • □ ضرب • ○ تدحرج • △ تفاعل — والأزرار تتغير حسب الموقف بنفس الرمز'); });
 $('#pHQ').onclick = () => dropdown($('#pHQ'), [['auto', 'تلقائي (حسب جوالك)'], ...QL.map((q, i) => [i, q.name])], qMode, (v) => { qMode = v; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); });
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
@@ -571,8 +572,18 @@ let knockCd = 0;
 const PISTOL_SVG = '<svg viewBox="0 0 64 40" width="34" height="22" aria-hidden="true"><path fill="#e5e7eb" d="M4 8h44l4-4h8v10h-6l-2 3H30l-3 4h-6l-4 15H7l5-17H4z"/><rect x="48" y="9" width="12" height="3" fill="#9ca3af"/><circle cx="24" cy="16" r="3" fill="#111827"/></svg>';
 const touchCache = {};
 function setOff(id, off) { const b = document.getElementById(id); if (b && b.classList.contains('off') !== off) b.classList.toggle('off', off); }
-function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (b) b.innerHTML = html; }
+function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (!b) return; if (BSTYLE !== 'classic' && SYM[id]) { const sm = html.match(/<small>[\s\S]*<\/small>/); b.innerHTML = '<svg class="sym" viewBox="0 0 40 40" fill="none" stroke="currentColor">' + SYM[id] + '</svg>' + (sm ? sm[0] : ''); } else b.innerHTML = html; }
 const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
+/* ✕ ○ □ △ برسمتنا الخاصة */
+const SYM = {
+  jumpBtn: '<path d="M11 11 29 29M29 11 11 29" stroke-width="5" stroke-linecap="round"/><rect x="17" y="17" width="6" height="6" transform="rotate(45 20 20)" fill="#0b1020" stroke-width="2"/>',
+  rollBtn: '<path d="M22 7a13 13 0 1 1-13.3 19.5" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="10.5" cy="13" r="2.6" fill="currentColor" stroke="none"/>',
+  atkBtn: '<path d="M14 8h12l6 6v12l-6 6H14l-6-6V14z" stroke-width="4.5" fill="none" stroke-linejoin="round"/><circle cx="20" cy="20" r="2.2" fill="currentColor" stroke="none"/>',
+  actBtn: '<path d="M20 7 33 31H7z" stroke-width="4.5" fill="none" stroke-linejoin="round"/><path d="M20 19.5 24.3 27h-8.6z" fill="currentColor" opacity=".55" stroke="none"/>',
+};
+let BSTYLE = 'classic'; try { BSTYLE = localStorage.getItem('nw_bstyle') || 'classic'; } catch (e) {}
+function applyBStyle() { const c = document.body.classList; c.toggle('bs-sym', BSTYLE !== 'classic'); c.toggle('bs-nolab', BSTYLE === 'sym'); for (const k in touchCache) delete touchCache[k]; const b = document.getElementById('pBtnStyle'); if (b) b.textContent = '🎮 شكل الأزرار: ' + { classic: 'كلاسيكي', sym: 'رموز ✕○□△', symlab: 'رموز + وصف' }[BSTYLE] + ' ▾'; }
+applyBStyle();
 function touchLabels() {
   const bc = document.body.classList; bc.toggle('m-aim', !!stealth.aiming); bc.toggle('m-hold', !!stealth.holding); bc.toggle('m-hang', player.state === 'hang' && !!player.edgeHang); bc.toggle('m-hug', player.state === 'hug'); bc.toggle('m-radio', !!stealth.radioOpen);
   const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();

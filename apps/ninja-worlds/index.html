@@ -159,6 +159,21 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
 #doneStats{display:flex;gap:10px;justify-content:center;margin:10px 0}
 #doneStats div{flex:1;background:rgba(255,255,255,.06);border-radius:14px;padding:10px 4px}#doneStats b{display:block;font-size:20px}#doneStats span{font-size:12px;color:#94a3b8}
 #doneMsg{color:#cbd5e1;margin:6px 0 10px}
+
+/* ✦ نمط «الرموز» — تصميمنا الخاص: بلاطات ماسية بترتيب صليب، ورموز ✕ ○ □ △ مرسومة بطريقتنا (هلال بدل الدائرة، مربع مشطوف الزوايا) */
+body.bs-sym .btns button{width:64px;height:64px;border-radius:26%;transform:rotate(45deg);background:linear-gradient(135deg,rgba(var(--c),.22),rgba(6,8,20,.78) 60%);border:2px solid rgba(var(--c),.8);box-shadow:inset 0 0 14px rgba(var(--c),.18),0 4px 14px #0008}
+body.bs-sym .btns button>*{transform:rotate(-45deg)}
+body.bs-sym .btns button.down{transform:rotate(45deg) scale(.88)}
+body.bs-sym .btns button .sym{width:34px;height:34px;color:rgb(var(--c));filter:drop-shadow(0 0 5px rgba(var(--c),.85))}
+body.bs-sym .btns button{place-items:center;align-content:center;gap:0}body.bs-sym .btns button small{font-size:8.5px;line-height:1;margin-top:-2px;opacity:.85}body.bs-sym .btns button .sym{width:30px;height:30px}
+body.bs-sym.bs-nolab .btns button small{display:none}
+body.bs-sym #jumpBtn{width:62px;height:62px;right:86px;bottom:18px;--c:94,234,212}
+body.bs-sym #rollBtn{width:62px;height:62px;right:10px;bottom:94px;--c:192,132,252}
+body.bs-sym #atkBtn{width:62px;height:62px;right:162px;bottom:94px;--c:255,209,102}
+body.bs-sym #actBtn{width:62px;height:62px;right:86px;bottom:170px;--c:163,230,53;opacity:1}
+body.bs-sym #aimBtn{right:236px;bottom:20px;width:52px;height:52px;--c:125,211,252}
+body.bs-sym #spBtn{right:236px;bottom:168px;width:52px;height:52px;--c:244,114,182}
+body.bs-sym.m-aim #atkBtn{width:76px;height:76px}
 </style>
 <script type="importmap">{"imports":{"three":"../saeq-albatal/lib/three.module.min.js","sky":"../saeq-albatal/lib/Sky.js","gltf":"../saeq-albatal/lib/loaders/GLTFLoader.js"}}</script>
 </head>
@@ -239,6 +254,7 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
   <input type="file" id="skinFile" accept=".glb,model/gltf-binary" hidden>
   <button id="pMirror">🪞 وضع المرآة (لما تبث شاشة الجوال للتلفزيون): طافي</button>
   <button id="pTVmode">📺 وضع التلفزيون</button>
+  <button id="pBtnStyle">🎮 شكل الأزرار: كلاسيكي ▾</button>
   <button id="pHQ">🎮 الجودة: تلقائي</button>
   <button id="pVol">🎚️ ضبط الأصوات</button>
   <button id="pProg">📊 تقدّمك</button>
