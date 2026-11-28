@@ -1,5 +1,6 @@
 // World layouts. Units: metres. Jump ≈ 2 m high / 5 m long; wall-run ≈ 10 m; wall-climb ≈ 4 m then ledge-grab.
 import * as THREE from 'three';
+import { textSprite } from './fx.js';
 const V = THREE.Vector3;
 const zone = (x, z, w, d, y, pad = 1) => ({ x0: x - w / 2 + pad, x1: x + w / 2 - pad, z0: z - d / 2 + pad, z1: z + d / 2 - pad, y });
 
@@ -434,29 +435,29 @@ export function w6(K, L, S) {
           → BOW helideck (extraction). Coordinates: deck top y=0, lower deck floor y=-6, ship x∈[-15,15], z∈[0,240]. */
 export function w7(K, L, S) {
   const cfg = {
-    id: 'w7', name: 'سفينة العاصفة', sub: 'عالم التسلّل', music: 'w7', killY: -11, motes: 0x9fb8c9, shardTotal: 10, ship: true, storm: true,
+    id: 'w7', name: 'سفينة العاصفة', sub: 'عالم التسلّل', music: 'w7', killY: -14, motes: 0x9fb8c9, shardTotal: 15, ship: true, storm: true,
     sky: { elev: 2, azim: 200, turb: 20, ray: 0.3, mie: 0.02, mieG: 0.9 }, exposure: 0.62, env: 0.45, fog: [0x0b1218, 0.014], sun: [0x9fb8d0, 1.3], hemi: [0x7d8fa3, 0x2a2f36, 1.55],
     spawn: { pos: new V(-8, 0, 4), yaw: 0 },
   };
   const sh = (n, x, y, z) => K.shard('w7-' + n, x, y, z, S.shards.includes('w7-' + n));
   const G = (x, y, z, path, zone, extra = {}) => K.enemy({ x, y, z, type: 'guard', path, zone, ...extra });
-  const DECK = { x0: -14, x1: 14, z0: 1, z1: 239 }, ENG = { x0: -14, x1: 14, z0: 3, z1: 49 }, HOLD = { x0: -14, x1: 14, z0: 51, z1: 117 };
-  K.ocean({ y: -3, cz: 120, hole: [-15.6, 15.6, -0.6, 240.6] }); K.rain(); // البحر ما يدخل جسم السفينة
+  const DECK = { x0: -14, x1: 14, z0: 1, z1: 479 }, ENG = { x0: -14, x1: 14, z0: 3, z1: 49 }, HOLD = { x0: -14, x1: 14, z0: 51, z1: 117 };
+  K.ocean({ y: -3, cz: 120, hole: [-15.6, 15.6, -0.6, 480.6] }); K.rain(); // البحر ما يدخل جسم السفينة
   // حافة السطح المكشوف: من هنا ترمي الحراس في البحر (السطح الرئيسي y≈0 فقط)
-  L.seaEdge = (p) => { if (p.y < -0.6 || p.y > 1.6) return null; if (p.x > 13.6) return new V(1, 0, 0); if (p.x < -13.6) return new V(-1, 0, 0); if (p.z < 2.4) return new V(0, 0, -1); if (p.z > 237.6) return new V(0, 0, 1); return null; };
+  L.seaEdge = (p) => { if (p.y < -0.6 || p.y > 1.6) return null; if (p.x > 13.6) return new V(1, 0, 0); if (p.x < -13.6) return new V(-1, 0, 0); if (p.z < 2.4) return new V(0, 0, -1); if (p.z > 477.6) return new V(0, 0, 1); return null; };
   /* ---------- hull ---------- */
   const hullM = new THREE.MeshStandardMaterial({ color: 0x5a1d1d, roughness: 0.7, metalness: 0.3 }); hullM.userData.own = true;
   // الهيكل: قاع تحت أرضية السرداب + كسوة حمراء من برّا الجدران (قبل: صندوق كان سقفه يقطع السرداب على ارتفاع ٣م ويغطي الكاميرا)
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(31.4, 2.5, 241.4), hullM); hull.position.set(0, -7.76, 120); L.add(hull);
-  [-1, 1].forEach((sd) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.12, 8, 241.4), hullM); c.position.set(sd * 15.62, -5, 120); L.add(c); });
-  [-0.62, 240.62].forEach((zz) => { const c = new THREE.Mesh(new THREE.BoxGeometry(31.4, 8, 0.12), hullM); c.position.set(0, -5, zz); L.add(c); });
-  const bowM = new THREE.Mesh(new THREE.ConeGeometry(15.5, 18, 4, 1), hullM); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.3); bowM.position.set(0, -3.5, 249); L.add(bowM);
-  [-1, 1].forEach((sd) => { K.wall({ x: sd * 15.25, y: 1.2, z: 120, w: 0.5, d: 240, h: 7.7, m: 'metal', ledge: false }).hull = true; }); // hull = تقدر تتعلّق من برّا
-  K.wall({ x: 0, y: 1.2, z: -0.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false }); K.wall({ x: 0, y: 1.2, z: 240.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(31.4, 1.2, 481.4), hullM); hull.position.set(0, -11.2, 240); L.add(hull);
+  [-1, 1].forEach((sd) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.12, 10.6, 481.4), hullM); c.position.set(sd * 15.62, -6.3, 240); L.add(c); });
+  [-0.62, 480.62].forEach((zz) => { const c = new THREE.Mesh(new THREE.BoxGeometry(31.4, 10.6, 0.12), hullM); c.position.set(0, -6.3, zz); L.add(c); });
+  const bowM = new THREE.Mesh(new THREE.ConeGeometry(15.5, 18, 4, 1), hullM); bowM.rotation.set(Math.PI / 2, Math.PI / 4, 0); bowM.scale.set(1, 1, 0.3); bowM.position.set(0, -3.5, 489); L.add(bowM);
+  [-1, 1].forEach((sd) => { K.wall({ x: sd * 15.25, y: 1.2, z: 240, w: 0.5, d: 480, h: 7.7, m: 'metal', ledge: false }).hull = true; }); // hull = تقدر تتعلّق من برّا
+  K.wall({ x: 0, y: 1.2, z: -0.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false }); K.wall({ x: 0, y: 1.2, z: 480.25, w: 31, d: 0.5, h: 7.7, m: 'metal', ledge: false });
   K.slab({ x0: -15, x1: 15, z0: 0, z1: 118, y: -6, h: 0.5 }); // lower deck floor
   // main deck with two stairwell holes (H1 stern: x 9.2..12.8, z 21.6..30 ; H2 cargo: x -12.8..-9.2, z 100..108.4)
   const deck = (x0, x1, z0, z1, h = 0.5) => K.slab({ x0, x1, z0, z1, y: 0, h, m: 'deck' });
-  deck(-15, 15, 0, 21.6); deck(-15, 9.2, 21.6, 30); deck(12.8, 15, 21.6, 30); deck(-15, 15, 30, 100); deck(-15, -12.8, 100, 108.4); deck(-9.2, 15, 100, 108.4); deck(-15, 15, 108.4, 118); deck(-15, 15, 118, 240, 6);
+  deck(-15, 15, 0, 21.6); deck(-15, 9.2, 21.6, 30); deck(12.8, 15, 21.6, 30); deck(-15, 15, 30, 100); deck(-15, -12.8, 100, 108.4); deck(-9.2, 15, 100, 108.4); deck(-15, 15, 108.4, 118); deck(-15, 15, 118, 244, 6);
   K.railing({ x0: 9.2, x1: 9.2, z0: 21.6, z1: 30 }); K.railing({ x0: 9.2, x1: 12.8, z0: 30, z1: 30 }); K.railing({ x0: 12.8, x1: 12.8, z0: 21.6, z1: 30 });
   K.railing({ x0: -9.2, x1: -9.2, z0: 100, z1: 108.4 }); K.railing({ x0: -12.8, x1: -9.2, z0: 100, z1: 100 }); K.railing({ x0: -12.8, x1: -12.8, z0: 100, z1: 108.4 });
   K.stairs({ x: 11, z: 30, w: 3.6, y0: -6, y1: 0, dir: '-z' });
@@ -552,9 +553,9 @@ export function w7(K, L, S) {
   G(-9, 12, 140, [[-9, 140], [9, 140], [9, 148]], { x0: -11.5, x1: 11.5, z0: 136.5, z1: 149.5 });
   K.checkpoint(4, 12, 146, Math.PI);
   const relic = K.relic({ x: 0, y: 12, z: 131, color: 0x38bdf8 });
-  const exit = K.portal({ x: 0, y: 0, z: 228, rot: Math.PI, to: 'hub', label: 'مهبط الهروب', color: 0x38bdf8, active: false });
-  L.exitPortal = exit; cfg.captain = { x: 0, y: 0, z: 222, zone: { x0: -13, x1: 13, z0: 204, z1: 236 } };
-  K.trigger({ x: 0, z: 131, y: 12, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.relicTaken = true; L.sfx('win'); }, text: '🧭 «بوصلة الظل» معك! المروحية تنتظرك عند مهبط المقدمة 🚁 — بس انتبه: القائد «عاصفة» بنفسه واقف على المهبط ⚓ وما ينخدع بأي تنكّر.' });
+  const exit = K.portal({ x: 0, y: 0, z: 470, rot: Math.PI, to: 'hub', label: 'مهبط الهروب', color: 0x38bdf8, active: false });
+  L.exitPortal = exit; cfg.captain = { x: 0, y: 0, z: 462, trigZ: 438, zone: { x0: -13, x1: 13, z0: 442, z1: 476 } };
+  K.trigger({ x: 0, z: 131, y: 12, r: 1.3, group: 'bow', fn: () => { relic.visible = false; L.relicTaken = true; L.sfx('win'); }, text: '🧭 «بوصلة الظل» معك! المروحية تنتظرك في «المهبط الأخير» آخر السفينة 🚁 — بس الطريق طويل: خزانات النفط، المختبر، والرافعة… والقائد «عاصفة» ينتظرك هناك ⚓' });
   sh(9, 6.5, 12.8, 125);
   /* ---------- F: bow + helideck ---------- */
   [[-9, 175, 1], [8, 182, 2], [-4, 195, 1], [10, 200, 1], [-11, 206, 2]].forEach(([x, z, st]) => K.container({ x, z, stack: st }));
@@ -570,7 +571,96 @@ export function w7(K, L, S) {
   K.checkpoint(9, 0, 162, 0);
   L.reinforce = [{ y: 0, zone: DECK, points: [[-3, 104], [3, 104]] }, { y: -6, zone: HOLD, points: [[0, 52], [2, 53]] }, { y: 0, zone: DECK, points: [[0, 168], [3, 168]] }, { y: 0, zone: DECK, points: [[-4, 212], [4, 212]] }];
   // deck lamps along the bulwarks
-  for (let z = 10; z < 235; z += 16) { [-14.6, 14.6].forEach((x) => { const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0x86efac })); s2.position.set(x, 1.9, z); L.add(s2); }); }
+  for (let z = 10; z < 475; z += 16) { [-14.6, 14.6].forEach((x) => { const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0x86efac })); s2.position.set(x, 1.9, z); L.add(s2); }); }
+
+  /* ================= التوسعة: نص السفينة الثاني (z 244 → 480) ================= */
+  const MID = { x0: -14, x1: 14, z0: 244, z1: 371 }, LAB = { x0: -14, x1: 14, z0: 246, z1: 336 }, YARD = { x0: -14, x1: 14, z0: 374, z1: 383 }, FIN = { x0: -14, x1: 14, z0: 418, z1: 478 };
+  // السطح فوق المختبر (فيه فتحتين للنزول/الطلوع)
+  deck(-15, 15, 244, 291); deck(-15, 9.9, 291, 300); deck(13.1, 15, 291, 300); deck(-15, 15, 300, 364.4); deck(-15, 15, 367.6, 372); deck(-15, -8.5, 364.4, 367.6); deck(0.5, 15, 364.4, 367.6);
+  deck(-15, 15, 372, 385); deck(-15, 15, 415, 480);
+  // ---------- ساحة خزانات النفط ----------
+  const tankM = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.55, metalness: 0.6 }); tankM.userData.own = true;
+  [[-8, 258], [8, 258], [-8, 284], [8, 284]].forEach(([x, z], k) => {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(3.7, 3.7, 8, 24), tankM); t.position.set(x, 4, z); t.castShadow = t.receiveShadow = true; L.add(t);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(3.75, 3.75, 0.5, 24), new THREE.MeshStandardMaterial({ color: [0xef4444, 0xfacc15, 0x3b82f6, 0x22c55e][k], roughness: 0.5 })); band.position.set(x, 6.5, z); L.add(band);
+    K.plat({ x, y: 8, z, w: 6.4, d: 6.4, h: 8, rock: false, hidden: true }).active = true;
+  });
+  K.crates({ x: -3.2, z: 280, n: 6, s: 1.3 }); K.plat({ x: -4.3, y: 5.2, z: 283, w: 1.6, d: 1.6, h: 1.4, m: 'metal', rock: false }); sh(14, -8, 8.9, 284);
+  for (const z of [266, 276]) { const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 28, 12), new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.7, roughness: 0.4 })); pipe.rotation.z = Math.PI / 2; pipe.position.set(0, 1.2, z); L.add(pipe); K.plat({ x: 0, y: 1.6, z, w: 28, d: 0.7, h: 1.6, rock: false, hidden: true, ledge: false }).active = true; }
+  // الصمّامات (لازم بالترتيب — الترتيب مكتوب على شاشة في المطعم)
+  K.valve({ x: -13.3, y: 0, z: 270, rot: Math.PI / 2, group: 'valves', seq: 1, color: 0xef4444, label: 'صمّام أحمر' });
+  K.valve({ x: 13.3, y: 0, z: 271, rot: -Math.PI / 2, group: 'valves', seq: 0, color: 0xfacc15, label: 'صمّام أصفر' });
+  K.valve({ x: 0, y: 0, z: 292.5, rot: Math.PI, group: 'valves', seq: 2, color: 0x3b82f6, label: 'صمّام أزرق' });
+  const hatch = K.plat({ x: 11.5, y: 0.15, z: 295.5, w: 3.4, d: 9.2, h: 0.3, m: 'metal', rock: false, ledge: false }); K.slider(hatch, new V(11.5, 0.15, 306), 2.6);
+  L.onPanels = L.onPanels || {}; L.onPanels.valves = () => { hatch.slide.go = true; L.say('🛢️ الضغط انقطع — فتحة السطح (يمين، جنب الصمّام الأزرق) انفتحت! انزل للمختبر.'); L.sfx('gate'); L.shake(0.3); };
+  K.note({ x: 12.5, y: 0, z: 248, title: 'ورقة ١', text: 'الرقم الأول لقفل مخزن السلاح: ٧' });
+  K.trigger({ x: 0, z: 247, r: 6, text: '🛢️ ساحة خزانات النفط: افتح الصمّامات الثلاثة «بالترتيب الصح» عشان تنفتح فتحة المختبر تحت. الترتيب مكتوب على شاشة في المطعم (قدّام). وانتبه: الغلط يطلّع بخار ويسمعك الحراس!' });
+  K.searchlight({ x: 0, y: 9, z: 271, from: -1.2, to: 1.2, speed: 0.45, range: 20, tilt: 0.5 });
+  G(0, 0, 250, [[0, 250], [0, 295], [-11, 295], [-11, 250]], MID); G(11, 0, 290, [[11, 290], [11, 252]], MID);
+  K.checkpoint(-12, 0, 246, 0);
+  // ---------- المطعم (على السطح) ----------
+  K.wallLine({ axis: 'x', at: 322, from: -12, to: 12, y: 0, h: 4, doors: [{ c: -8, open: true }, { c: 8, open: true }] });
+  K.wallLine({ axis: 'x', at: 352, from: -12, to: 12, y: 0, h: 4, doors: [{ c: 0, open: true }] });
+  K.wall({ x: -12, y: 4, z: 337, w: 0.3, d: 30, h: 4, m: 'metal', ledge: false }); K.wall({ x: 12, y: 4, z: 337, w: 0.3, d: 30, h: 4, m: 'metal', ledge: false });
+  K.slab({ x0: -12, x1: 12, z0: 322, z1: 352, y: 4.3, h: 0.3 });
+  for (const [x, z] of [[-6, 330], [6, 330], [-6, 344], [6, 344]]) K.plat({ x, y: 0.9, z, w: 2.4, d: 4, h: 0.9, m: 'wood', rock: false });
+  K.lamp({ x: 0, y: 3.8, z: 337, color: 0xfde68a, light: true });
+  const mon = textSprite('شاشة الصيانة: ترتيب الصمّامات ⬅ ١ 🟡  ٢ 🔴  ٣ 🔵', { size: 40, scale: 0.6, glow: '#22d3ee' }); mon.position.set(0, 2.6, 351.2); L.add(mon);
+  K.note({ x: 6, y: 0.9, z: 344, title: 'ورقة ٣', text: 'الرقم الثالث: ٩' });
+  G(-6, 0, 337, [[-6, 337], [-6, 337]], { x0: -11, x1: 11, z0: 323, z1: 351 }); G(6, 0, 326, [[6, 326], [9, 348], [-9, 348]], { x0: -11, x1: 11, z0: 323, z1: 351 });
+  // ---------- المختبر السرّي (الطابق السفلي) ----------
+  K.slab({ x0: -15, x1: 15, z0: 244, z1: 372, y: -6, h: 0.5, m: 'metal' });
+  K.wall({ x: 0, y: -0.5, z: 243.75, w: 30, d: 0.5, h: 5.5, m: 'metal', ledge: false }); K.wall({ x: 0, y: -0.5, z: 372.25, w: 30, d: 0.5, h: 5.5, m: 'metal', ledge: false });
+  K.stairs({ x: 11.5, z: 291.6, w: 3, y0: -6, y1: 0, dir: '+z' });
+  for (let z = 252; z < 370; z += 14) K.lamp({ x: 0, y: -0.9, z, color: 0xa7f3d0, light: z === 308 || z === 350 });
+  for (const [x, z] of [[-9, 260], [-9, 272], [9, 262], [-2, 280]]) K.machine({ x, y: -6, z, w: 3, d: 4, h: 2 });
+  K.note({ x: -12, y: -6, z: 296, title: 'ورقة ٢', text: 'الرقم الثاني: ٣' });
+  sh(12, -12.5, -5.2, 252);
+  K.lasers = [K.laser({ x0: -15, x1: 15, z0: 305.8, z1: 306.2, y: -6, on: 2.2, off: 1.8, phase: 0 }), K.laser({ x0: -15, x1: 15, z0: 314.8, z1: 315.2, y: -6, on: 2.0, off: 1.7, phase: 1.3 }), K.laser({ x0: -15, x1: 15, z0: 323.8, z1: 324.2, y: -6, on: 2.4, off: 1.6, phase: 2.2 })];
+  K.fusebox({ x: -14.7, y: -3.3, z: 300, rot: Math.PI / 2, onShot: () => { for (const lz of L.lasers || []) lz.dead = true; L.say('⚡ صبت صندوق الكهرباء — الليزر انطفى نهائياً! 😎'); L.sfx('gate'); } });
+  K.trigger({ x: 11.5, z: 290, y: -6, r: 5, dy: 3, text: '🔬 المختبر السرّي: قدّامك ممر ليزر 🔴 يشتغل ويطفي — عدّ بالتوقيت… أو صوّب بالمسدس على صندوق الكهرباء الأخضر (يسار، على الجدار) ويطفي كله!' });
+  G(-6, -6, 330, [[-6, 330], [6, 330]], LAB); G(0, -6, 270, [[0, 270], [0, 296], [-6, 296]], LAB);
+  K.checkpoint(12, -6, 288, Math.PI);
+  // مخزن السلاح (قفل رقمي)
+  K.wallLine({ axis: 'x', at: 338, from: -15, to: 15, y: -6, h: 5.5, doors: [{ c: 0, lock: 'مخزن السلاح' }] });
+  K.keypad({ x: 2.2, y: -6, z: 337.6, rot: Math.PI, code: '7391', label: 'قفل مخزن السلاح', onOpen: () => { L.keys['مخزن السلاح'] = true; L.say('🔓 الرقم صح! مخزن السلاح انفتح.'); } });
+  K.keycard({ x: -8, y: -6, z: 356, id: 'crane', name: 'بطاقة الرافعة' }); sh(11, 8, -5.2, 360);
+  K.ammo('a7', -10, -5.5, 348, 'sniper'); K.ammo('a8', 10, -5.5, 348, 'pistol'); K.ammo('a9', 6, -5.5, 366, 'sniper');
+  for (const [x, z] of [[-12, 344], [12, 344], [12, 362], [-5, 350]]) K.plat({ x, y: -4, z, w: 2, d: 5, h: 2, m: 'metal', rock: false });
+  K.stairs({ x: 0, z: 366, w: 3, y0: -6, y1: 0, dir: '-x' });
+  // ---------- بوابة ساحة الرافعة ----------
+  K.wallLine({ axis: 'x', at: 372.3, from: -15, to: 15, y: 0, h: 4, doors: [{ c: 0, lock: 'بطاقة الرافعة' }] });
+  // ---------- ساحة الرافعة + الحفرة الكبيرة ----------
+  K.slab({ x0: -15, x1: 15, z0: 385, z1: 415, y: -6, h: 0.5, m: 'deck' });
+  K.wall({ x: 0, y: 0, z: 384.75, w: 30, d: 0.5, h: 6, m: 'metal', ledge: false }); K.wall({ x: 0, y: 0, z: 415.25, w: 30, d: 0.5, h: 6, m: 'metal', ledge: false });
+  [[12.5, 388, -4.7], [12.5, 391, -3.4], [12.5, 394, -2.1], [9.5, 394, -0.8]].forEach(([x, z, y]) => K.plat({ x, y, z, w: 3, d: 3, h: 1, m: 'wood', rock: false }));
+  K.plat({ x: 11, y: -0.8, z: 386.2, w: 6, d: 1.6, h: 1, m: 'wood', rock: false });
+  sh(15, -10, -5.2, 405); for (const [x, z] of [[-8, 395], [4, 408], [-3, 390]]) K.container({ x, y: -6, z, rot: 0 });
+  const bridge = K.plat({ x: 0, y: 9, z: 400, w: 3, d: 31.2, h: 1.2, rock: false, m: new THREE.MeshStandardMaterial({ color: 0xb7791f, roughness: 0.55, metalness: 0.45 }) });
+  K.slider(bridge, new V(0, 0, 400), 5, () => L.say('🏗️ الجسر نزل! اعبر للمهبط الأخير 🚁'));
+  // الرافعة (برج + ذراع + كيبل يتبع الحاوية)
+  const craneM = new THREE.MeshStandardMaterial({ color: 0xca8a04, roughness: 0.5, metalness: 0.5 });
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(1.4, 20, 1.4), craneM); tower.position.set(-13, 10, 379); L.add(tower);
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 26), craneM); boom.position.set(-13, 19.5, 392); L.add(boom);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(14, 0.8, 0.8), craneM); arm.position.set(-6, 19.5, 400); L.add(arm);
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1, 6), new THREE.MeshStandardMaterial({ color: 0x111827 })); cable.userData.dyn = true; L.add(cable);
+  L.anim.push(() => { const top = bridge.center.y + 0.1, h = 19.5 - top; cable.scale.y = Math.max(0.1, h); cable.position.set(0, top + h / 2, 400); });
+  K.panel({ x: 10, y: 0, z: 380, rot: Math.PI, group: 'crane', label: 'لوحة الرافعة' });
+  L.onPanels.crane = () => { bridge.slide.go = true; L.say('🏗️ الرافعة تشتغل… الحاوية تنزل فوق الحفرة!'); L.sfx('gate'); };
+  K.trigger({ x: 0, z: 376, r: 6, text: '🏗️ ساحة الرافعة: قدّامك حفرة كبيرة! شغّل لوحة الرافعة (يمين) عشان تنزل الحاوية وتصير جسر. لو طحت في الحفرة: فيه صناديق تطلّعك.' });
+  K.checkpoint(-10, 0, 376, 0);
+  G(-8, 0, 378, [[-8, 378], [8, 378]], YARD); G(0, -6, 400, [[0, 390], [0, 412], [-10, 412]], { x0: -14, x1: 14, z0: 386, z1: 414 });
+  // ---------- المهبط الأخير ----------
+  const pad2 = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.7 })); pad2.material.userData.own = true; pad2.rotation.x = -Math.PI / 2; pad2.position.set(0, 0.02, 458); L.add(pad2);
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(7.4, 8, 40), new THREE.MeshBasicMaterial({ color: 0xfacc15 })); ring2.rotation.x = -Math.PI / 2; ring2.position.set(0, 0.04, 458); L.add(ring2);
+  const hMark = textSprite('H', { size: 120, scale: 1.4, color: '#facc15', glow: '#facc15' }); hMark.position.set(0, 0.3, 458); L.add(hMark);
+  [[-9, 430, 2], [9, 438, 1], [-10, 446, 1]].forEach(([x, z, st]) => K.container({ x, z, stack: st }));
+  K.searchlight({ x: 13, y: 6, z: 440, from: -2.6, to: -0.6, speed: 0.5, range: 22, tilt: 0.38 }); K.wall({ x: 13, y: 6, z: 440, w: 1, d: 1, h: 6, m: 'metal', ledge: false });
+  K.locker({ x: -14.3, z: 426, rot: Math.PI / 2 }); K.locker({ x: 14.3, z: 452, rot: -Math.PI / 2 });
+  K.checkpoint(0, 0, 421, 0);
+  K.note({ x: 6, y: 0, z: 228, title: 'ورقة ٤', text: 'الرقم الأخير: ١' });
+  K.trigger({ x: 0, z: 418, r: 6, text: '🚁 المهبط الأخير — المروحية تنتظرك… بس القائد «عاصفة» هنا!' });
+  L.reinforce.push({ y: 0, zone: MID, points: [[-3, 300], [3, 300]] }, { y: -6, zone: LAB, points: [[0, 300], [3, 300]] });
   return cfg;
 }
 

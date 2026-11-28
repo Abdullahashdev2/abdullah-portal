@@ -218,6 +218,7 @@ export class Stealth {
         if (disc < 0) continue; const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt) { bt = tt; best = { e, isHead }; }
       }
     }
+    for (const SH of this.L.shootables || []) { if (SH.done) continue; const tv = o.clone().sub(SH.pos), b = tv.dot(dir), cc = tv.lengthSq() - SH.r * SH.r, disc = b * b - cc; if (disc < 0) continue; const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt + 0.3) { bt = tt; best = null; this.c.sparks.emit(SH.pos.clone(), { color: 0xfde68a, count: 30, speed: 5, life: 0.5 }); this.c.sfx.S('dg_zap_two_tone', 0.7); SH.fn(); break; } }
     const end = o.clone().addScaledVector(dir, Math.min(bt, far));
     this.tracer(o.clone().addScaledVector(dir, 0.6).add(new V(0, -0.08, 0)), end);
     if (best) {

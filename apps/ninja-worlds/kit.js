@@ -26,6 +26,11 @@ export class Level {
         const k = b.sink; k.off = player.ground === b ? Math.max(-k.depth, k.off - dt * k.rate) : Math.min(0, k.off + dt * 0.6);
         const ny = b.base.y + k.off, dy = ny - b.center.y; b.delta.y = dy; b.center.y = ny; b.min.y += dy; b.max.y += dy; b.mesh.position.y += dy;
       }
+      if (b.slide && b.slide.go && b.slide.k < 1) { // حاوية/جسر ينزلق لمكان جديد مرة وحدة
+        const sl = b.slide; sl.k = Math.min(1, sl.k + dt / sl.dur); const e = sl.k < 0.5 ? 2 * sl.k * sl.k : 1 - Math.pow(-2 * sl.k + 2, 2) / 2;
+        const nc = sl.from.clone().lerp(sl.to, e); b.delta.subVectors(nc, b.center); b.center.copy(nc); b.min.add(b.delta); b.max.add(b.delta); b.mesh.position.add(b.delta);
+        if (sl.k >= 1 && sl.done) sl.done();
+      }
       if (b.crumble) {
         const c = b.crumble;
         if (c.state === 0) {
@@ -651,6 +656,42 @@ export function makeKit(L) {
     L.anim.push((dt, t) => { g.rotation.y += dt * 2; g.position.y = y + 0.7 + Math.sin(t * 2.5) * 0.08; });
   };
   K.crates = ({ x, y = 0, z, n = 3, s = 1.2 }) => { for (let i = 0; i < n; i++) { const ox = (i % 2) * s * 1.05 - s * 0.5, oz = Math.floor(i / 2) * s * 1.05, lvl = i >= 4 ? 1 : 0; K.plat({ x: x + ox, y: y + s * (lvl + 1), z: z + oz, w: s, d: s, h: s, m: 'wood', rock: false, tile: 1.2 }); } };
+  /* ---------- ألغاز السفينة الكبيرة ---------- */
+  K.valve = ({ x, y, z, rot = 0, group, seq, color = 0xef4444, label }) => { // صمّام: لوحة ضمن تسلسل
+    const P = K.panel({ x, y, z, rot, group, label }); P.seq = seq; P.scr.material.color.setHex(color); P.baseColor = color; P.gl.material.color.setHex(color);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.06, 8, 18), own(new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: 0.3 }))); wheel.position.set(x + Math.sin(rot) * 0.32, y + 1.65, z + Math.cos(rot) * 0.32); wheel.rotation.y = rot; L.add(wheel); wheel.userData.dyn = true; P.wheel = wheel;
+    return P;
+  };
+  K.laser = ({ x0, x1, z0, z1, y, h = 2.2, on = 2.2, off = 1.6, phase = 0, axis = 'x' }) => { // شبكة ليزر تشتغل وتطفي
+    L.hazards = L.hazards || [];
+    const g = new THREE.Group(); L.add(g); g.userData.dyn = true; const mm = own(new THREE.MeshBasicMaterial({ color: 0xff1f3d, transparent: true, opacity: 0.85 }));
+    const len = axis === 'x' ? x1 - x0 : z1 - z0; for (let k = 0; k < 5; k++) { const beam = new THREE.Mesh(new THREE.BoxGeometry(axis === 'x' ? len : 0.04, 0.04, axis === 'x' ? 0.04 : len), mm); beam.position.set((x0 + x1) / 2, y + 0.25 + k * (h / 5), (z0 + z1) / 2); g.add(beam); }
+    const hz = { kind: 'laser', x0, x1, z0, z1, y, h, on: true, dead: false, g }; L.hazards.push(hz); L.lasers = L.lasers || []; L.lasers.push(hz);
+    L.anim.push((dt, t) => { if (hz.dead) { g.visible = false; hz.on = false; return; } const ph = ((t + phase) % (on + off)); hz.on = ph < on; g.visible = hz.on || (ph > on + off - 0.35 && Math.sin(t * 40) > 0); });
+    return hz;
+  };
+  K.fusebox = ({ x, y, z, rot = 0, onShot }) => { // صندوق كهرباء — صوّب عليه بالمسدس
+    L.shootables = L.shootables || [];
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.3), own(new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6, roughness: 0.4 }))); box.position.set(x, y, z); box.rotation.y = rot; L.add(box); box.userData.dyn = true;
+    const led = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), own(new THREE.MeshBasicMaterial({ color: 0x22c55e }))); led.position.set(x + Math.sin(rot) * 0.17, y + 0.3, z + Math.cos(rot) * 0.17); L.add(led); led.userData.dyn = true;
+    const glow = glowSprite(0x22c55e, 1.2, 0.6); glow.position.copy(led.position); L.add(glow);
+    const S = { pos: new V(x, y, z), r: 0.55, done: false, fn: () => { if (S.done) return; S.done = true; led.material.color.setHex(0xef4444); glow.material.color.setHex(0xef4444); onShot && onShot(); } };
+    L.shootables.push(S); return S;
+  };
+  K.keypad = ({ x, y, z, rot = 0, code, label = 'قفل رقمي', onOpen }) => { // لوحة أرقام — الكود من أوراق مخبّاة
+    L.keypads = L.keypads || [];
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.12), own(new THREE.MeshStandardMaterial({ color: 0x1f2937, metalness: 0.6 }))); b.position.set(x, y + 1.3, z); b.rotation.y = rot; L.add(b);
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.14), own(new THREE.MeshBasicMaterial({ color: 0x22d3ee }))); scr.position.set(x + Math.sin(rot) * 0.07, y + 1.5, z + Math.cos(rot) * 0.07); scr.rotation.y = rot; L.add(scr); scr.userData.dyn = true;
+    const KP = { pos: new V(x, y, z), front: new V(x + Math.sin(rot) * 0.9, y, z + Math.cos(rot) * 0.9), code: String(code), label, open: false, scr, onOpen }; L.keypads.push(KP); return KP;
+  };
+  K.note = ({ x, y, z, text, title = 'ورقة' }) => { // ورقة/لوح مكتوب — اقرأه
+    L.notes = L.notes || [];
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.6), own(new THREE.MeshBasicMaterial({ color: 0xfef3c7, side: THREE.DoubleSide }))); p.position.set(x, y + 1.2, z); p.rotation.y = Math.random() * 6; L.add(p);
+    const g = glowSprite(0xfde68a, 1.0, 0.5); g.position.set(x, y + 1.2, z); L.add(g);
+    const lab = textSprite('📄 ' + title, { size: 34, scale: 0.32, glow: '#fde68a' }); lab.position.set(x, y + 1.85, z); L.add(lab);
+    const N = { pos: new V(x, y, z), text, title, read: false }; L.notes.push(N); return N;
+  };
+  K.slider = (b, to, dur = 3.5, done) => { b.slide = { from: b.center.clone(), to: to.clone(), dur, k: 0, go: false, done }; b.mesh.userData.dyn = true; if (!L.dyn.includes(b)) L.dyn.push(b); return b; };
   K.trigger = (o) => { L.triggers.push({ r: 3, dy: 4, once: true, fired: false, ...o, pos: new V(o.x, o.y ?? 0, o.z) }); };
   K.enemy = (o) => { L.enemyDefs.push(o); };
   return K;

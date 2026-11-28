@@ -344,15 +344,15 @@ function hudUpdate() {
 }
 const BONUS = { w5: { id: 'w5-10', hint: '🥷 الشظية العاشرة السرّية: خلّص القلعة بدون ولا إنذار (محد يشوفك)' }, w7: { id: 'w7-10', hint: '👻 الشظية العاشرة السرّية «شبح السفينة»: خلّص السفينة بدون ولا إنذار' } };
 function openProgress() {
-  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10', 'w11'], per = 10; let got = 0, done = 0;
+  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10', 'w11'], PER = { w7: 15 }; let got = 0, done = 0, total = 0;
   const rows = ids.map((id) => {
-    const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id] || n >= per) done++;
+    const per = PER[id] || 10; total += per; const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id] || n >= per) done++;
     const b = SAVE.best[id], t = b ? `⏱️ ${Math.floor(b / 60)}:${String(b % 60).padStart(2, '0')}` : '';
     const bonus = BONUS[id] && !SAVE.shards.includes(BONUS[id].id) ? `<div class="hint">${BONUS[id].hint}</div>` : '';
-    return `<div class="prow2"><b>${SAVE.done[id] || n >= per ? '✅' : '⬜'} ${WORLD_NAMES[id]}</b><span>💎 ${n}/${per} ${t}</span><div class="bar2"><i style="width:${n * 10}%"></i></div>${bonus}</div>`;
+    return `<div class="prow2"><b>${SAVE.done[id] || n >= per ? '✅' : '⬜'} ${WORLD_NAMES[id]}</b><span>💎 ${n}/${per} ${t}</span><div class="bar2"><i style="width:${Math.round(n / per * 100)}%"></i></div>${bonus}</div>`;
   }).join('');
-  const pct = Math.round(((got / (ids.length * per)) * 0.7 + (done / ids.length) * 0.3) * 100);
-  $('#progTotal').innerHTML = `<div><b>${pct}%</b><span>الإنجاز الكلّي</span></div><div><b>💎 ${got}/${ids.length * per}</b><span>الشظايا</span></div><div><b>🏁 ${done}/${ids.length}</b><span>عوالم مختومة</span></div><div><b>🪙 ${SAVE.coins || 0}</b><span>كوينز</span></div>`;
+  const pct = Math.round(((got / total) * 0.7 + (done / ids.length) * 0.3) * 100);
+  $('#progTotal').innerHTML = `<div><b>${pct}%</b><span>الإنجاز الكلّي</span></div><div><b>💎 ${got}/${total}</b><span>الشظايا</span></div><div><b>🏁 ${done}/${ids.length}</b><span>عوالم مختومة</span></div><div><b>🪙 ${SAVE.coins || 0}</b><span>كوينز</span></div>`;
   $('#progList').innerHTML = rows; $('#prog').classList.add('on');
 }
 function showDone() {
@@ -445,7 +445,7 @@ function togglePause(v) { if (!started || $('#done').classList.contains('on')) r
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
 let navIdx = 0, navCool = 0;
 function activeMenu() {
-  for (const s of ['#volSheet', '#prog', '#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
+  for (const s of ['#keypad', '#volSheet', '#prog', '#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
   const t = document.getElementById('title'); if (t && !t.classList.contains('off')) return t;
   return null;
 }
@@ -457,7 +457,7 @@ function menuNav(dir) {
   bs[navIdx].classList.add('navfocus'); try { bs[navIdx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
 }
 function menuSelect() { const m = activeMenu(); if (!m) return; const bs = menuButtons(m); const b = bs[Math.min(navIdx, bs.length - 1)]; if (b) { b.click(); setTimeout(() => { if (activeMenu()) menuNav(0); }, 60); } }
-function menuBack() { if ($('#volSheet').classList.contains('on')) $('#volSheet').classList.remove('on'); else if ($('#prog').classList.contains('on')) $('#prog').classList.remove('on'); else if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
+function menuBack() { if ($('#keypad').classList.contains('on')) kpPress('x'); else if ($('#volSheet').classList.contains('on')) $('#volSheet').classList.remove('on'); else if ($('#prog').classList.contains('on')) $('#prog').classList.remove('on'); else if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
 let gpPrev = {};
 function menuPoll(dt) {
   navCool = Math.max(0, navCool - dt);
@@ -571,6 +571,17 @@ function touchLabels() {
   if (!swim) setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
+let kpCur = null, kpVal = '';
+function openKeypad(KP) { kpCur = KP; kpVal = ''; $('#kpTitle').textContent = '🔢 ' + KP.label; $('#kpDisp').textContent = '_ _ _ _'; $('#keypad').classList.add('on'); paused = true; sfx.click(); }
+function kpPress(d) {
+  if (!kpCur) return;
+  if (d === 'c') kpVal = ''; else if (d === 'x') { $('#keypad').classList.remove('on'); paused = false; kpCur = null; return; } else if (kpVal.length < 4) kpVal += d;
+  sfx.click(); $('#kpDisp').textContent = (kpVal + '____').slice(0, 4).split('').join(' ');
+  if (kpVal.length === 4) {
+    if (kpVal === kpCur.code) { kpCur.open = true; kpCur.scr.material.color.setHex(0x22c55e); sfx.S('dg_power_up_11', 0.6); $('#keypad').classList.remove('on'); paused = false; const k = kpCur; kpCur = null; k.onOpen && k.onOpen(); }
+    else { sfx.S('dg_zap_two_tone', 0.6); $('#kpDisp').textContent = '✖ غلط'; kpVal = ''; }
+  }
+}
 function canGrab() {
   for (const e of enemies.list) {
     if (!e.ship || !e.alive || e.alert || e.hidden || ['sleep', 'dragged', 'held', 'dying', 'radio', 'drowsy'].includes(e.st)) continue;
@@ -616,11 +627,22 @@ function interact() {
     const c = cars.nearest(player.pos, 3.3); if (c && !player.carry) { cars.enter(c, player); if (!level._driveTip) { level._driveTip = true; say('🚗 العصا: فوق = بنزين، تحت = فرامل/رجوع، يمين/يسار = دركسون • 🅿️ = فرامل يد (تفحيط) • 💨 = نيترو • 📯 = بوري • ✋ = انزل'); } return; }
   }
   for (const P of level.panels || []) if (!P.done && Math.hypot(P.front.x - player.pos.x, P.front.z - player.pos.z) < 1.5 && Math.abs(P.pos.y - player.pos.y) < 1.2) {
+    if (P.seq != null) { // صمّامات بالترتيب
+      level.seqNext = level.seqNext || {}; const exp = level.seqNext[P.group] || 0;
+      if (P.seq !== exp) {
+        for (const Q of level.panels) if (Q.group === P.group) { Q.done = false; Q.scr.material.color.setHex(Q.baseColor); Q.gl.material.color.setHex(Q.baseColor); }
+        level.seqNext[P.group] = 0; sfx.S('sf_thruster_fire_', 0.8); sparks.emit(P.pos.clone().add(new V(0, 1.6, 0)), { color: 0xffffff, count: 40, speed: 5, up: 4, life: 0.8, size: 0.6, grav: -1 });
+        player.damage(1, P.front.clone().add(new V(0.01, 0, 0))); enemies.noise(P.pos, 14); say('💨 غلط بالترتيب! البخار طلع والحراس سمعوا — شوف الشاشة وأعد من الأول.'); return;
+      }
+      level.seqNext[P.group] = exp + 1; if (P.wheel) P.wheel.rotation.z += 2;
+    }
     P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.panel(); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
     const all = level.panels.filter((x) => x.group === P.group), left = all.filter((x) => !x.done).length;
     say(left ? `⚙️ ${P.label} — باقي ${left}` : `⚙️ ${P.label} — خلصت الكل!`); if (!left && level.onPanels && level.onPanels[P.group]) level.onPanels[P.group]();
     return;
   }
+  for (const KP of level.keypads || []) if (!KP.open && Math.hypot(KP.front.x - player.pos.x, KP.front.z - player.pos.z) < 1.4 && Math.abs(KP.pos.y - player.pos.y) < 1.2) { openKeypad(KP); return; }
+  for (const N of level.notes || []) if (N.pos.distanceTo(player.pos) < 1.8) { N.read = true; sfx.S('cloth', 0.4, { rate: 1.6 }); say('📄 ' + N.title + ': ' + N.text); return; }
   if (player.state === 'hug' && player.hug && !stealth.dragging) { knockWall(); return; }
   if (stealth.interact()) return;
   if (player.carry) { const p = nearPed(); if (p) placeItem(p); else dropItem(false); return; }
@@ -714,6 +736,7 @@ function showInstall() {
 $('#installBtn').onclick = (e) => { e.stopPropagation(); showInstall(); };
 $('#installGo').onclick = () => { $('#installSheet').classList.remove('on'); if (installEvt) { installEvt.prompt(); installEvt.userChoice.finally(() => { installEvt = null; }); } $('#installGo').textContent = 'تمام 👍'; };
 if (IS_APP) document.body.classList.add('isApp');
+document.querySelectorAll('#keypad [data-d]').forEach((b) => (b.onclick = () => kpPress(b.dataset.d)));
 document.querySelectorAll('#radio .rcmd').forEach((b) => (b.onclick = () => stealth.command(b.dataset.cmd))); $('#rClose').onclick = () => stealth.closeRadio();
 // قرص بإصبعين على الشاشة وقت التصويب = تكبير/تصغير
 { let pd = 0; const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -843,7 +866,7 @@ function captainDown(e, how) {
 }
 function captainLogic() {
   if (!cfg || !cfg.captain || !level.relicTaken || level.capSpawned) return;
-  if (player.pos.z > 200 && player.pos.y > -0.6 && player.pos.y < 2) {
+  if (player.pos.z > (cfg.captain.trigZ || 200) && player.pos.y > -0.6 && player.pos.y < 2) {
     level.capSpawned = true; const c = cfg.captain;
     const e = enemies.spawn({ x: c.x, y: c.y, z: c.z, type: 'guard', alert: true, zone: c.zone, captain: true }); e.yaw = Math.PI;
     sfx.musicFile('mus_battle', 0.55); sfx.speak('توقّعتك تجي… محد يطلع من سفينتي.', { pitch: 0.55, rate: 0.9 });
@@ -929,6 +952,7 @@ function worldLogic(dt) {
     const chest = new V(p.x, p.y + 1.1, p.z);
     for (const hz of level.hazards) {
       if (hz.kind === 'blade') { if (hz.tip.distanceTo(chest) < 0.95 || hz.mid.distanceTo(chest) < 0.8) { if (player.damage(1, new V(p.x + Math.sin(player.yaw) * 0.8, p.y, p.z + Math.cos(player.yaw) * 0.8))) sparks.emit(chest, { color: 0xffffff, count: 14, speed: 6, life: 0.3 }); } }
+      else if (hz.kind === 'laser') { if (hz.on && p.x > hz.x0 - 0.3 && p.x < hz.x1 + 0.3 && p.z > hz.z0 - 0.3 && p.z < hz.z1 + 0.3 && p.y >= hz.y - 0.5 && p.y < hz.y + hz.h) { if (player.damage(1, new V(p.x - player.vel.x * 0.1, p.y, p.z - player.vel.z * 0.1 - 0.01))) { sfx.S('dg_zap_two_tone', 0.7); if (stealth.on && level.phase !== 'alert') { stealth.setPhase('alert'); level.lastSeen = player.pos.clone(); say('🔴 لمست الليزر — الإنذار انطلق!'); } } } }
       else if (hz.kind === 'orb') { if (hz.tip.distanceTo(chest) < hz.r) player.damage(1, hz.tip); }
       else if (hz.kind === 'geyser') { if (hz.on && Math.hypot(p.x - hz.x, p.z - hz.z) < 1.0 && p.y - hz.y < 5 && p.y - hz.y > -0.5) { if (player.damage(1, new V(hz.x, p.y, hz.z + 0.01)) && !hz.soft) player.vel.y = 13; } }
       else if (hz.kind === 'spikes' && hz.up && p.x > hz.x0 && p.x < hz.x1 && p.z > hz.z0 && p.z < hz.z1 && p.y - hz.y < 0.6) player.damage(1, new V(p.x - player.vel.x, p.y, p.z - player.vel.z - 0.01));
@@ -979,6 +1003,8 @@ function worldLogic(dt) {
   else if (stealth.on && !stealth.dragging && canGrab()) label = 'امسكه من الخلف ⚔️';
   else if (stealth.on && !stealth.aiming && player.hullEdge && player.hullEdge()) label = 'اقفز 🦘 = تعلّق برّا السفينة وتختفي 🧗';
   else if (player.state === 'hang' && player.edgeHang) label = 'متعلّق برّا 🧗 — تحرّك يمين/يسار • اقفز = اطلع';
+  else if ((level.keypads || []).some((KP) => !KP.open && Math.hypot(KP.front.x - p.x, KP.front.z - p.z) < 1.4 && Math.abs(KP.pos.y - p.y) < 1.2)) label = 'ادخل الرقم السري 🔢';
+  else if ((level.notes || []).some((N) => N.pos.distanceTo(p) < 1.8)) label = 'اقرأ الورقة 📄';
   else if (player.state === 'hug' && !player.carry) label = player.hug && player.hug.peek > 0.5 ? 'طق 🤜 (أنت تطل 👀)' : 'طق على الجدار 🤜';
   else if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
   else if (nearItem() && player.onGround) label = 'شيل';
