@@ -36,6 +36,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 #hintBar{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:7;max-width:92vw;background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 14px;font:800 14px system-ui;display:none;text-align:center}#hintBar.on{display:block}
 #rot{display:none;position:fixed;inset:0;z-index:10;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
 @media (orientation:portrait){#rot.need{display:flex}}
+#pad button{opacity:var(--padA,.9)}.shoulder[hidden]{display:none!important}
+body.nolab #pad button small,body.nolab .shoulder span{display:none}
+/* ✨ ثيم الزجاج الشفاف — تصميمنا الخاص */
+body.glass #pad button{border-radius:30%;border:1.5px solid var(--c);background:linear-gradient(150deg,rgba(255,255,255,.22),rgba(255,255,255,.04) 45%,rgba(0,0,0,.18));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 0 18px -4px var(--c),inset 0 1px 0 rgba(255,255,255,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+body.glass #pad button small{position:static;font-size:10px;color:#fff;opacity:.9}
+body.glass #pad button.down{background:linear-gradient(150deg,var(--c),rgba(255,255,255,.08));transform:scale(.92)}
+#setSheet{position:fixed;inset:0;z-index:12;display:none;align-items:center;justify-content:center;background:rgba(3,4,12,.75);padding:12px}#setSheet.on{display:flex}
+#setSheet .sbox{width:min(560px,100%);max-height:calc(100dvh - 24px);overflow-y:auto;touch-action:pan-y;background:linear-gradient(180deg,#141a33,#0d1024);border:1px solid rgba(255,255,255,.16);border-radius:20px;padding:14px 16px;text-align:right}
+#setSheet h3{margin:0 0 8px;text-align:center}.srow{margin:10px 0}.srow b{display:block;margin-bottom:6px;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips button{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#fff;border-radius:999px;padding:7px 12px;font:800 13px system-ui}.chips button.on{background:rgba(255,209,102,.25);border-color:#ffd166}
+#alphaR{width:100%;touch-action:pan-x;accent-color:#f59e0b}#setSheet label{font-weight:800;font-size:14px}
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0;font-size:13px}.mrow select{flex:0 0 52%;background:#0b1020;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:6px}
+#mapReset{margin-top:6px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#cbd5e1;border-radius:10px;padding:6px 10px;font-weight:800}
+#setClose{display:block;margin:10px auto 0}
 /* 🎮 شكل جهاز محمول (مثل PSP): جسم أسود لامع، أزرار الأشكال، أكتاف L/R */
 body.psp{background:linear-gradient(180deg,#1b1d24 0%,#0b0c10 55%,#14161c 100%)}
 body.psp::before{content:"";position:fixed;inset:6px;border-radius:28px;border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 2px 0 rgba(255,255,255,.06),inset 0 -20px 60px rgba(0,0,0,.6);pointer-events:none;z-index:0}
@@ -77,6 +91,7 @@ body.psp.joying .nubRest{opacity:.15}
   <span id="sp"></span>
   <button class="tb" id="streamB" title="الجوال يشغّل اللعبة والتلفزيون يعرضها فيديو">📡 بث فائق</button>
   <button class="tb" id="menuB">🧭 قوائم</button>
+  <button class="tb" id="setB" title="إعدادات يد التحكم">⚙️</button>
   <button class="tb" id="pauseB" hidden>⏸</button>
 </div>
 <div class="nubRest"></div>
@@ -91,6 +106,13 @@ body.psp.joying .nubRest{opacity:.15}
   <button id="mPad">🎮 يد تحكم بس<small>التلفزيون يشغّل اللعبة بنفسه (لأجهزة الكمبيوتر واللابتوب)</small></button>
 </div>
 <div id="hintBar"></div>
+<div id="setSheet"><div class="sbox"><h3>⚙️ إعدادات يد التحكم</h3>
+  <div class="srow"><b>🎨 الثيم</b><div class="chips" id="thChips"><button data-v="classic">كلاسيكي (وصف الوظيفة)</button><button data-v="glass">زجاج شفاف ✨</button><button data-v="shapes">أشكال ✕○□△</button></div></div>
+  <div class="srow"><b>📏 حجم الأزرار</b><div class="chips" id="szChips"><button data-v="0.7">صغير</button><button data-v="0.82">وسط</button><button data-v="1">كبير</button></div></div>
+  <div class="srow"><b>👁️ الوضوح</b><input type="range" id="alphaR" min="0.3" max="1" step="0.05"></div>
+  <div class="srow"><label><input type="checkbox" id="labC"> 🏷️ أظهر وصف كل زر تحته</label></div>
+  <div class="srow"><b>🔀 ربط الأزرار (لهاللعبة)</b><div id="mapBox"></div><button id="mapReset">↩️ رجّع الترتيب الأصلي</button></div>
+  <button id="setClose" class="btnMain">تمام ✓</button></div></div>
 <div id="rot">📱↔️<br>دوّر الجوال بالعرض</div>
 <script src="lib/peerjs.min.js"></script>
 <script>
@@ -109,8 +131,34 @@ const SLOTS = [{ r: 0, b: 6, s: 104 }, { r: 120, b: 0, s: 86 }, { r: 134, b: 110
 const FACE = [{ r: 96, b: 8, s: 78, sym: 'x', col: '#60a5fa' }, { r: 188, b: 92, s: 74, sym: 'sq', col: '#f472b6' }, { r: 4, b: 92, s: 74, sym: 'o', col: '#f87171' }, { r: 96, b: 172, s: 70, sym: 'tri', col: '#4ade80' }];
 const SYM = { x: '<path d="M14 14L50 50M50 14L14 50"/>', sq: '<rect x="14" y="14" width="36" height="36" rx="2"/>', o: '<circle cx="32" cy="32" r="19"/>', tri: '<path d="M32 12L54 50H10z"/>' };
 const svgSym = (k) => '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">' + SYM[k] + '</svg>';
-const PSP = !/[?&]classic\b/.test(location.search); if (PSP) document.body.classList.add('psp');
+/* ⚙️ تفضيلات يد التحكم: الثيم، الحجم، الشفافية، الوصف، وربط الأزرار لكل لعبة */
+const PREF = Object.assign({ theme: 'classic', size: 0.82, alpha: 0.9, labels: true, map: {} }, (() => { try { return JSON.parse(localStorage.getItem('pad_pref') || '{}'); } catch (e) { return {}; } })());
+const savePref = () => { try { localStorage.setItem('pad_pref', JSON.stringify(PREF)); } catch (e) {} };
+let PSP = false;
+function applyTheme() { PSP = PREF.theme === 'shapes'; document.body.classList.toggle('psp', PSP); document.body.classList.toggle('glass', PREF.theme === 'glass'); document.body.classList.toggle('nolab', !PREF.labels); document.documentElement.style.setProperty('--padA', PREF.alpha); }
+applyTheme();
+function orderButtons(list) { const m = PREF.map[layout.title || '?']; if (!m) return list; const out = []; for (const id of m) { const b = list.find((x) => x.id === id); if (b && !out.includes(b)) out.push(b); } for (const b of list) if (!out.includes(b)) out.push(b); return out; }
 const COLORS = ['rgba(125,211,252,.85)', 'rgba(255,120,120,.85)', 'rgba(255,255,255,.4)', 'rgba(255,209,102,.8)', 'rgba(167,139,250,.85)', 'rgba(52,211,153,.8)'];
+const SLOT_NAMES = ['الزر الكبير (يمين تحت)', 'الزر الثاني (يساره)', 'الزر الثالث (فوق الثاني)', 'الزر الرابع (فوق الكبير)', 'الزر الخامس', 'الزر السادس'];
+function openSettings() {
+  const sh = $('#setSheet'); sh.classList.add('on');
+  const mark = (box, v) => box.querySelectorAll('button').forEach((b) => b.classList.toggle('on', String(b.dataset.v) === String(v)));
+  mark($('#thChips'), PREF.theme); mark($('#szChips'), PREF.size); $('#alphaR').value = PREF.alpha; $('#labC').checked = PREF.labels;
+  const btns = layout.buttons || [], cur = orderButtons(btns), box = $('#mapBox'); box.innerHTML = '';
+  if (!btns.length) { box.textContent = '— افتح لعبة أول عشان تربط أزرارها —'; return; }
+  cur.slice(0, 6).forEach((b, i) => {
+    const row = document.createElement('div'); row.className = 'mrow'; row.innerHTML = '<span></span><select></select>'; row.firstChild.textContent = SLOT_NAMES[i];
+    const sel = row.lastChild; btns.forEach((o) => { const op = document.createElement('option'); op.value = o.id; op.textContent = o.label; if (o.id === b.id) op.selected = true; sel.appendChild(op); });
+    sel.onchange = () => { const ids = cur.map((x) => x.id); const j = ids.indexOf(sel.value); [ids[i], ids[j]] = [ids[j], ids[i]]; PREF.map[layout.title || '?'] = ids; savePref(); render(); openSettings(); };
+    box.appendChild(row);
+  });
+}
+$('#setB').onclick = openSettings; $('#setClose').onclick = () => $('#setSheet').classList.remove('on');
+$('#thChips').onclick = (e) => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; PREF.theme = v; savePref(); applyTheme(); render(); openSettings(); };
+$('#szChips').onclick = (e) => { const v = e.target.dataset && e.target.dataset.v; if (!v) return; PREF.size = +v; savePref(); render(); openSettings(); };
+$('#alphaR').oninput = () => { PREF.alpha = +$('#alphaR').value; savePref(); applyTheme(); };
+$('#labC').onchange = () => { PREF.labels = $('#labC').checked; savePref(); applyTheme(); };
+$('#mapReset').onclick = () => { delete PREF.map[layout.title || '?']; savePref(); render(); openSettings(); };
 function render() {
   const pad = $('#pad'); pad.innerHTML = '';
   const menuOnly = !!layout.menuOnly, M = menu || menuOnly;
@@ -119,7 +167,7 @@ function render() {
   $('#pauseB').hidden = !layout.pause || M; $('#homeB').hidden = !layout.title || menuOnly && !layout.native && layout.title === 'برامج وتطبيقات عبدالله';
   $('#look').style.pointerEvents = layout.look && !M ? 'auto' : 'none';
   $('#hint').textContent = M ? '← العصا تتنقّل بين الأزرار على الشاشة' : layout.look ? '← العصا هنا • اسحب بالنص للكاميرا' : '← العصا هنا';
-  const list = M ? [{ id: '__ok', label: '✅ اختيار' }] : (layout.buttons || []);
+  const list = M ? [{ id: '__ok', label: '✅ اختيار' }] : orderButtons(layout.buttons || []); const K = PREF.size;
   for (const k of ['shL', 'shR']) { const e = $('#' + k); e.hidden = true; e.onpointerdown = null; }
   list.slice(0, 6).forEach((b, i) => {
     if (PSP && i >= 4) { // L/R
@@ -132,9 +180,9 @@ function render() {
     const icon = parts.length > 1 && /\p{Extended_Pictographic}/u.test(parts[0]) ? parts[0] : (b.icon || parts[0].slice(0, 2));
     const name = parts.length > 1 ? parts.slice(1).join(' ') : b.label;
     el.innerHTML = `<span></span><small></small>`; el.firstChild.textContent = icon; el.lastChild.textContent = name;
-    Object.assign(el.style, { width: sl.s + 'px', height: sl.s + 'px', right: sl.r + 'px', bottom: sl.b + 'px', borderColor: COLORS[i] });
+    Object.assign(el.style, { width: sl.s * K + 'px', height: sl.s * K + 'px', right: sl.r * K + 'px', bottom: sl.b * K + 'px', borderColor: COLORS[i], fontSize: (i === 0 ? 34 : 24) * K + 'px' }); el.style.setProperty('--c', COLORS[i]);
     if (PSP) { el.classList.add('face'); el.style.color = sl.col; el.firstChild.outerHTML; el.innerHTML = svgSym(sl.sym) + '<small></small>'; el.lastChild.textContent = name; }
-    else if (i === 0) el.style.fontSize = '36px';
+
     const id = b.id;
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} st.c[id] = (st.c[id] || 0) + 1; st.h[id] = true; el.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
     const up = () => { st.h[id] = false; el.classList.remove('down'); send(true); };
