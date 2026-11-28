@@ -62,6 +62,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 #touch .btns button.off{opacity:.28!important;filter:grayscale(1) brightness(.7);box-shadow:none!important}#touch .btns button:not(.off){filter:none}
 body.m-hang.m-pull #atkBtn{display:grid!important;animation:pullGlow 1s infinite}@keyframes pullGlow{50%{box-shadow:0 0 22px #ffd166}}
 #rageBar{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));width:min(46vw,300px);height:20px;border-radius:999px;background:#0009;border:2px solid #b45309;overflow:hidden;display:none;pointer-events:none}#rageBar.on{display:block}#rageBar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#f59e0b,#ffd166);transition:width .15s}#rageBar b{position:relative;display:block;text-align:center;font-size:12px;line-height:16px;color:#fff;text-shadow:0 1px 3px #000}#rageBar.full{border-color:#ffd166;box-shadow:0 0 18px #ffb020;animation:rpulse .8s infinite}#rageBar.red i{background:linear-gradient(90deg,#b91c1c,#ff4d4d)}@keyframes rpulse{50%{box-shadow:0 0 30px #ff7a00}}
+#proneBtn{display:none;--c:148,163,184;width:50px;height:50px;right:186px;bottom:96px}body.shipmode #proneBtn{display:grid}body.m-hang #proneBtn,body.m-hold #proneBtn,body.m-drive #proneBtn{display:none!important}body.m-aim #proneBtn{right:112px;bottom:96px}body.bs-sym #proneBtn{right:236px;bottom:94px}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -246,6 +247,7 @@ body.th-custom .btns button{--c:var(--mine)!important}
     <button id="rollBtn" data-btn="roll">🌀<small>تدحرج</small></button>
     <button id="actBtn" data-btn="act">✋<small>شيل</small></button>
     <button id="aimBtn" data-btn="aim">🔫<small>تصويب</small></button>
+    <button id="proneBtn" data-btn="prone">⬇️<small>انبطح</small></button>
     <button id="spBtn" data-btn="sp" style="display:none">✴️<small>دوّامة</small></button>
   </div>
 </div>

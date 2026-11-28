@@ -140,6 +140,8 @@ export class Player {
     if (this.ground && this.ground.active && (this.onGround || this.state === 'hang')) this.pos.add(this.ground.delta);
     const W = this.g.waterAt && this.g.waterAt(this.pos);
     if (W && this.state !== 'swim' && this.state !== 'climb' && this.state !== 'hang' && this.pos.y + 1.0 < W.y1 && this.vel.y <= 0 && this.t > (this.leapT || 0)) this.startSwim(W);
+    if (inp.proneP) this.toggleProne();
+    if (this.prone && (inp.jumpP || inp.rollP || (inp.atkP && !this.aiming) || this.state !== 'ground' || this.carry || this.holding || this.dragging)) { if (this.state === 'ground') { inp.jumpP = inp.rollP = false; if (!this.aiming) inp.atkP = false; } this.prone = false; this.jumpBuf = 0; this.g.sfx.S && this.g.sfx.S('cloth', 0.4); } // تقوم
     if (inp.spP && this.battle && !this.carry && (this.state === 'ground' || this.state === 'air')) { inp.spP = false; this.startCharge(0); }
     if (inp.spP && !this.carry && (this.state === 'ground' || this.state === 'air' || this.state === 'attack')) this.startSpin();
     switch (this.state) {
@@ -168,7 +170,7 @@ export class Player {
   locomotion(dt, inp) {
     const { v, m } = this.moveInput(inp);
     this.onBeam = this.onGround && this.ground && this.ground.beam;
-    const max = this.carry ? C.carry : this.holding ? 1.5 : this.dragging ? 2.6 : this.aiming ? 2.4 : this.onBeam ? C.beam : C.run;
+    const max = this.prone ? 1.35 : this.carry ? C.carry : this.holding ? 1.5 : this.dragging ? 2.6 : this.aiming ? 2.4 : this.onBeam ? C.beam : C.run;
     this.airLock = Math.max(0, (this.airLock || 0) - dt);
     if (this.onGround) this.airLock = 0;
     if (this.airLock <= 0) this.steer(dt, v.clone().multiplyScalar(max), this.onGround ? C.accel : C.airAccel);
@@ -355,6 +357,12 @@ export class Player {
     if (inp.rollP) { this.state = 'air'; this.noBar = this.t; this.vel.set(0, 0, 0); }
   }
   /* ---------- spin special (unlocked by shards) ---------- */
+  /* 🪖 الانبطاح (بالسفينة): زحف بطيء، الحراس ما يشوفونك بسهولة، والقنص أثبت وأسرع */
+  toggleProne() {
+    if (!this.g.level.cfg.ship) return;
+    if (this.prone) { this.prone = false; } else if (this.onGround && this.state === 'ground' && !this.carry && !this.holding && !this.dragging) { this.prone = true; this.vel.x *= 0.2; this.vel.z *= 0.2; } else return;
+    this.g.sfx.S && this.g.sfx.S('cloth', 0.5, { rate: this.prone ? 0.8 : 1.1 }); if (this.prone) this.g.dust && this.g.dust(this.pos, 6);
+  }
   get battle() { const c = this.g.level && this.g.level.cfg; return !!(c && c.battle); }
   get maxC() { return this.battle ? 6 : 3; }
   atkDur(c) { return this.battle ? (c === 6 ? 0.42 : 0.24) : ATK[c] || ATK[1]; }
@@ -446,6 +454,10 @@ export class Player {
     if (st === 'ground' || (st === 'roll' && false)) {
       if (s > 0.06) run(Math.min(1, s * (this.onBeam ? 1.6 : 1)));
       else { P.chestX = Math.sin(t * 2) * 0.03; P.hipY = Math.sin(t * 2) * 0.012 - 0.04; P.knL = P.knR = 0.18; P.thLx = P.thRx = 0.06; P.shRx = 0.65; P.elR = 1.0; P.shRz = 0.25; P.shLz = 0.25; P.elL = 0.5; P.headY = Math.sin(t * 0.5) * 0.2; }
+      if (this.prone) { const mv = Math.min(1, hs / 1.2), c = Math.sin(this.t * 7) * mv;
+        P.rootPitch = 1.42; P.hipY = -0.4; P.headX = -0.95; P.spineX = -0.1; P.chestX = 0; // على بطنه، والراس مرفوع يشوف قدّام
+        P.shLx = 2.3 + c * 0.45; P.shRx = 2.3 - c * 0.45; P.elL = P.elR = 1.5; P.shLz = P.shRz = 0.35; // يزحف على كوعه
+        P.thLx = -0.1 - c * 0.35; P.thRx = -0.1 + c * 0.35; P.knL = 0.2 + Math.max(0, c) * 0.9; P.knR = 0.2 + Math.max(0, -c) * 0.9; P.thLz = P.thRz = 0.15; }
       if (this.holding) { P.shLx = P.shRx = 1.25; P.elL = P.elR = 1.7; P.shLz = P.shRz = -0.25; P.spineX = 0.18; P.headX = 0.15; } // ذراعين حول رقبة الحارس
       if (this.onBeam) { P.shLz = 1.35; P.shRz = 1.35; P.shLx = 0.1; P.shRx = 0.2; P.elL = P.elR = 0.2; P.rootRoll = Math.sin(t * 2.3) * 0.08; P.spineX = 0.15; }
     } else if (st === 'hug' && this.hug) {

@@ -227,7 +227,7 @@ export class Stealth {
     const w = this.weapon;
     if (this.ammo[w] <= 0) { this.c.sfx.tone(300, 300, 0.05, 'square', 0.06); this.c.say(w === 'pistol' ? '🎯 خلصت أسهم المسدس — دوّر صناديق زرقاء' : '🎯 خلصت أسهم القنّاصة — دوّر صناديق خضراء'); return; }
     if (w === 'sniper' && this.boltT > 0) return; // لسا يلقّم
-    this.ammo[w]--; this.hud(); this.recoil += w === 'sniper' ? 0.055 : 0.02; if (w === 'sniper') { this.boltT = 1.15; setTimeout(() => this.c.sfx.bolt(), 480); }
+    this.ammo[w]--; this.hud(); this.recoil += (w === 'sniper' ? 0.055 : 0.02) * (P.prone ? 0.45 : 1); if (w === 'sniper') { this.boltT = P.prone ? 0.7 : 1.15; setTimeout(() => this.c.sfx.bolt(), 480); }
     const cam = this.c.camera, o = cam.getWorldPosition(new V()), dir = cam.getWorldDirection(new V());
     this.c.sfx.shot(w === 'sniper');
     const far = w === 'sniper' ? 420 : 200, ray = new THREE.Raycaster(o, dir, 0.1, far), hits = ray.intersectObjects(this.L.camMeshes, false), wall = hits.length ? hits[0].distance : far;
@@ -333,9 +333,9 @@ export class Stealth {
     else this.breath = Math.min(1, this.breath + dt / (this.tired > 0 ? 6 : 3)); this.tired = Math.max(0, this.tired - dt);
     const k = (fov / 62) * (sn ? 0.95 : 1) * (this.pick && this.pick.target ? 0.55 : 1); // يبطّئ لما تكون على هدف (أسهل بالجوال)
     if (look.dx || look.dy) { cam.yaw -= look.dx * 0.0035 * k; this.aimPitch = Math.max(-1.2, Math.min(1.2, this.aimPitch - look.dy * 0.003 * k)); look.dx = look.dy = 0; }
-    const t = performance.now() / 1000, base = sn ? 0.0017 : 0.0012, sway = base * (holding ? 0.12 : this.tired > 0 ? 2.2 : 1) * (P.vel && Math.hypot(P.vel.x, P.vel.z) > 0.5 ? 2.5 : 1);
+    const t = performance.now() / 1000, base = sn ? 0.0017 : 0.0012, sway = base * (P.prone ? 0.3 : 1) * (holding ? 0.12 : this.tired > 0 ? 2.2 : 1) * (P.vel && Math.hypot(P.vel.x, P.vel.z) > 0.5 ? 2.5 : 1);
     const yaw = cam.yaw + (Math.sin(t * 0.7) + Math.sin(t * 1.3 + 1) * 0.4) * sway, pitch = this.aimPitch + this.recoil + (Math.sin(t * 0.9) * 0.8 + Math.sin(t * 0.4) * 0.5) * sway;
-    camera.position.copy(P.pos).add(new V(0, 1.62, 0));
+    camera.position.copy(P.pos).add(new V(0, P.prone ? 0.42 : 1.62, 0)); // منبطح = العين قريبة من الأرض
     const dir = new V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
     camera.lookAt(camera.position.clone().add(dir));
     if (camera.far < 600) { this.farSave = camera.far; camera.far = 600; camera.updateProjectionMatrix(); }

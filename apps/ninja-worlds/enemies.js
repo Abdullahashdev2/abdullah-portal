@@ -213,11 +213,12 @@ export class Enemies {
     const dis = this.g.disguised && this.g.disguised();
     if (dis && !dis.reveal && !e.captain) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
     const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
-    const range = hidden ? 2.4 : (e.captain ? 19 : e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1); // ملزوق بالجدار وساكن = أصعب تنشاف
+    const prone = pl.prone, still = prone && Math.hypot(pl.vel.x, pl.vel.z) < 0.3;
+    const range = hidden ? 2.4 : (e.captain ? 19 : e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1) * (still ? 0.45 : prone ? 0.6 : 1); // منبطح = أصعب تنشاف // ملزوق بالجدار وساكن = أصعب تنشاف
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
     if (d > range || Math.abs(dy) > 3.5) return 0;
     if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
-    const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5), BX = this.g.level.segBoxes(a, b);
+    const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, pl.prone ? 0.3 : 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5), BX = this.g.level.segBoxes(a, b);
     for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of BX) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return 0; }
     return 1 + (9 - d) / 9;
   }
