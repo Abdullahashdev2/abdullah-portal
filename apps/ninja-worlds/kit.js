@@ -69,6 +69,7 @@ export class Level {
     const cand = [];
     const walk = (o) => {
       for (const c of o.children) {
+        if (c.isGroup && c.userData.batchable && !c.userData.dyn && c.visible) { walk(c); continue; }
         if (!c.isMesh || c.isSkinnedMesh || c.isInstancedMesh || c.userData.dyn || c.userData.nobatch || !c.visible) continue; // groups/sprites/lights are skipped entirely
         if (!Array.isArray(c.material) && OK(c.material) && c.geometry && c.geometry.attributes.position && !c.morphTargetInfluences) cand.push(c);
         walk(c);
@@ -417,7 +418,7 @@ export function makeKit(L) {
     return G;
   };
   K.palm = ({ x, y, z, s = 1 }) => {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g); g.userData.batchable = true;
     const tm = own(new THREE.MeshStandardMaterial({ color: 0x8b6a43, roughness: 1, flatShading: true }));
     let px = 0, py = 0; for (let i = 0; i < 7; i++) { const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.16 - i * 0.012, 0.2 - i * 0.012, 0.75, 7), tm); px += 0.08 * i * 0.25; py += 0.7; seg.position.set(px, py, 0); seg.rotation.z = -0.05 * i; seg.castShadow = true; g.add(seg); }
     const lm = own(new THREE.MeshStandardMaterial({ color: 0x3f8f3a, roughness: 0.8, side: THREE.DoubleSide, flatShading: true }));
@@ -465,12 +466,12 @@ export function makeKit(L) {
   };
   K.kelp = ({ x, y, z, h = 5, color = 0x2f9e44 }) => {
     const geo = new THREE.PlaneGeometry(0.5, h, 1, 8); geo.translate(0, h / 2, 0);
-    const m = new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.8 }))); m.position.set(x, y, z); m.rotation.y = Math.random() * 3; L.add(m);
+    const m = new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.8 }))); m.position.set(x, y, z); m.rotation.y = Math.random() * 3; L.add(m); m.userData.nobatch = true;
     const p = geo.attributes.position, base = Float32Array.from(p.array), ph = Math.random() * 6;
     L.anim.push((dt, t) => { for (let i = 0; i < p.count; i++) { const yy = base[i * 3 + 1]; p.array[i * 3] = base[i * 3] + Math.sin(t * 1.3 + yy * 0.6 + ph) * 0.25 * (yy / h); } p.needsUpdate = true; });
   };
   K.coral = ({ x, y, z, color = 0xfb7185, s = 1 }) => {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g); g.userData.batchable = true;
     const mm = own(new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.15, flatShading: true }));
     for (let i = 0; i < 6; i++) { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.12, 0.8 + Math.random() * 0.8, 6), mm); c.position.set((Math.random() - 0.5) * 0.7, 0.4, (Math.random() - 0.5) * 0.7); c.rotation.set((Math.random() - 0.5) * 0.9, 0, (Math.random() - 0.5) * 0.9); g.add(c); const b = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), mm); b.position.copy(c.position).multiplyScalar(1.6); b.position.y = 0.9 + Math.random() * 0.5; g.add(b); }
   };

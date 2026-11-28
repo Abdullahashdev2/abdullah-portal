@@ -50,7 +50,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 3); sun.castShadow = true; scen
 sun.shadow.mapSize.set(LOW ? 1024 : 2048, LOW ? 1024 : 2048); Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 140 }); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.04;
 const pmrem = new THREE.PMREMGenerator(renderer); let envRT = null;
 const sunDir = new V(), lightDir = new V();
-const BREATH = 12; let breath = 12, normalFog = null; const waterFog = new THREE.FogExp2(0x0b5f7a, 0.06);
+const BREATH = 12; const maxBreath = () => (cfg && cfg.breath) || BREATH; let breath = 12, normalFog = null; const waterFog = new THREE.FogExp2(0x0b5f7a, 0.06);
 /* ---------- lightweight bloom (HDR glow) ---------- */
 let post = null, HQ = !LOW, bloomSamples = 2;
 /* ---------- 📺 TV mode: built for weak smart-TV browsers (render small + upscale, cheap materials, no sky/shadows/glow, 30 fps lock) ---------- */
@@ -157,8 +157,8 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 const sparks = new Particles(900, true), dust = new Particles(400, false), motes = new Particles(500, true);
 scene.add(sparks.points, dust.points, motes.points);
 const sfx = new Sound();
-const SURF = { hub: 'conc', w1: 'conc', w2: 'grass', w3: 'snow', w4: 'conc', w5: 'conc', w6: 'conc', w7: 'metal', w8: 'conc' };
-const AMB = { hub: 'breeze', w1: 'breeze', w2: 'wind', w3: 'wind', w4: 'breeze', w5: 'night', w6: 'fire', w7: 'storm', w8: 'city' };
+const SURF = { hub: 'conc', w1: 'conc', w2: 'grass', w3: 'snow', w4: 'conc', w5: 'conc', w6: 'conc', w7: 'metal', w8: 'conc', w9: 'conc', w10: 'wood', w11: 'snow' };
+const AMB = { hub: 'breeze', w1: 'breeze', w2: 'wind', w3: 'wind', w4: 'breeze', w5: 'night', w6: 'fire', w7: 'storm', w8: 'city', w9: 'wind', w10: 'breeze', w11: 'wind' };
 const ROOM = { w5: 0.2, w7: 0.12, w1: 0.12 };
 addEventListener('resize', resize); resize();
 
@@ -263,7 +263,7 @@ function loadWorld(id, from) {
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
   // السفينة أثقل عالم: على الجوال نبدأ فيها بجودة «متوسطة» (بدون bloom وMSAA) والتلقائي يرفعها لو الجوال قدر
   sfx.ear = camera; sfx.surface = SURF[cfg.id] || 'conc'; sfx.room = ROOM[cfg.id] || 0; if (sfx.ctx) { sfx.amb(AMB[cfg.id] || 'breeze'); }
-  setSpy(hero, !!(cfg.ship || cfg.city), cfg.city ? 'street' : 'spy'); player.spy = !!cfg.ship; hero.sword.visible = !(cfg.ship || cfg.city);
+  setSpy(hero, !!(cfg.ship || cfg.city || cfg.outfit), cfg.outfit || (cfg.city ? 'street' : 'spy')); player.spy = !!cfg.ship; hero.sword.visible = !(cfg.ship || cfg.city || cfg.outfit === 'diver');
   for (const d of level.carDefs || []) cars.spawn(d); // في السفينة: بدلة تجسس وقتال بالأيدي
   if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
@@ -273,7 +273,7 @@ function loadWorld(id, from) {
   applyAtmo(cfg);
   if (level.npcDef) { const d = level.npcDef; npc = buildHero('calm'); npc.root.position.set(d.x, d.y, d.z); npc.root.rotation.y = d.yaw; scene.add(npc.root); npc.line = 0; }
   checkpoint = level.checkpoints[0] ? { pos: level.checkpoints[0].pos, yaw: level.checkpoints[0].yaw } : null;
-  computeUpg(); player.spawn(cfg.spawn.pos, cfg.spawn.yaw); player.hp = player.maxHp; breath = BREATH; normalFog = scene.fog; player.carry = null;
+  computeUpg(); player.spawn(cfg.spawn.pos, cfg.spawn.yaw); player.hp = player.maxHp; breath = maxBreath(); normalFog = scene.fog; player.carry = null;
   if (!checkpoint) checkpoint = { pos: cfg.spawn.pos.clone(), yaw: cfg.spawn.yaw };
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
@@ -344,7 +344,7 @@ function hudUpdate() {
 }
 const BONUS = { w5: { id: 'w5-10', hint: '🥷 الشظية العاشرة السرّية: خلّص القلعة بدون ولا إنذار (محد يشوفك)' }, w7: { id: 'w7-10', hint: '👻 الشظية العاشرة السرّية «شبح السفينة»: خلّص السفينة بدون ولا إنذار' } };
 function openProgress() {
-  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8'], per = 10; let got = 0, done = 0;
+  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8', 'w9', 'w10', 'w11'], per = 10; let got = 0, done = 0;
   const rows = ids.map((id) => {
     const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id] || n >= per) done++;
     const b = SAVE.best[id], t = b ? `⏱️ ${Math.floor(b / 60)}:${String(b % 60).padStart(2, '0')}` : '';
@@ -373,10 +373,13 @@ const WMETA = {
   w4: { sub: 'العالم الرابع', tease: 'تحت الماء… نفسك محدود، والأعماق ما ترحم', sky: ['#082f49', '#0e7490', '#67e8f9'] },
   w5: { sub: 'العالم الخامس', tease: 'قلعة الظلال… الحراس ما ينامون، والقمر يفضحك', sky: ['#020617', '#1e3a8a', '#a5b4fc'] },
   w6: { sub: 'العالم الأخير', tease: 'قلب البركان… العملاق صاحي', sky: ['#1c0a04', '#9a3412', '#fb923c'] },
+  w9: { sub: 'عالم السائق', tease: 'طريق طويل وقت الغروب… والواحة تنتظرك في آخره', sky: ['#3b1d2e', '#e8906a', '#ffd59e'] },
+  w10: { sub: 'عالم الغوّاص', tease: 'شعاب ملوّنة، أسراب سمك، وحطام سفينة فيه كنوز… والقروش تحرسه', sky: ['#062a3a', '#0e7490', '#67e8f9'] },
+  w11: { sub: 'عالم المتسلّق', tease: 'عاصفة ثلجية، جليد يزلّق، ووحوش ثلج… والقمة فوق الغيوم', sky: ['#64748b', '#cbd5e1', '#f8fafc'] },
   w8: { sub: 'عالم السيارات', tease: 'مدينة ما تنام… اسرق سيارة، طِر من المنحدرات، وسوق لأي عالم تبيه', sky: ['#0f0524', '#4c1d95', '#f472b6'] },
   w7: { sub: 'عالم التسلّل', tease: 'ليلة عاصفة… سفينة مليانة حراس، وبوصلة الظل مخبّاة فوق الجسر', sky: ['#020617', '#1e293b', '#64748b'] },
 };
-const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة', w8: '🌃 مدينة النيون' };
+const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة', w8: '🌃 مدينة النيون', w9: '🏜️ طريق الغروب', w10: '🤿 الشعاب العميقة', w11: '🏔️ قمم الثلج' };
 const TIPS = ['💡 الجدار المضيء بالرونات تقدر تركض عليه.', '💡 اضغط قفز قدّام الجدار = تطلع عليه.', '💡 في السفينة: ادفع للجدار = تلتصق فيه وتطل من الزاوية.', '💡 السفينة: اقفز جنب الحاجز = تتعلّق برّا والحراس ما يشوفونك.', '💡 امسك الحارس من الخلف ⚔️ وارمه في البحر عند الحافة 🌊.', '💡 القنّاصة: احبس نفسك 🫁 عشان يثبت المنظار.', '💡 الموجة الكبيرة = الحراس يتمسكون وما يشوفون — استغلها!', '💡 اخنق حارس = تاخذ الراديو، وتقلّد صوت القائد 📻.', '💡 الكوينز تشتري فيها ترقيات من 🛒 المتجر.', '💡 لا تطوّل وأنت ماسك الحارس — بيفلت ويعلن الإنذار!'];
 function drawLoaderArt(id) {
   const cv = $('#ldArt'), dpr = Math.min(2, devicePixelRatio || 1), W = cv.width = Math.round(innerWidth * dpr), H = cv.height = Math.round(innerHeight * dpr), g = cv.getContext('2d');
@@ -401,14 +404,17 @@ function drawLoaderArt(id) {
   } else {
     g.fillStyle = 'rgba(255,255,255,.7)'; if (id === 'w5' || id === 'hub') for (let i = 0; i < 120; i++) g.fillRect(R(0, W), R(0, hz * 0.8), 1.5 * dpr, 1.5 * dpr);
     if (id === 'w5') { g.fillStyle = '#e0e7ff'; g.beginPath(); g.arc(W * 0.75, H * 0.22, H * 0.09, 0, 7); g.fill(); }
-    if (id === 'w4') { g.fillStyle = 'rgba(224,242,254,.35)'; for (let i = 0; i < 60; i++) { g.beginPath(); g.arc(R(0, W), R(0, H), R(2, 9) * dpr, 0, 7); g.fill(); } }
+    if (id === 'w9') { g.fillStyle = '#fde68a'; g.shadowColor = '#fb923c'; g.shadowBlur = 60 * dpr; g.beginPath(); g.arc(W * 0.5, hz - H * 0.02, H * 0.12, Math.PI, 0); g.fill(); g.shadowBlur = 0; g.fillStyle = 'rgba(80,40,30,.85)'; for (let i = 0; i < 6; i++) { g.beginPath(); g.ellipse(W * (i / 5), hz + 4, W * 0.18, H * 0.06, 0, Math.PI, 0); g.fill(); } g.fillStyle = '#2a2328'; g.beginPath(); g.moveTo(W * 0.47, hz); g.lineTo(W * 0.53, hz); g.lineTo(W * 0.85, H); g.lineTo(W * 0.15, H); g.fill(); g.fillStyle = '#fde68a'; for (let k = 0; k < 6; k++) { const t = k / 6, y1 = hz + (H - hz) * t * t; g.fillRect(W * 0.5 - (1 + t * 6) * dpr, y1, (2 + t * 12) * dpr, (4 + t * 30) * dpr); } }
+    if (id === 'w11') { g.fillStyle = '#f1f5f9'; for (let i = 0; i < 5; i++) { const cx = W * (0.1 + i * 0.2), h = H * R(0.3, 0.55); g.beginPath(); g.moveTo(cx - W * 0.16, hz); g.lineTo(cx, hz - h); g.lineTo(cx + W * 0.16, hz); g.fill(); } g.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 220; i++) g.fillRect(R(0, W), R(0, H), 2 * dpr, 2 * dpr); }
+    if (id === 'w4' || id === 'w10') { g.fillStyle = 'rgba(224,242,254,.35)'; for (let i = 0; i < 60; i++) { g.beginPath(); g.arc(R(0, W), R(0, H), R(2, 9) * dpr, 0, 7); g.fill(); } }
     g.fillStyle = sil;
     if (id === 'w6') { g.beginPath(); g.moveTo(W * 0.15, hz); g.lineTo(W * 0.42, H * 0.25); g.lineTo(W * 0.58, H * 0.25); g.lineTo(W * 0.85, hz); g.fill(); g.fillStyle = '#f97316'; g.shadowColor = '#fb923c'; g.shadowBlur = 40 * dpr; g.fillRect(W * 0.44, H * 0.24, W * 0.12, H * 0.02); g.shadowBlur = 0; g.fillStyle = sil; }
     else if (id === 'w2') { for (let i = 0; i < 5; i++) { const cx = W * (0.12 + i * 0.19), cy = H * R(0.35, 0.6), r = W * R(0.05, 0.09); g.beginPath(); g.moveTo(cx - r, cy); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r * 1.3); g.fill(); g.fillRect(cx - r, cy - H * 0.015, r * 2, H * 0.015); } }
+    else if (id === 'w9' || id === 'w11' || id === 'w10') { /* مرسومة فوق */ }
     else { // أبراج/بوابات/أطلال
       for (let i = 0; i < 9; i++) { const w = W * R(0.05, 0.11), h = H * R(0.12, 0.34), x = (i / 9) * W + R(-10, 10); g.fillRect(x, hz - h, w, h + 2); if (id === 'hub' && i % 2) { g.fillStyle = m.sky[2]; g.globalAlpha = 0.5; g.beginPath(); g.ellipse(x + w / 2, hz - h * 0.55, w * 0.32, h * 0.32, 0, 0, 7); g.fill(); g.globalAlpha = 1; g.fillStyle = sil; } }
     }
-    g.fillRect(0, hz, W, H - hz);
+    if (id !== 'w9') g.fillRect(0, hz, W, H - hz);
   }
 }
 let loading = false;
@@ -549,14 +555,14 @@ const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
 function touchLabels() {
   const bc = document.body.classList; bc.toggle('m-aim', !!stealth.aiming); bc.toggle('m-hold', !!stealth.holding); bc.toggle('m-hang', player.state === 'hang' && !!player.edgeHang); bc.toggle('m-hug', player.state === 'hug'); bc.toggle('m-radio', !!stealth.radioOpen);
   const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();
-  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : cfg && cfg.city ? lab('fist', 'ضرب') : lab('sword', 'ضرب'));
+  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : cfg && (cfg.city || cfg.outfit === 'diver') ? lab('fist', 'ضرب') : lab('sword', 'ضرب'));
   setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
   setBtn('actBtn', aim ? lab(stealth.weapon === 'pistol' ? 'sniper' : 'pistol', stealth.weapon === 'pistol' ? 'قنّاصة' : 'مسدس') : hold ? lab('wave', 'ارمِ') : player.state === 'hug' ? lab('knock', 'طق') : hang ? lab('none', '—') : lab('hand', 'شيل'));
   document.body.classList.toggle('m-drive', !!player.driving);
   if (player.driving) { setBtn('jumpBtn', lab('brake', 'فرامل يد')); setBtn('rollBtn', lab('dash', 'نيترو')); setBtn('atkBtn', lab('horn', 'بوري')); setBtn('actBtn', lab('back', 'انزل')); return; }
   if (cfg && cfg.city && cars.nearest(player.pos, 3.3)) setBtn('actBtn', lab('car', 'اركب'));
   const swim = player.state === 'swim';
-  if (swim) { setBtn('jumpBtn', lab('swimup', 'اطلع لفوق')); setBtn('rollBtn', lab('dive', 'غوص')); setBtn('atkBtn', lab('sword', 'ضرب')); setBtn('actBtn', lab('hand', 'شيل')); }
+  if (swim) { setBtn('jumpBtn', lab('swimup', 'اطلع لفوق')); setBtn('rollBtn', lab('dive', 'غوص')); setBtn('atkBtn', lab(cfg && cfg.outfit === 'diver' ? 'fist' : 'sword', 'ضرب')); setBtn('actBtn', lab('hand', 'شيل')); }
   else setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
   if (!swim) setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
@@ -640,7 +646,7 @@ function respawn(why) {
   if (player.carry) dropItem(true);
   const f = $('#fade'); f.classList.add('on');
   setTimeout(() => {
-    player.spawn(checkpoint.pos.clone().add(new V(0, 0.05, 0)), checkpoint.yaw); player.inv = 1; breath = BREATH;
+    player.spawn(checkpoint.pos.clone().add(new V(0, 0.05, 0)), checkpoint.yaw); player.inv = 1; breath = maxBreath();
     for (const e of enemies.list) if (e.boss && e.alive && e.hp < e.maxHp) { e.hp = e.maxHp; e.pos.set(e.def.x, e.def.y, e.def.z); e.st = 'idle'; setTimeout(() => say('🌋 العملاق رجع لقوته كاملة! هالمرة لا تطيح 😤'), 600); }
     if (why === 'death') { player.hp = player.maxHp; const lost = Math.floor((SAVE.coins || 0) * 0.2); if (lost) addCoins(-lost); say(lost ? `💀 طحت! خسرت ${lost} 🪙 ورجعت لآخر نقطة — ركّز أكثر.` : '💀 طحت! رجعت لآخر نقطة.'); }
     else if (why === 'fall' && worldFalls % 4 === 3) say('السقوط جزء من التدريب 🥷 — خذ نفس وجرّب مرة ثانية.');
@@ -882,6 +888,7 @@ function worldLogic(dt) {
   }
   // keycards
   for (const C of level.cards || []) if (!C.taken && C.pos.distanceTo(new V(p.x, p.y + 0.8, p.z)) < 1.3) { C.taken = true; C.g.removeFromParent(); level.keys[C.name] = true; sfx.keycard(); say('🗝️ أخذت «' + C.name + '»'); }
+  if (level.snowMesh) level.snowMesh.position.set(p.x, p.y - 4, p.z);
   if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.thunder(), 400 + Math.random() * 900); }
     flash = Math.max(0, flash - dt * 5); hemi.intensity = cfg.hemi[2] * (1 + 4 * flash * (flash > 0.6 || flash < 0.35 ? 1 : 0.3));
     if (level.rainMesh) { level.rainMesh.position.set(p.x, p.y - 4, p.z); level.rainMesh.visible = !cam.roof && !underRoof(); } }
@@ -902,10 +909,10 @@ function worldLogic(dt) {
   // breath & bubbles
   if (level.waters) {
     const W = G.waterAt(p), under = player.state === 'swim' && W && p.y + 1.62 < W.y1;
-    breath = under ? breath - dt : Math.min(BREATH, breath + dt * 5);
+    breath = under ? breath - dt : Math.min(maxBreath(), breath + dt * 5);
     if (breath <= 0) { breath = 1.4; player.damage(1, new V(p.x, p.y + 3, p.z)); say('🫧 خلص الهوا! اطلع فوق أو دوّر فقاعة هوا.'); }
-    for (const B of level.bubbles || []) { if (!B.g.visible) { B.t -= dt; if (B.t <= 0) B.g.visible = true; continue; } if (B.pos.distanceTo(new V(p.x, p.y + 1, p.z)) < 1.3) { breath = BREATH; B.g.visible = false; B.t = 6; sfx.tone(600, 1200, 0.2, 'sine', 0.1); sparks.emit(B.pos, { color: 0xe0ffff, count: 20, speed: 3, life: 0.5 }); } }
-    const bb = $('#breath'); bb.classList.toggle('on', breath < BREATH - 0.05); $('#breathFill').style.width = Math.max(0, (breath / BREATH) * 100) + '%'; $('#breathFill').style.background = breath < 4 ? '#f87171' : '#7dd3fc';
+    for (const B of level.bubbles || []) { if (!B.g.visible) { B.t -= dt; if (B.t <= 0) B.g.visible = true; continue; } if (B.pos.distanceTo(new V(p.x, p.y + 1, p.z)) < 1.3) { breath = maxBreath(); B.g.visible = false; B.t = 6; sfx.tone(600, 1200, 0.2, 'sine', 0.1); sparks.emit(B.pos, { color: 0xe0ffff, count: 20, speed: 3, life: 0.5 }); } }
+    const bb = $('#breath'); bb.classList.toggle('on', breath < maxBreath() - 0.05); $('#breathFill').style.width = Math.max(0, (breath / maxBreath()) * 100) + '%'; $('#breathFill').style.background = breath < 4 ? '#f87171' : '#7dd3fc';
   }
   // boss bar
   const boss = enemies.list.find((e) => (e.boss || e.captain) && e.alive && e.st !== 'sleep');

@@ -625,10 +625,10 @@ export function w8(K, L, S) {
   // أعمدة إنارة
   for (const r of [-72, 72]) for (let t = -110; t <= 110; t += 44) { K.lamp({ x: r + 7.5, y: 6, z: t, color: 0xfde68a, light: Math.abs(t) < 50 }); }
   // الساحة: بوابات لكل العوالم (تدخلها بالسيارة أو مشي)
-  const prevOf = { w1: null, w2: 'w1', w3: 'w2', w4: 'w3', w5: 'w4', w6: 'w5', w7: 'w1' };
-  const GATES = [['hub', 'ساحة البوابات 🌀', 0xffffff], ['w1', 'أطلال المكتبة', 0xffc94d], ['w2', 'الجزر السماوية', 0xc084fc], ['w3', 'حصن الرمال', 0xffb020], ['w4', 'الأعماق الزرقاء', 0x22d3ee], ['w5', 'قلعة الظلال', 0x818cf8], ['w6', 'قلب البركان', 0xff6a00], ['w7', 'سفينة العاصفة 🌧️', 0x38bdf8]];
+  const prevOf = { w1: null, w2: 'w1', w3: 'w2', w4: 'w3', w5: 'w4', w6: 'w5', w7: 'w1', w9: 'w1', w10: 'w1', w11: 'w1' };
+  const GATES = [['hub', 'ساحة البوابات 🌀', 0xffffff], ['w1', 'أطلال المكتبة', 0xffc94d], ['w2', 'الجزر السماوية', 0xc084fc], ['w3', 'حصن الرمال', 0xffb020], ['w4', 'الأعماق الزرقاء', 0x22d3ee], ['w5', 'قلعة الظلال', 0x818cf8], ['w6', 'قلب البركان', 0xff6a00], ['w7', 'سفينة العاصفة 🌧️', 0x38bdf8], ['w9', 'طريق الغروب 🏜️', 0xffb070], ['w10', 'الشعاب العميقة 🤿', 0x22d3ee], ['w11', 'قمم الثلج 🏔️', 0xbae6fd]];
   GATES.forEach(([id, nm, col], k) => {
-    const a = (k / GATES.length) * Math.PI * 2, x = Math.sin(a) * 12.5, z = Math.cos(a) * 12.5, open = id === 'hub' || id === 'w1' || !!S.done[prevOf[id]];
+    const a = (k / GATES.length) * Math.PI * 2, x = Math.sin(a) * 14, z = Math.cos(a) * 14, open = id === 'hub' || id === 'w1' || !!S.done[prevOf[id]];
     K.portal({ x, y: 0, z, rot: a + Math.PI, to: id, label: open ? (S.done[id] ? '✓ ' : '') + nm : '🔒 ' + nm, color: col, active: open, locked: !open && 'هالبوابة تنفتح بعد ما تخلّص العالم اللي قبله 🔒' });
   });
   // منحدرات القفز (بالسيارة) + شظايا في الهوا
@@ -655,10 +655,163 @@ export function w8(K, L, S) {
   const loop = (a, dir) => { const p = [[-a, -a], [a, -a], [a, a], [-a, a]]; return dir > 0 ? p : p.reverse(); };
   L.carDefs = [];
   [[27.5, 1], [20.5, -1], [75.5, 1], [68.5, -1], [123.5, 1], [116.5, -1]].forEach(([a, d], k) => { for (let m = 0; m < 2; m++) L.carDefs.push({ path: loop(a, d), pi: m * 2 + (k % 2), x: 0, z: 0 }); });
-  [[-75, -100, 0], [-69, -112, 0, 'sport', 0xfacc15], [75, 100, Math.PI], [69, 112, Math.PI], [100, -77, -Math.PI / 2], [-100, 77, Math.PI / 2, 'sport', 0xef4444], [6, -14, Math.PI, 'sport', 0x22d3ee], [-6, -14, Math.PI]].forEach(([x, z, yaw, kind, color]) => L.carDefs.push({ x, z, yaw, kind, color }));
+  [[-75, -100, 0], [-69, -112, 0, 'sport', 0xfacc15], [75, 100, Math.PI], [69, 112, Math.PI], [100, -77, -Math.PI / 2], [-100, 77, Math.PI / 2, 'sport', 0xef4444], [5, -4, Math.PI, 'sport', 0x22d3ee], [-5, -4, Math.PI]].forEach(([x, z, yaw, kind, color]) => L.carDefs.push({ x, z, yaw, kind, color }));
   K.checkpoint(0, 0, -6, Math.PI);
   K.trigger({ x: 0, z: -6, r: 4, text: '🌃 مدينة النيون! تقدر تسرق أي سيارة: روح جنبها واضغط ✋ (لو فيها سائق تسحبه 😅). وبالسيارة تقدر تدخل أي بوابة في الساحة — المدينة مربوطة بكل العوالم!' });
   return cfg;
 }
 
-export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7, w8 };
+/* ===================== W9: طريق الغروب — سواقة صحراوية طويلة (أجواء «الرحّال») ===================== */
+export function w9(K, L, S) {
+  const cfg = {
+    id: 'w9', name: 'طريق الغروب', sub: 'عالم السائق', music: 'w3', killY: -10, motes: 0xffd8a8, shardTotal: 10, city: true, batch: true, outfit: 'street',
+    sky: { elev: 1.5, azim: 180, turb: 8, ray: 2.2, mie: 0.012, mieG: 0.85 }, exposure: 0.62, env: 0.6, fog: [0xe8906a, 0.0032], sun: [0xffb070, 2.6], hemi: [0xffc9a0, 0x6b4a32, 1.1],
+    spawn: { pos: new V(6, 0, 0), yaw: 0 },
+  };
+  const sh = (n, x, y, z) => K.shard('w9-' + n, x, y, z, S.shards.includes('w9-' + n));
+  const LEN = 1200;
+  K.plat({ x: 0, y: 0, z: LEN / 2, w: 420, d: LEN + 200, h: 1, m: 'sand', rock: false, tile: 10, ledge: false });
+  const asphalt = new THREE.MeshStandardMaterial({ color: 0x3b3a40, roughness: 0.6 }), lineM = new THREE.MeshBasicMaterial({ color: 0xfde68a }), rumble = [new THREE.MeshBasicMaterial({ color: 0xe11d48 }), new THREE.MeshBasicMaterial({ color: 0xf1f5f9 })];
+  const flat = (x, z, w, d, m, y = 0.012) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), m); me.position.set(x, y, z); me.receiveShadow = true; L.add(me); return me; };
+  flat(0, LEN / 2, 16, LEN + 40, asphalt);
+  for (let z = -10; z < LEN + 10; z += 10) { flat(0, z, 0.3, 4, lineM, 0.03); flat(-8.2, z, 0.5, 5, rumble[(z / 10 | 0) & 1], 0.028); flat(8.2, z, 0.5, 5, rumble[(z / 10 | 0) & 1], 0.028); }
+  K.dunes({ n: 34, color: 0xe7a96b, y: -24 }); K.mountains({ color: 0x9a5b4a, r0: 520, n: 18, hmin: 70, hmax: 170, y: -30 });
+  // نخيل وصخور على الجانبين (الصخور صلبة)
+  for (let z = 20; z < LEN; z += 26) { const sd = (z / 26 | 0) % 2 ? 1 : -1; K.palm({ x: sd * (14 + (z % 7)), y: 0, z, s: 0.9 + (z % 5) * 0.08 }); }
+  for (let z = 60; z < LEN; z += 75) for (const sd of [-1, 1]) K.plat({ x: sd * (22 + (z % 11)), y: 3 + (z % 4), z: z + sd * 9, w: 7, d: 6, h: 3 + (z % 4), m: 'rock', rock: false });
+  // منحدرات + شظايا معلّقة
+  L.ramps = [];
+  const rampM = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5, metalness: 0.3 });
+  const ramp = (x, z) => { const me = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 7), rampM); me.position.set(x, 0.75, z); me.rotation.x = -0.22; me.castShadow = true; L.add(me); L.ramps.push({ x0: x - 3, x1: x + 3, z0: z - 3, z1: z + 3, dx: 0, dz: 1 }); };
+  [[3.5, 150, 1], [-3.5, 330, 2], [3.5, 520, 3], [-3.5, 700, 4], [3.5, 880, 5], [-3.5, 1050, 6]].forEach(([x, z, n]) => { ramp(x, z); sh(n, x, 4.6, z + 22); });
+  // محطة بنزين قديمة (على الرجل) + معلم صخري + واحة
+  K.plat({ x: -24, y: 4, z: 420, w: 12, d: 8, h: 4, m: 'wood', rock: false }); K.plat({ x: -24, y: 4.3, z: 420, w: 14, d: 10, h: 0.3, m: 'metal', rock: false }); sh(7, -24, 5.2, 420);
+  K.crates({ x: -18, z: 418, n: 4, s: 1.3 });
+  K.arch({ x: 30, y: 0, z: 610, w: 7, h: 8, rot: Math.PI / 2, m: 'rock' }); sh(8, 30, 1.2, 610);
+  sh(9, -40, 1.2, 780); K.palm({ x: -42, y: 0, z: 782, s: 1.3 }); K.palm({ x: -38, y: 0, z: 776 });
+  // زحمة بالاتجاهين
+  L.carDefs = [];
+  for (let k = 0; k < 6; k++) L.carDefs.push({ path: [[3.5, -5], [3.5, LEN + 5], [-3.5, LEN + 5], [-3.5, -5]], pi: k % 4 });
+  for (let k = 0; k < 6; k++) { const c = L.carDefs[k]; c.pi = 0; c.path = k % 2 ? [[-3.5, LEN - k * 170], [-3.5, -5], [3.5, -5], [3.5, LEN + 5]] : [[3.5, k * 170 + 40], [3.5, LEN + 5], [-3.5, LEN + 5], [-3.5, -5]]; }
+  L.carDefs.push({ x: 6, z: 6, yaw: 0, kind: 'sport', color: 0xef4444 });
+  // الواحة: النهاية
+  const oz = LEN + 40;
+  K.water({ x0: -12, x1: 12, z0: oz - 8, z1: oz + 8, y0: -3, y1: -0.2 });
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; K.palm({ x: Math.cos(a) * 17, y: 0, z: oz + Math.sin(a) * 15, s: 1.1 + (i % 3) * 0.1 }); }
+  sh(10, 0, -1.6, oz);
+  const exit = K.portal({ x: 0, y: 0, z: oz + 22, rot: Math.PI, to: 'w8', label: 'رجوع لمدينة النيون 🌃', color: 0xffb070, active: false });
+  K.trigger({ x: 0, z: oz - 14, r: 12, fn: () => { exit.setActive(true); L.complete = true; L.sfx('win'); }, text: '🌴 وصلت الواحة!! 🏆 طريق الغروب انختم. البوابة فتحت — والشظية العاشرة تحت الماء 🌊' });
+  for (let z = 200; z < LEN; z += 200) K.checkpoint(10, 0, z, 0);
+  K.checkpoint(10, 0, 0, 0);
+  K.trigger({ x: 6, z: 0, r: 5, text: '🏜️ طريق الغروب: سيارتك الحمراء جنبك — اركبها (✋) وسوق لين الواحة في آخر الطريق. المنحدرات تطيّرك للشظايا المعلّقة، وفيه أماكن على الرجل (محطة، قوس صخري، نخلة بعيدة).' });
+  return cfg;
+}
+
+/* ===================== W10: الشعاب العميقة — غوص، أسماك، حطام سفينة، قروش ===================== */
+export function w10(K, L, S) {
+  const cfg = {
+    id: 'w10', name: 'الشعاب العميقة', sub: 'عالم الغوّاص', music: 'w4', killY: -60, motes: 0xbff7ff, shardTotal: 10, breath: 70, outfit: 'diver', batch: true,
+    sky: { elev: 50, azim: 140, turb: 2, ray: 1, mie: 0.003, mieG: 0.8 }, exposure: 0.55, env: 0.45, fog: [0x7fd3ee, 0.004], sun: [0xfffaf0, 3.0], hemi: [0xd6f6ff, 0x2a5a6a, 1.0],
+    spawn: { pos: new V(0, 0.6, -6), yaw: 0 },
+  };
+  const sh = (n, x, y, z) => K.shard('w10-' + n, x, y, z, S.shards.includes('w10-' + n));
+  // قارب الغوص
+  K.plat({ x: 0, y: 0.6, z: -6, w: 8, d: 12, h: 1.2, m: 'wood', rock: false });
+  K.trigger({ x: 0, z: -6, y: 0.6, r: 4, text: '🤿 الشعاب العميقة: معك أسطوانة أكسجين (٧٠ ثانية). اغطس (🌀 مطوّل) وكشّف الشعاب وحطام السفينة الغارقة — والكنوز فيها. ⚠️ انتبه من القروش!' });
+  K.checkpoint(0, 0.6, -3, 0);
+  const W0 = -60, W1 = 60, Z0 = 2, Z1 = 160;
+  K.water({ x0: W0, x1: W1, z0: Z0, z1: Z1, y0: -32, y1: 0 });
+  K.plat({ x: 0, y: -32, z: (Z0 + Z1) / 2, w: W1 - W0, d: Z1 - Z0, h: 2, m: 'sand', rock: false, tile: 6 });
+  for (const sd of [-1, 1]) K.wall({ x: sd * (W1 + 1), y: 2, z: (Z0 + Z1) / 2, w: 2, d: Z1 - Z0, h: 36, m: 'rock', ledge: false });
+  K.wall({ x: 0, y: 2, z: Z1 + 1, w: W1 - W0 + 4, d: 2, h: 36, m: 'rock', ledge: false });
+  // شعاب: أعمدة صخرية + مرجان + أعشاب
+  let sd = 7; const R = () => ((sd = (sd * 9301 + 49297) % 233280) / 233280);
+  for (let i = 0; i < 26; i++) { const x = W0 + 6 + R() * (W1 - W0 - 12), z = Z0 + 8 + R() * (Z1 - Z0 - 16), h = 4 + R() * 12; K.plat({ x, y: -32 + h, z, w: 3 + R() * 4, d: 3 + R() * 4, h, m: 'rock', rock: false }); }
+  for (let i = 0; i < 90; i++) K.coral({ x: W0 + 4 + R() * (W1 - W0 - 8), y: -31, z: Z0 + 4 + R() * (Z1 - Z0 - 8), color: [0xfb7185, 0xf59e0b, 0xa78bfa, 0x22d3ee, 0x4ade80][i % 5], s: 0.8 + R() * 1.4 });
+  for (let i = 0; i < 70; i++) K.kelp({ x: W0 + 4 + R() * (W1 - W0 - 8), y: -31, z: Z0 + 4 + R() * (Z1 - Z0 - 8), h: 4 + R() * 9, color: i % 3 ? 0x2f9e44 : 0x15803d });
+  for (let i = 0; i < 9; i++) K.fish({ x: W0 + 10 + R() * (W1 - W0 - 20), y: -8 - R() * 18, z: Z0 + 10 + R() * (Z1 - Z0 - 20), color: [0xfbbf24, 0x38bdf8, 0xf472b6, 0x4ade80][i % 4], n: 12 + (i % 3) * 6, r: 3 + R() * 3 });
+  for (let i = 0; i < 14; i++) K.bubble(W0 + 8 + R() * (W1 - W0 - 16), -10 - R() * 18, Z0 + 10 + R() * (Z1 - Z0 - 20));
+  // حطام السفينة الغارقة (تقدر تدخلها)
+  const wx = 18, wz = 110, wy = -30; const hullM = new THREE.MeshStandardMaterial({ color: 0x5b3a29, roughness: 0.9 }); hullM.userData.own = true;
+  K.plat({ x: wx, y: wy + 0.4, z: wz, w: 10, d: 34, h: 0.4, m: 'wood', rock: false });
+  for (const sx of [-1, 1]) K.plat({ x: wx + sx * 5, y: wy + 6, z: wz, w: 0.6, d: 34, h: 6, m: hullM, rock: false, ledge: false });
+  K.plat({ x: wx, y: wy + 6, z: wz + 17, w: 10, d: 0.6, h: 6, m: hullM, rock: false });
+  K.plat({ x: wx, y: wy + 6.3, z: wz - 6, w: 10.6, d: 14, h: 0.3, m: 'wood', rock: false }); // سطح مكسور
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 18, 8), hullM); mast.position.set(wx + 2, wy + 9, wz + 3); mast.rotation.z = 0.5; L.add(mast);
+  sh(1, wx, wy + 1.2, wz + 12); sh(2, wx - 3, wy + 1.2, wz - 10); sh(3, wx + 2, wy + 7.2, wz - 9);
+  K.trigger({ x: wx, z: wz - 17, y: wy, r: 8, dy: 12, text: '⚓ حطام السفينة! ادخل من الفتحة اللي قدّام — الكنوز داخلها 💎' });
+  // كنوز متفرقة
+  sh(4, -40, -30.2, 40); sh(5, 44, -12, 30); sh(6, -30, -22, 140); sh(7, 0, -30.2, 150); sh(8, -50, -6, 90); sh(9, 50, -28, 150);
+  // قروش (تعضّ إذا لمستها)
+  L.hazards = L.hazards || [];
+  const shark = (cx, cy, cz, r, speed, phase) => {
+    const g = new THREE.Group(); L.add(g); g.userData.dyn = true; const m = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 }), belly = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 10), m); body.scale.set(1, 0.8, 3.2); g.add(body);
+    const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.62, 12, 8), belly); b2.scale.set(0.9, 0.55, 2.8); b2.position.y = -0.18; g.add(b2);
+    const fin = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.1, 4), m); fin.position.set(0, 0.85, -0.2); fin.rotation.x = -0.3; g.add(fin);
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.3, 4), m); tail.position.z = -2.5; tail.rotation.x = Math.PI / 2; tail.scale.set(0.3, 1, 1.4); g.add(tail);
+    for (const s2 of [-1, 1]) { const pf = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.0, 4), m); pf.position.set(s2 * 0.75, -0.3, 0.6); pf.rotation.z = s2 * 1.3; g.add(pf); }
+    const hz = { kind: 'orb', tip: new V(), r: 1.5 }; L.hazards.push(hz);
+    L.anim.push((dt, t) => { const a = t * speed + phase, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r, y = cy + Math.sin(t * 0.7 + phase) * 2; g.position.set(x, y, z); g.rotation.y = Math.atan2(-Math.sin(a) * speed, Math.cos(a) * speed) + Math.PI / 2 * Math.sign(speed) * 0 + (speed > 0 ? Math.PI : 0) - Math.PI / 2; tail.rotation.y = Math.sin(t * 6) * 0.4; hz.tip.set(x, y, z); });
+  };
+  shark(-20, -18, 60, 14, 0.35, 0); shark(25, -22, 120, 16, -0.3, 2); shark(0, -12, 140, 20, 0.25, 4);
+  // الخروج: بوابة على صخرة في آخر الشعاب
+  K.plat({ x: 0, y: 0.6, z: Z1 - 6, w: 12, d: 8, h: 33, m: 'rock', rock: false });
+  sh(10, 0, 1.4, Z1 - 4);
+  const exit = K.portal({ x: 0, y: 0.6, z: Z1 - 4, rot: Math.PI, to: 'w8', label: 'رجوع لمدينة النيون 🌃', color: 0x22d3ee, active: false });
+  K.trigger({ x: 0, z: Z1 - 6, y: 0.6, r: 5, fn: () => { exit.setActive(true); L.complete = true; L.sfx('win'); }, text: '🏝️ طلعت من الأعماق!! 🏆 الشعاب العميقة انختمت — البوابة فتحت.' });
+  return cfg;
+}
+
+/* ===================== W11: قمم الثلج — تسلّق جبل في عاصفة ثلجية، وحوش ثلج ===================== */
+export function w11(K, L, S) {
+  const cfg = {
+    id: 'w11', name: 'قمم الثلج', sub: 'عالم المتسلّق', music: 'w2', killY: -20, motes: 0xffffff, shardTotal: 10, snow: true, outfit: 'parka', batch: true,
+    sky: { elev: 18, azim: 160, turb: 10, ray: 0.6, mie: 0.01, mieG: 0.8 }, exposure: 0.62, env: 0.7, fog: [0xd7e3ee, 0.012], sun: [0xf8fbff, 2.2], hemi: [0xe8f1ff, 0x8a9bb0, 1.3],
+    spawn: { pos: new V(0, 0, 0), yaw: 0 },
+  };
+  const sh = (n, x, y, z) => K.shard('w11-' + n, x, y, z, S.shards.includes('w11-' + n));
+  const snowM = new THREE.MeshStandardMaterial({ color: 0xf4f8ff, roughness: 0.95 }), iceM = new THREE.MeshStandardMaterial({ color: 0xa5d8ff, roughness: 0.15, metalness: 0.2, transparent: true, opacity: 0.9 }); snowM.userData.own = iceM.userData.own = true;
+  K.mountains({ color: 0xdfe8f2, r0: 260, n: 20, hmin: 90, hmax: 220, y: -40 });
+  K.plat({ x: 0, y: 0, z: 0, w: 20, d: 20, h: 2, m: snowM, rockDepth: 12 });
+  K.trigger({ x: 0, z: 0, r: 5, text: '🏔️ قمم الثلج: اطلع للقمة فوق العاصفة! الحواف تتمسّك فيها، والجليد الأزرق يزلّق 🧊. وانتبه من وحوش الثلج ❄️👹' });
+  K.checkpoint(0, 0, 3, 0);
+  // درب صاعد حلزوني حول الجبل
+  let x = 0, y = 0, z = 12, n = 0; const steps = [];
+  for (let i = 0; i < 48; i++) {
+    const a = i * 0.26, r = 19; x = Math.cos(a) * r; z = 14 + Math.sin(a) * r + i * 0.8; y = 1.2 + i * 0.95;
+    const ice = i % 6 === 4, w = ice ? 5 : 6, d = 5;
+    K.plat({ x, y, z, w, d, h: 1 + (i % 2), m: ice ? iceM : snowM, rockDepth: 4 });
+    steps.push([x, y, z]);
+    if (i % 7 === 3) K.checkpoint(x, y, z, 0);
+  }
+  // جدار تسلّق كبير في النص
+  const top = steps[steps.length - 1];
+  K.wall({ x: 0, y: 30, z: 40, w: 6, d: 2, h: 30, m: 'rock', run: true });
+  // شظايا على الدرب وحوله
+  [4, 11, 18, 25, 32, 39, 45].forEach((i, k) => { const [px, py, pz] = steps[i]; sh(k + 1, px, py + 1.2, pz); });
+  sh(8, 0, 31.2, 40); // فوق جدار التسلّق
+  // كهف جليدي جانبي
+  K.plat({ x: -34, y: 6, z: 30, w: 10, d: 10, h: 1, m: iceM, rock: false }); K.plat({ x: -34, y: 11, z: 30, w: 12, d: 12, h: 1, m: snowM, rock: false });
+  K.plat({ x: -27, y: 3, z: 26, w: 3, d: 3, h: 1, m: snowM, rock: false }); K.plat({ x: -22, y: 1.5, z: 22, w: 3, d: 3, h: 1, m: snowM, rock: false });
+  sh(9, -34, 7.2, 30);
+  // القمة: علم + بوابة
+  const sx = top[0], sy = top[1] + 2, sz = top[2] + 8;
+  K.plat({ x: sx, y: sy, z: sz, w: 14, d: 12, h: 3, m: snowM, rockDepth: 6 });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 6, 8), new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.8, roughness: 0.3 })); pole.position.set(sx + 4, sy + 3, sz); L.add(pole);
+  K.banner({ x: sx + 4.7, y: sy + 5.6, z: sz, color: 0xdc2626, rot: 0, h: 2 });
+  sh(10, sx - 4, sy + 1, sz + 3);
+  const exit = K.portal({ x: sx, y: sy, z: sz + 4, rot: Math.PI, to: 'w8', label: 'رجوع لمدينة النيون 🌃', color: 0xbae6fd, active: false });
+  K.trigger({ x: sx, z: sz, y: sy, r: 5, fn: () => { exit.setActive(true); L.complete = true; L.sfx('win'); }, text: '🚩 وصلت القمة!! 🏆 قمم الثلج انختمت — البوابة فتحت.' });
+  // وحوش ثلج
+  [[14, 0], [28, 0], [41, 0]].forEach(([i, j]) => { const [ax, ay, az] = steps[i]; K.enemy({ x: ax, y: ay, z: az, type: 'brute', group: null, zone: { x0: ax - 3, x1: ax + 3, z0: az - 3, z1: az + 3 }, yeti: true }); });
+  [[8], [21], [36]].forEach(([i]) => { const [ax, ay, az] = steps[i]; K.enemy({ x: ax, y: ay, z: az, type: 'shade', zone: { x0: ax - 2.5, x1: ax + 2.5, z0: az - 2, z1: az + 2 }, yeti: true }); });
+  // ثلج يتساقط
+  const n2 = 1600, g = new THREE.BufferGeometry(), pp = new Float32Array(n2 * 3); for (let i = 0; i < n2; i++) { pp[i * 3] = (Math.random() - 0.5) * 50; pp[i * 3 + 1] = Math.random() * 30; pp[i * 3 + 2] = (Math.random() - 0.5) * 50; }
+  g.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+  const flakes = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16, transparent: true, opacity: 0.85, depthWrite: false })); flakes.frustumCulled = false; flakes.userData.dyn = true; L.add(flakes); L.snowMesh = flakes;
+  L.anim.push((dt, t) => { const a = g.attributes.position.array; for (let i = 0; i < a.length; i += 3) { a[i + 1] -= 2.2 * dt; a[i] += Math.sin(t + i) * 0.6 * dt + 1.2 * dt; if (a[i + 1] < -2) { a[i + 1] += 30; a[i] = (Math.random() - 0.5) * 50; } } g.attributes.position.needsUpdate = true; });
+  return cfg;
+}
+
+export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11 };

@@ -55,6 +55,7 @@ export class Enemies {
     const e = { def, m, big, pos: m.g.position, yaw: Math.PI, hp: big ? 9 : 3, maxHp: big ? 9 : 3, st: rise ? 'rise' : 'idle', t: 0, kb: new V(), flash: 0, zone, group: def.group || null, reach: big ? 2.7 : 1.9, speed: big ? 3.0 : 3.9, alive: true, cd: Math.random() + (archer ? 1 : 0), archer };
     if (archer) { e.hp = e.maxHp = 2; e.speed = 2.6; }
     if (guard) { Object.assign(e, { guard: true, alert: !!def.alert, sus: def.alert ? 1 : 0, pi: 0, wait: 0, speed: 3.6 }); e.yaw = def.yaw || 0; }
+    if (def.yeti && m.bodyM) { m.bodyM.color.setHex(0xe2e8f0); m.bodyM.emissive.setHex(0x60a5fa); m.bodyM.emissiveIntensity = 0.35; }
     if (def.captain) { Object.assign(e, { captain: true, capHp: 6, capMax: 6, ammo: 3, reloadT: 0, cd: 1.5, alert: true, sus: 1 }); m.g.scale.setScalar(1.14); if (m.bodyM) m.bodyM.color.setHex(0x1e293b); }
     if (guard && this.g.level.cfg && this.g.level.cfg.ship) {
       Object.assign(e, { ship: true, archer: true, hp: 3, maxHp: 3, speed: 3.2 });

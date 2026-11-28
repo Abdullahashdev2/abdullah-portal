@@ -212,7 +212,23 @@ export function setSpy(h, on, mode = 'spy') {
     h.spyGear = parts;
   }
   const S = h.mats, O = h.spyOrig;
-  if (on && mode === 'street') { // سائق المدينة: جاكيت جلد + خطوط نيون
+  if (!h.diveGear) { // أسطوانة أكسجين + قناع للغوّاص
+    const tM = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, metalness: 0.6 }), dM = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.4 }), gl = new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.05, metalness: 0.8, transparent: true, opacity: 0.6 });
+    const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.5, 12), tM); t1.position.set(-0.08, 0.26, -0.2); h.spine.add(t1);
+    const t2 = t1.clone(); t2.position.x = 0.08; h.spine.add(t2);
+    const mask = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.1, 0.06), gl); mask.position.set(0, 0.03, 0.15); h.head.add(mask);
+    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.012, 6, 24), dM); strap.rotation.x = Math.PI / 2; strap.position.y = 0.03; h.head.add(strap);
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.32), dM); fl.position.set(0, -0.04, 0.2); h.ftL.add(fl); const fr = fl.clone(); h.ftR.add(fr);
+    h.diveGear = [t1, t2, mask, strap, fl, fr]; h.diveGear.forEach((m) => { m.castShadow = true; });
+  }
+  h.diveGear.forEach((m) => (m.visible = on && mode === 'diver'));
+  if (on && mode === 'diver') { // بدلة غوص سوداء بخطوط صفراء
+    S.suit.color.setHex(0x0f172a); S.suit.roughness = 0.35; S.suit.metalness = 0.1; S.suit2.color.setHex(0x0b1020);
+    S.trim.color.setHex(0xfacc15); S.trim.emissive.setHex(0xb45309); S.trim.emissiveIntensity = 0.35; S.red.color.setHex(0xfacc15);
+  } else if (on && mode === 'parka') { // معطف ثلجي أبيض وأحمر
+    S.suit.color.setHex(0xe2e8f0); S.suit.roughness = 0.9; S.suit.metalness = 0; S.suit2.color.setHex(0x334155);
+    S.trim.color.setHex(0xdc2626); S.trim.emissive.setHex(0x7f1d1d); S.trim.emissiveIntensity = 0.3; S.red.color.setHex(0xdc2626);
+  } else if (on && mode === 'street') { // سائق المدينة: جاكيت جلد + خطوط نيون
     S.suit.color.setHex(0x2a1f1a); S.suit.roughness = 0.45; S.suit.metalness = 0.25; S.suit2.color.setHex(0x111827);
     S.trim.color.setHex(0xf472b6); S.trim.emissive.setHex(0xdb2777); S.trim.emissiveIntensity = 0.6; S.red.color.setHex(0xf1f5f9);
   } else if (on) {
@@ -222,7 +238,7 @@ export function setSpy(h, on, mode = 'spy') {
     S.red.color.setHex(0x1f2329); S.red.roughness = 0.8;
   } else for (const k in S) { const o = O[k]; S[k].color.setHex(o.c); S[k].emissive.setHex(o.e); S[k].emissiveIntensity = o.ei; S[k].roughness = o.r; S[k].metalness = o.m; }
   h.spyGear.forEach((m) => (m.visible = on && mode === 'spy'));
-  h.sword.visible = !on; if (h.sheath) h.sheath.visible = !on; if (h.collar) h.collar.visible = !on;
+  const noBlade = on && (mode === 'spy' || mode === 'street' || mode === 'diver'); h.sword.visible = !noBlade; if (h.sheath) h.sheath.visible = !noBlade; if (h.collar) h.collar.visible = !on || mode === 'parka';
   h.spy = on;
 }
 /* ---------- زي الحارس (تنكّر): لون الزي الزيتي + قبعة + سترة ---------- */
