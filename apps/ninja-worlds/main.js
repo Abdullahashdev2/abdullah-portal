@@ -445,7 +445,7 @@ function togglePause(v) { if (!started || $('#done').classList.contains('on')) r
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
 let navIdx = 0, navCool = 0;
 function activeMenu() {
-  for (const s of ['#prog', '#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
+  for (const s of ['#volSheet', '#prog', '#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
   const t = document.getElementById('title'); if (t && !t.classList.contains('off')) return t;
   return null;
 }
@@ -457,7 +457,7 @@ function menuNav(dir) {
   bs[navIdx].classList.add('navfocus'); try { bs[navIdx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
 }
 function menuSelect() { const m = activeMenu(); if (!m) return; const bs = menuButtons(m); const b = bs[Math.min(navIdx, bs.length - 1)]; if (b) { b.click(); setTimeout(() => { if (activeMenu()) menuNav(0); }, 60); } }
-function menuBack() { if ($('#prog').classList.contains('on')) $('#prog').classList.remove('on'); else if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
+function menuBack() { if ($('#volSheet').classList.contains('on')) $('#volSheet').classList.remove('on'); else if ($('#prog').classList.contains('on')) $('#prog').classList.remove('on'); else if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
 let gpPrev = {};
 function menuPoll(dt) {
   navCool = Math.max(0, navCool - dt);
@@ -479,6 +479,10 @@ $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); goWorld('hub', null); };
 $('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
+$('#pVol').onclick = () => { document.querySelectorAll('#volSheet input').forEach((r) => { r.value = sfx.vol[r.dataset.k]; }); $('#volSheet').classList.add('on'); };
+document.querySelectorAll('#volSheet input').forEach((r) => { r.addEventListener('input', () => sfx.setVol(r.dataset.k, +r.value)); r.addEventListener('pointerdown', (e) => e.stopPropagation()); });
+$('#volClose').onclick = () => $('#volSheet').classList.remove('on');
+$('#volTest').onclick = () => { sfx.init(); sfx.S('punch_h', 0.8); sfx.S('nf_gem', 0.6, { delay: 0.35 }); sfx.voice('look_out', null, 1); sfx.speak('مين هناك؟', { pitch: 0.7 }); };
 $('#pProg').onclick = () => openProgress(); $('#progClose').onclick = () => $('#prog').classList.remove('on');
 $('#pHelp').onclick = () => $('#help').classList.toggle('on');
 /* ---------- big-screen mode: this device renders, a phone is the controller ---------- */

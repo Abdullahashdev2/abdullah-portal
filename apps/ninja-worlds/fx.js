@@ -181,7 +181,7 @@ const MUSIC = {
 };
 const SFX_FILES = ["bell0", "bell1", "bell2", "bell3", "bell4", "belt_handle_1", "chop", "cloth1", "cloth2", "cloth3", "cloth4", "cloth_belt", "creak1", "creak2", "creak3", "dg_pep_sound_2", "dg_phase_jump_2", "dg_power_up_11", "dg_power_up_3", "dg_power_up_7", "dg_three_tone_1", "dg_tone_1", "dg_zap_two_tone", "door_c1", "door_c2", "door_c3", "door_o1", "door_o2", "door_o3", "drop_leather", "handle_coins", "handle_coins_2", "metal_click", "metal_h0", "metal_h1", "metal_h2", "metal_h3", "metal_h4", "metal_l0", "metal_l1", "metal_l2", "metal_l3", "metal_l4", "metal_latch", "metal_m0", "metal_m1", "metal_m2", "metal_m3", "metal_m4", "metal_pot_1", "mine0", "mine1", "mine2", "mine3", "mine4", "nf_big_kill", "nf_coin", "nf_confirm", "nf_dash", "nf_gem", "nf_hurt", "nf_kill", "nf_land", "nf_level_up", "punch_h0", "punch_h1", "punch_h2", "punch_h3", "punch_m0", "punch_m1", "punch_m2", "punch_m3", "sf_computer_noise_000", "sf_computer_noise_002", "sf_door_close_000", "sf_door_open_000", "sf_engine_circular_000", "sf_explosion_crunch_000", "sf_force_field_000", "sf_force_field_002", "sf_laser_small_000", "sf_low_frequency_explosion_000", "sf_space_engine_low_000", "sf_thruster_fire_000", "sf_thruster_fire_002", "soft_h0", "soft_h1", "soft_h2", "soft_h3", "soft_h4", "st_conc0", "st_conc1", "st_conc2", "st_conc3", "st_conc4", "st_grass0", "st_grass1", "st_grass2", "st_grass3", "st_grass4", "st_metal0", "st_metal1", "st_metal2", "st_metal3", "st_metal4", "st_snow0", "st_snow1", "st_snow2", "st_snow3", "st_snow4", "st_wood0", "st_wood1", "st_wood2", "st_wood3", "st_wood4", "swish0", "swish1", "swish2", "swish3", "swish4", "vo_call_for_backup", "vo_congratulations", "vo_cover_me", "vo_get_down", "vo_go", "vo_go_go_go", "vo_hold", "vo_look_out", "vo_medic", "vo_mission_completed", "vo_objective_achieved", "vo_power_up", "vo_ready", "vo_reloading", "vo_sniper", "vo_suppressing_fire", "vo_target_engaged", "vo_watch_my_back", "wood_h0", "wood_h1", "wood_h2", "wood_h3", "wood_h4"];
 export class Sound {
-  constructor() { this.ctx = null; this.on = true; }
+  constructor() { this.ctx = null; this.on = true; this.vol = { master: 0.85, music: 0.42, sfx: 0.9, amb: 0.45, voice: 1.3 }; try { Object.assign(this.vol, JSON.parse(localStorage.getItem('nw_vol') || '{}')); } catch (e) {} }
   init(extCtx, toStream) {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC && !extCtx) return;
@@ -190,6 +190,7 @@ export class Sound {
     const comp = c.createDynamicsCompressor(); this.master.connect(comp); if (toStream) { this.streamDest = c.createMediaStreamDestination(); comp.connect(this.streamDest); } else comp.connect(c.destination);
     this.sfxBus = c.createGain(); this.sfxBus.gain.value = 0.9; this.sfxBus.connect(this.master);
     this.musBus = c.createGain(); this.musBus.gain.value = 0.42; this.musBus.connect(this.master);
+    this.ambBus = c.createGain(); this.ambBus.connect(this.master); this.voBus = c.createGain(); this.voBus.connect(this.master); this.applyVol();
     // generated reverb impulse
     const len = c.sampleRate * 2.6, ir = c.createBuffer(2, len, c.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
@@ -217,7 +218,7 @@ export class Sound {
     if (o.at && this.ear) { const e = this.ear, dx = o.at.x - e.position.x, dy = o.at.y - e.position.y, dz = o.at.z - e.position.z, d = Math.hypot(dx, dy, dz); v *= 1 / Math.pow(1 + d / 9, 1.25); if (v < 0.01) return true; const r = this._right || (this._right = new e.position.constructor()); r.set(1, 0, 0).applyQuaternion(e.quaternion); pan = Math.max(-1, Math.min(1, (dx * r.x + dz * r.z) / (d || 1))) * 0.8; }
     gn.gain.value = v; src.connect(gn);
     let out = gn; if (pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; gn.connect(p); out = p; }
-    out.connect(this.sfxBus); if (o.verb && this.verb) { const vs = c.createGain(); vs.gain.value = o.verb; out.connect(vs); vs.connect(this.verb); }
+    out.connect(o.bus || this.sfxBus); if (o.verb && this.verb) { const vs = c.createGain(); vs.gain.value = o.verb; out.connect(vs); vs.connect(this.verb); }
     src.start(c.currentTime + (o.delay || 0)); return true;
   }
   surfaceStep(v = 0.42, at) { return this.S('st_' + (this.surface || 'conc'), v, { at, verb: this.room || 0 }); }
@@ -234,12 +235,12 @@ export class Sound {
   coin() { this.S('nf_coin', 0.45) || this.pickup(); }
   crash(v = 0.6, at) { this.S('metal_h', Math.min(1, v), { at, rate: 0.85 }); this.S('soft_h', v * 0.6, { at }); }
   nitro() { this.S('sf_thruster_fire_', 0.5); }
-  voice(n, at, vol = 1) { const t = performance.now(); if (t - (this._vt || 0) < 900) return; this._vt = t; this.S('vo_' + n, vol, { at, rv: 0.02, verb: this.room || 0.05 }); }
+  voice(n, at, vol = 1) { const t = performance.now(); if (t - (this._vt || 0) < 900) return; this._vt = t; this.S('vo_' + n, vol, { at, rv: 0.02, verb: this.room || 0.05, bus: this.voBus }); }
   // عربي من صوت الجوال نفسه (إذا متوفر)
   speak(text, o = {}) {
     try { const ss = window.speechSynthesis; if (!ss || !this.on) return; const t = performance.now(); if (t - (this._st || 0) < 1500) return; this._st = t;
       const u = new SpeechSynthesisUtterance(text); const vs = ss.getVoices(); const ar = vs.find((v) => /^ar/i.test(v.lang)); if (ar) u.voice = ar; u.lang = ar ? ar.lang : 'ar-SA';
-      u.pitch = o.pitch ?? 0.75; u.rate = o.rate ?? 1.0; u.volume = Math.max(0, Math.min(1, o.vol ?? 0.9)); ss.cancel(); ss.speak(u); } catch (e) {}
+      u.pitch = o.pitch ?? 0.75; u.rate = o.rate ?? 1.0; u.volume = Math.max(0, Math.min(1, (o.vol ?? 0.9) * (this.vol.voice / 1.3) * this.vol.master / 0.85)); ss.cancel(); ss.speak(u); } catch (e) {}
   }
   thunder() { this.noise(2.8, 220, 0.6, 0.55, 'lowpass'); this.noise(0.25, 1200, 0.8, 0.25, 'bandpass'); this.S('sf_low_frequency_explosion_', 0.5, { rate: 0.6, verb: 0.4 }); }
   /* ---------- أجواء العوالم (من «الرحّال») ---------- */
@@ -247,7 +248,7 @@ export class Sound {
     if (!this.ctx) return; const a = this.ctx;
     if (kind === this.ambKind) { if (this.ambGain) this.ambGain.gain.setTargetAtTime(vol, a.currentTime, 0.4); return; }
     this.ambStop(); this.ambKind = kind; if (!kind) return;
-    const g = a.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(vol, a.currentTime, 0.9); g.connect(this.master); this.ambGain = g; this.ambNodes = [];
+    const g = a.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(vol, a.currentTime, 0.9); g.connect(this.ambBus || this.master); this.ambGain = g; this.ambNodes = [];
     const noise = (type, freq, q, v) => { const s = a.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true; const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 0.7; const gg = a.createGain(); gg.gain.value = v; s.connect(f); f.connect(gg); gg.connect(g); s.start(0, Math.random()); this.ambNodes.push(s); return { f, gg }; };
     const osc = (type, freq, v) => { const o = a.createOscillator(); o.type = type; o.frequency.value = freq; const gg = a.createGain(); gg.gain.value = v; o.connect(gg); gg.connect(g); o.start(); this.ambNodes.push(o); return { o, gg }; };
     const lfo = (param, rate, depth) => { const o = a.createOscillator(); o.frequency.value = rate; const gg = a.createGain(); gg.gain.value = depth; o.connect(gg); gg.connect(param); o.start(); this.ambNodes.push(o); };
@@ -272,7 +273,9 @@ export class Sound {
     if (!this.ctx || !this.buf || !this.buf[n]) { if (this.buf && !this.buf[n] && !this._mf) { this._mf = true; fetch(new URL('sfx/' + n + '.ogg', import.meta.url).href).then((r) => r.arrayBuffer()).then((ab) => new Promise((res, rej) => this.ctx.decodeAudioData(ab, res, rej))).then((b) => { this.buf[n] = b; this._mf = false; this.musicFile(n, vol); }).catch(() => { this._mf = false; }); } return; }
     this.stopMusic(); const s = this.ctx.createBufferSource(), g = this.ctx.createGain(); s.buffer = this.buf[n]; s.loop = true; g.gain.value = vol; s.connect(g); g.connect(this.musBus); s.start(); this.musSrc = s;
   }
-  toggle() { this.on = !this.on; if (this.master) this.master.gain.value = this.on ? 0.8 : 0; return this.on; }
+  setVol(k, v) { this.vol[k] = v; this.applyVol(); try { localStorage.setItem('nw_vol', JSON.stringify(this.vol)); } catch (e) {} }
+  applyVol() { if (!this.master) return; const V = this.vol; this.master.gain.value = this.on ? V.master : 0; this.sfxBus.gain.value = V.sfx; this.musBus.gain.value = V.music; this.ambBus.gain.value = V.amb; this.voBus.gain.value = V.voice; }
+  toggle() { this.on = !this.on; this.applyVol(); if (!this.on) try { speechSynthesis.cancel(); } catch (e) {} return this.on; }
   get t() { return this.ctx ? this.ctx.currentTime : 0; }
   tone(f0, f1, dur, type = 'sine', vol = 0.2, when = 0, bus) {
     if (!this.ctx) return; const c = this.ctx, t = c.currentTime + when, o = c.createOscillator(), g = c.createGain();
@@ -305,7 +308,7 @@ export class Sound {
   checkpoint() { if (this.S('dg_power_up_11', 0.45, { verb: 0.35 })) return; [0, 5, 9, 12].forEach((s, i) => this.tone(mtof(72 + s), 0, 0.6, 'sine', 0.08, i * 0.09)); }
   portal() { if (this.S('sf_force_field_', 0.7)) { this.S('dg_phase_jump_2', 0.45, { delay: 0.15, verb: 0.4 }); return; } this.tone(200, 1200, 1.0, 'sine', 0.15); this.noise(1.0, 400, 2, 0.15, 'bandpass', 0, 3000); }
   slam() { if (this.S('sf_low_frequency_explosion_', 0.8)) { this.S('mine', 0.6); return; } this.noise(0.5, 180, 0.5, 0.5, 'lowpass'); this.tone(90, 40, 0.5, 'square', 0.18); }
-  win() { if (this.S('nf_level_up', 0.65, { verb: 0.3 })) { this.S('vo_mission_completed', 0.9, { delay: 0.9, rv: 0 }); return; } [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(mtof(67 + s), 0, 0.8, 'triangle', 0.08, i * 0.1)); }
+  win() { if (this.S('nf_level_up', 0.65, { verb: 0.3 })) { this.S('vo_mission_completed', 0.9, { delay: 0.9, rv: 0, bus: this.voBus }); return; } [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(mtof(67 + s), 0, 0.8, 'triangle', 0.08, i * 0.1)); }
   crumble() { if (this.S('mine', 0.7, { rate: 0.8 })) return; this.noise(0.6, 200, 0.5, 0.25, 'lowpass', 0, 80); }
   music(name) {
     this.stopMusic(); if (!this.ctx || !MUSIC[name]) return;
