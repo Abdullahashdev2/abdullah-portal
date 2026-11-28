@@ -26,7 +26,7 @@ export class Stealth {
     this.on = !!cfg.ship; this.exitAim(); this.drop(); this.release(true); this.leaveLocker(true); this.flying = [];
     this.radio = false; this.radioSus = 0; this.radioCd = 0; this.chatT = 18; this.setDisguise(false, true); this.closeRadio(true);
     const d = this.c.upg().darts || 0;
-    this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d };
+    this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d }; this.cans = 5; this.cansFly = []; this.noiseLv = 0; this.noiseT = 0; this.wasAir = false;
     level.phase = 'normal'; level.phaseT = 0; level.lastSeen = null;
     document.body.classList.toggle('shipmode', this.on); this.hud(true);
   }
@@ -37,6 +37,7 @@ export class Stealth {
     if (inp.spP && !this.aiming && !this.holding && this.gadget()) inp.spP = false;
     // 🧗 متعلّق برّا السفينة: حارس واقف فوقك جنب الحافة؟ مدّ يدك واسحبه من رجله للبحر
     if (P.state === 'hang' && P.edgeHang && inp.atkP) { inp.atkP = false; const e = this.pullTarget(); if (e) this.pullOver(e); else this.c.say('🤚 ما فيه أحد قريب من الحافة فوقك — انتظر لين يقرّب حارس'); }
+    if (inp.throwP) { inp.throwP = false; if (!this.aiming && !this.holding && !P.inLocker && P.state !== 'hang') this.throwCan(); }
     if (this.holding) { // ماسك حارس من الخلف
       if (inp.atkP) { inp.atkP = false; this.choke(); }
       if (inp.actP) { inp.actP = false; if (!this.throwBody(this.holding)) this.c.say('🌊 قرّب من حافة السفينة (السطح المكشوف) عشان ترميه في البحر — أو اضغط ⚔️ عشان تخنقه لين يغمى عليه'); }
@@ -256,7 +257,45 @@ export class Stealth {
     this.c.scene.add(l); this.tracers.push({ l, t: 0.15 });
   }
   /* ---------- per frame ---------- */
+  /* 🥫 الإلهاء: ترمي علبة قدّامك (قوس ~٩م)، تطق بالأرض أو بالجدار، والحراس القريبين يروحون يشوفون وش الصوت */
+  throwCan() {
+    const P = this.c.player; if ((this.cans || 0) <= 0) { this.c.say('🥫 خلصت العلب — تلقى علب زيادة مع صناديق الذخيرة'); return; }
+    this.cans--; const f = new V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), from = P.pos.clone().add(new V(0, P.prone ? 0.5 : 1.5, 0)).addScaledVector(f, 0.4);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.13, 8), new THREE.MeshStandardMaterial({ color: 0xc0c7d0, metalness: 0.8, roughness: 0.3 })); m.position.copy(from); this.c.scene.add(m);
+    this.cansFly.push({ m, p: from.clone(), v: f.multiplyScalar(P.prone ? 7 : 9).add(new V(0, P.prone ? 3 : 4.2, 0)), t: 0, y0: P.pos.y });
+    this.c.sfx.S && this.c.sfx.S('cloth', 0.35, { rate: 1.5 }); this.hud(); P.throwT = 0.3;
+  }
+  updateCans(dt) {
+    const L = this.L;
+    for (const c of this.cansFly) {
+      c.t += dt; c.v.y -= 18 * dt; const nx = c.p.clone().addScaledVector(c.v, dt);
+      let hit = nx.y <= c.y0 + 0.06 && c.v.y < 0; // الأرضية (نفس مستوى الرمي)
+      for (const b of L.segBoxes(c.p, nx)) if (b.active && nx.x > b.min.x && nx.x < b.max.x && nx.y > b.min.y && nx.y < b.max.y && nx.z > b.min.z && nx.z < b.max.z) { hit = true; break; }
+      if (hit || c.t > 2.5) {
+        c.done = true; c.m.removeFromParent(); const at = c.p.clone(); at.y = Math.max(at.y, c.y0);
+        this.c.sfx.tone(1900, 1500, 0.07, 'square', 0.12); this.c.sfx.tone(2400, 1800, 0.05, 'square', 0.08, 0.09); this.c.sfx.tone(1700, 1400, 0.04, 'square', 0.05, 0.18); // طق طق طق
+        this.c.sparks.emit(at.clone().add(new V(0, 0.1, 0)), { color: 0xe2e8f0, count: 10, speed: 2, up: 2, life: 0.3, size: 0.12, grav: 8 });
+        this.c.enemies.noise(at, 9); this.ring(at);
+      } else { c.p.copy(nx); c.m.position.copy(nx); c.m.rotation.x += dt * 14; }
+    }
+    this.cansFly = this.cansFly.filter((c) => !c.done);
+  }
+  ring(at) { // حلقة تبيّن مدى الصوت
+    const r = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false })); r.rotation.x = -Math.PI / 2; r.position.copy(at).add(new V(0, 0.05, 0)); this.c.scene.add(r);
+    let k = 0; const step = () => { k += 0.04; r.scale.setScalar(1 + k * 8); r.material.opacity = 0.7 * (1 - k); if (k < 1) requestAnimationFrame(step); else { r.removeFromParent(); r.geometry.dispose(); r.material.dispose(); } }; step();
+  }
+  /* 👣 ضجيج الخطوات: الركض يُسمع من بعيد، المشي الهادي قليل، والانبطاح صامت — والمطر يغطي جزء من صوتك */
+  footNoise(dt) {
+    const P = this.c.player, hs = Math.hypot(P.vel.x, P.vel.z), air = !P.onGround;
+    let r = P.prone || P.state === 'hug' || P.state === 'hang' || P.inLocker ? 0 : hs > 5.2 ? 7 : hs > 3 ? 3.5 : hs > 0.6 ? 1.2 : 0;
+    if (this.wasAir && !air && P.vel.y < -6) { r = Math.max(r, 6); this.noiseT = 0; } // نزلة قوية من قفزة
+    this.wasAir = air; r *= 0.75; // صوت المطر يغطي ربع ضجيجك
+    this.noiseLv += (r - this.noiseLv) * Math.min(1, dt * 6);
+    if ((this.noiseT -= dt) <= 0 && r >= 2) { this.noiseT = 0.6; this.c.enemies.noise(P.pos.clone(), r); }
+    const el = document.getElementById('noiseM'); if (el) { const lv = Math.round(this.noiseLv / 7 * 5); if (el.dataset.lv !== String(lv)) { el.dataset.lv = lv; el.innerHTML = '👣 ' + [0, 1, 2, 3, 4].map((i) => '<i class="' + (i < lv ? 'on' : '') + '"></i>').join('') + (lv >= 4 ? ' <b>عالي!</b>' : lv === 0 ? ' <span>صامت</span>' : ''); } }
+  }
   update(dt) {
+    if (this.on) { this.updateCans(dt); this.footNoise(dt); }
     for (const t of this.tracers) { t.t -= dt; t.l.material.opacity = Math.max(0, t.t / 0.15); if (t.t <= 0) { t.l.removeFromParent(); t.l.geometry.dispose(); } }
     this.tracers = this.tracers.filter((t) => t.t > 0);
     if (!this.on) return;
@@ -299,7 +338,7 @@ export class Stealth {
     if (L.phase === 'alert') { if (E.anySees(P)) { L.phaseT = PHASE.alert.time; L.lastSeen = P.pos.clone(); } else { L.phaseT -= dt; if (L.phaseT <= 0) this.setPhase('evasion'); } }
     else if (L.phase === 'evasion' || L.phase === 'caution') { L.phaseT -= dt; if (L.phaseT <= 0) this.setPhase(L.phase === 'evasion' ? 'caution' : 'normal'); }
     // dart pickups
-    for (const A of L.ammo || []) if (!A.taken && A.pos.distanceTo(P.pos.clone().add(new V(0, 0.6, 0))) < 1.3) { A.taken = true; A.g.removeFromParent(); this.ammo[A.kind] += A.kind === 'sniper' ? 2 : 4; this.c.sfx.pickup(); this.c.say(A.kind === 'sniper' ? '🎯 +٢ أسهم قنّاصة' : '🔫 +٤ أسهم مسدس'); this.hud(); }
+    for (const A of L.ammo || []) if (!A.taken && A.pos.distanceTo(P.pos.clone().add(new V(0, 0.6, 0))) < 1.3) { A.taken = true; A.g.removeFromParent(); this.ammo[A.kind] += A.kind === 'sniper' ? 2 : 4; this.cans = Math.min(9, (this.cans || 0) + 2); this.c.sfx.pickup(); this.c.say(A.kind === 'sniper' ? '🎯 +٢ أسهم قنّاصة' : '🔫 +٤ أسهم مسدس'); this.hud(); }
     this.c.hero.root.visible = this.c.hero.root.visible && !this.aiming && !P.inLocker;
     this.gun.visible = this.aiming && this.weapon === 'pistol';
     this.radarT -= dt; if (this.radarT <= 0) { this.radarT = 0.05; this.radar(); }

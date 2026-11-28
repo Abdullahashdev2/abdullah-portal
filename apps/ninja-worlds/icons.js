@@ -16,6 +16,7 @@ const P = {
   back: '<path d="M26 18L12 32l14 14"/><path d="M12 32h26a12 12 0 0 1 0 24h-6"/>',
   climb: '<path d="M10 22h44" opacity=".7"/><path d="M24 22v-6M40 22v-6"/><circle cx="32" cy="34" r="5"/><path d="M24 22l6 8M40 22l-6 8M32 39v8l-6 9M32 47l6 9"/>',
   up: '<path d="M32 52V14"/><path d="M18 28l14-14 14 14"/><path d="M14 54h36" opacity=".5"/>',
+  can: '<rect x="24" y="14" width="16" height="26" rx="3"/><path d="M24 20h16M24 34h16" opacity=".6"/><path d="M14 50q18-14 36-4" stroke-dasharray="4 5"/>',
   prone: '<circle cx="14" cy="34" r="5"/><path d="M20 38h26l8 4"/><path d="M24 38l-6 8"/><path d="M8 52h48" opacity=".5"/>',
   knock: '<path d="M44 10v44" opacity=".7"/><path d="M14 30h14a6 6 0 0 0 0-12h-8v24h8a6 6 0 0 0 6-6v-6"/><path d="M48 22l6-3M48 32h7M48 42l6 3"/>',
   wave: '<path d="M6 40c6-6 10-6 16 0s10 6 16 0 10-6 16 0 6 2 6 2"/><path d="M6 52c6-6 10-6 16 0s10 6 16 0 10-6 16 0" opacity=".6"/><path d="M30 30V10M22 18l8-8 8 8"/>',

@@ -620,6 +620,7 @@ function touchLabels() {
   setOff('actBtn', !actOK || (hang && !player.driving)); setOff('aimBtn', !aim && !ammoOK); setOff('rollBtn', hang && !player.driving && !swim);
   setOff('atkBtn', aim && stealth.ammo[stealth.weapon] <= 0);
   if (cfg && cfg.battle) { setBtn('spBtn', lab('spin', 'قوية')); setBtn('actBtn', lab('spin', 'إعصار')); setOff('actBtn', G.charge.rage < 100 && !G.charge.busy()); setOff('spBtn', false); return; }
+  setBtn('throwBtn', lab('can', 'ارمِ ' + (stealth.cans || 0))); setOff('throwBtn', !(stealth.cans > 0) || aim || hold || hang);
   setBtn('proneBtn', player.prone ? lab('up', 'قوم') : lab('prone', 'انبطح')); setOff('proneBtn', !player.prone && !(player.onGround && (player.state === 'ground') && !player.carry && !stealth.holding && !stealth.dragging));
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
@@ -846,11 +847,12 @@ function readInput() {
     actP: edge('act', !!(keys.KeyE || keys.KeyF)) || edge('gx', gx) || vin.act > 0,
     spP: edge('sp', !!(keys.KeyL || keys.KeyQ)) || edge('gs', gs) || vin.sp > 0,
     aimP: edge('aim', !!keys.KeyR) || edge('gaim', gaim) || vin.aim > 0,
+    throwP: edge('throw', !!keys.KeyG) || edge('gthrow', !!(gp && gp.buttons[11] && gp.buttons[11].pressed)) || vin.throw > 0,
     proneP: edge('prone', !!keys.KeyZ) || edge('gprone', !!(gp && gp.buttons[10] && gp.buttons[10].pressed)) || vin.prone > 0,
     jumpH: !!keys.Space || held.jump || gj || remote.jumpH || !!(__virt && __virt.jumpH),
     rollH: !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC) || held.roll || gr || remote.rollH || !!(__virt && __virt.rollH),
   };
-  vin.jump = vin.atk = vin.roll = vin.act = vin.sp = vin.aim = vin.prone = 0;
+  vin.jump = vin.atk = vin.roll = vin.act = vin.sp = vin.aim = vin.prone = vin.throw = 0;
   return inp;
 }
 let __virt = null, gpAwake = false;
@@ -1124,7 +1126,7 @@ function simulate(dt) {
     if (cars.list.length) cars.update(STEP, player, inp);
     enemies.update(STEP, player);
     if (G.crowd.on) { G.crowd.update(STEP, player); G.charge.update(STEP, player); }
-    inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = inp.proneP = false; acc -= STEP; n++;
+    inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = inp.proneP = inp.throwP = false; acc -= STEP; n++;
   }
   if (n === 14) acc = 0;
   worldLogic(dt);
