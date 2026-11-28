@@ -730,7 +730,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "8.0",
+      version: "8.0.1",
       leaderboard: { unit: "💎" },
     },
     {

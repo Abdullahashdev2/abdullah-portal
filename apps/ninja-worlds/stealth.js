@@ -228,7 +228,7 @@ export class Stealth {
   leaveLocker(silent) { const P = this.c.player; if (!P || !P.inLocker) return; P.inLocker.openT = 1; P.inLocker.player = false; P.inLocker = null; if (!silent) this.c.sfx.locker(); if (false) this.c.sfx.tone(140, 180, 0.2, 'square', 0.08); }
   /* ---------- shooting ---------- */
   shoot() {
-    const w = this.weapon;
+    const w = this.weapon, P = this.c.player;
     if (this.ammo[w] <= 0) { this.c.sfx.tone(300, 300, 0.05, 'square', 0.06); this.c.say(w === 'pistol' ? '🎯 خلصت أسهم المسدس — دوّر صناديق زرقاء' : '🎯 خلصت أسهم القنّاصة — دوّر صناديق خضراء'); return; }
     if (w === 'sniper' && this.boltT > 0) return; // لسا يلقّم
     this.ammo[w]--; this.hud(); this.recoil += (w === 'sniper' ? 0.055 : 0.02) * (P.prone ? 0.45 : 1); if (w === 'sniper') { this.boltT = P.prone ? 0.7 : 1.15; setTimeout(() => this.c.sfx.bolt(), 480); }
@@ -289,7 +289,7 @@ export class Stealth {
     for (const d of this.dogs || []) d.g.removeFromParent(); this.dogs = [];
     for (const D of level.dogs || []) {
       const g = new THREE.Group(), M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }), fur = M(0x3b2a1e), dark = M(0x1a120c);
-      const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+      const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
       add(new THREE.BoxGeometry(0.32, 0.32, 0.8), fur, 0, 0.55, 0); const head = add(new THREE.BoxGeometry(0.26, 0.26, 0.3), fur, 0, 0.78, 0.5); add(new THREE.BoxGeometry(0.14, 0.12, 0.2), dark, 0, 0.72, 0.7);
       [-1, 1].forEach((s) => { const ear = add(new THREE.ConeGeometry(0.06, 0.16, 4), dark, s * 0.09, 0.97, 0.46); ear.rotation.z = -s * 0.2; });
       const legs = [[-0.11, 0.3], [0.11, 0.3], [-0.11, -0.3], [0.11, -0.3]].map(([x, z]) => { const l = add(new THREE.BoxGeometry(0.08, 0.42, 0.08), dark, x, 0.21, z); return l; });
