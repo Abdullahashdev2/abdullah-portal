@@ -35,6 +35,16 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "neon-cars-2",
+      date: "2026-11-28",
+      app: "ninja-worlds",
+      title: "🚙 سيارات «الرحّال» دخلت مدينة النيون",
+      items: [
+        "🚙 ٧ أنواع سيارات بأشكالها من «الرحّال»: سيدان عائلي، جيب فخم، بيك أب، هاتشباك، كهربائية، كروس أوفر، وسبورت بجناح",
+        "🔊 صوت محرك متواصل يعلى مع السرعة — وتحس بتغيير القير",
+      ],
+    },
+    {
       id: "neon-city-1",
       date: "2026-11-28",
       app: "ninja-worlds",
@@ -564,7 +574,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "6.0",
+      version: "6.1",
       leaderboard: { unit: "💎" },
     },
     {
