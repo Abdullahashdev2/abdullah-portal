@@ -57,6 +57,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 #uw{position:fixed;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at 50% 30%,rgba(40,180,220,.08),rgba(0,40,70,.45));opacity:0;transition:opacity .25s}#uw.on{opacity:1}
 #spBtn{--c:192,132,252;width:54px;height:54px;right:180px;bottom:104px}#spBtn.cool{opacity:.35}
 #upgList{display:none;text-align:right;margin:6px 0}#upgList.on{display:block}#upgList .u{background:rgba(255,255,255,.05);border-radius:12px;padding:8px 10px;margin:6px 0;opacity:.6}#upgList .u.on{opacity:1;border:1px solid rgba(255,209,102,.4)}#upgList b{display:block;font-size:14px}#upgList span{font-size:12px;color:#94a3b8}
+#battleHud{position:fixed;z-index:6;top:calc(64px + env(safe-area-inset-top));right:14px;display:none;flex-direction:column;align-items:flex-end;gap:2px;pointer-events:none;font-family:inherit}#battleHud.on{display:flex}#battleHud b{font-size:30px;font-weight:900;color:#fff;text-shadow:0 0 14px #dc2626,0 3px 6px #000}#battleHud i{font-style:normal;font-size:22px;font-weight:900;color:#ffd166;text-shadow:0 0 12px #ff7a00,0 2px 4px #000;animation:cpop .25s}#battleHud span{font-size:13px;font-weight:700;color:#e5e7eb;background:#0009;border-radius:999px;padding:2px 10px}@keyframes cpop{from{transform:scale(1.5)}to{transform:scale(1)}}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -186,7 +187,7 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
 <div id="banner"><div id="bSub"></div><div id="bName"></div></div>
 <div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div></div>
 <div id="prompt"></div>
-<div id="timer"></div>
+<div id="timer"></div><div id="battleHud"></div>
 <div id="breath"><div id="breathFill"></div></div>
 <div id="bossbar">🌋 عملاق الحمم<div class="bar"><div id="bossFill"></div></div></div>
 <div id="uw"></div>

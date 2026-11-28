@@ -33,6 +33,8 @@ export function hub(K, L, S) {
   K.portal({ x: 10.9, y: 0.3, z: -16, rot: -Math.PI / 2, to: 'w8', label: w8open ? (S.done.w8 ? '✓ ' : '') + 'مدينة النيون 🚗' : '🔒 مدينة النيون', color: 0xf472b6, active: w8open, locked: !w8open && 'خلّص «أطلال المكتبة» أول عشان تنفتح بوابة المدينة 🔒' });
   K.plat({ x: -10.4, y: 0.3, z: -16, w: 3, d: 4, h: 0.3, m: 'gold', rock: false });
   K.portal({ x: -10.9, y: 0.3, z: -16, rot: Math.PI / 2, to: 'w7', label: w7open ? (S.done.w7 ? '✓ ' : '') + 'سفينة العاصفة 🌧️' : '🔒 سفينة العاصفة', color: 0x38bdf8, active: w7open, locked: !w7open && 'خلّص «أطلال المكتبة» أول عشان تنفتح بوابة السفينة 🔒' });
+  K.plat({ x: 9.5, y: 0.3, z: 8, w: 4, d: 4, h: 0.3, m: 'gold', rock: false });
+  K.portal({ x: 10.4, y: 0.3, z: 8, rot: -Math.PI / 2, to: 'w12', label: (S.done.w12 ? '✓ ' : '') + 'ميدان الألف سيف ⚔️', color: 0xef4444 });
   K.banner({ x: -11, y: 4, z: -23.4, color: 0x0e7490 }); K.banner({ x: 11, y: 4, z: -23.4, color: 0x9a3412 });
   // centre monument
   K.plat({ x: 0, y: 0.5, z: 0, w: 3.2, d: 3.2, h: 0.5, m: 'dark', rock: false });
@@ -904,4 +906,72 @@ export function w11(K, L, S) {
   return cfg;
 }
 
-export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11 };
+/* ===================== W12: ميدان الألف سيف — وادي الضباب الأحمر (المرحلة ١: الساحة والحشود) ===================== */
+export function w12(K, L, S) {
+  const cfg = {
+    id: 'w12', name: 'ميدان الألف سيف', sub: 'وادي الضباب الأحمر', music: 'w6', killY: -20, motes: 0xffb4a0, shardTotal: 0, outfit: 'samurai', batch: true, battle: true,
+    sky: { elev: 5, azim: 200, turb: 9, ray: 2.6, mie: 0.014, mieG: 0.86 }, exposure: 0.6, env: 0.55, fog: [0xa4553a, 0.0075], sun: [0xffa56b, 2.7], hemi: [0xffc8a0, 0x4a3524, 1.15],
+    spawn: { pos: new V(0, 0, -100), yaw: 0 },
+  };
+  const own = (m) => { m.userData.own = true; return m; };
+  const grassM = own(new THREE.MeshStandardMaterial({ color: 0x5f6b34, roughness: 0.95 })), dirtM = own(new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.95 }));
+  const woodM = own(new THREE.MeshStandardMaterial({ color: 0x5b3a22, roughness: 0.8 })), stoneM = own(new THREE.MeshStandardMaterial({ color: 0x8b8478, roughness: 0.9 })), roofM = own(new THREE.MeshStandardMaterial({ color: 0x23262e, roughness: 0.5, metalness: 0.3 }));
+  const whiteM = own(new THREE.MeshStandardMaterial({ color: 0xe9e4d8, roughness: 0.85 }));
+  K.mountains({ color: 0x5b3a3a, r0: 300, n: 22, hmin: 70, hmax: 170, y: -30 });
+  // الأرض + طريق ترابي بين المعسكرين
+  K.plat({ x: 0, y: 0, z: 0, w: 420, d: 420, h: 2, m: grassM, rockDepth: 6, ledge: false });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(14, 380), dirtM); road.rotation.x = -Math.PI / 2; road.position.y = 0.02; road.receiveShadow = true; L.add(road);
+  const road2 = new THREE.Mesh(new THREE.PlaneGeometry(260, 10), dirtM); road2.rotation.x = -Math.PI / 2; road2.position.set(0, 0.025, 30); road2.receiveShadow = true; L.add(road2);
+  // حدود الساحة (غير مرئية)
+  for (const s of [-1, 1]) { K.plat({ x: s * 205, y: 8, z: 0, w: 2, d: 420, h: 10, hidden: true, rock: false, ledge: false }).active = true; K.plat({ x: 0, y: 8, z: s * 205, w: 420, d: 2, h: 10, hidden: true, rock: false, ledge: false }).active = true; }
+  // سياج خشبي (أوتاد) حول كل معسكر
+  const palisade = (cx, cz, w, d, gap) => {
+    const g = new THREE.Group(); g.userData.batchable = true; L.add(g);
+    const post = new THREE.CylinderGeometry(0.22, 0.26, 3.4, 6), tip = new THREE.ConeGeometry(0.24, 0.6, 6);
+    const edge = (x0, z0, x1, z1) => { const n = Math.floor(Math.hypot(x1 - x0, z1 - z0) / 0.5); for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n, z = z0 + (z1 - z0) * i / n; if (Math.abs(x - cx) < gap && Math.abs(z - cz) > d / 2 - 1) continue; const p = new THREE.Mesh(post, woodM); p.position.set(x, 1.7, z); p.castShadow = true; g.add(p); const t = new THREE.Mesh(tip, woodM); t.position.set(x, 3.7, z); g.add(t); } };
+    edge(cx - w / 2, cz - d / 2, cx + w / 2, cz - d / 2); edge(cx - w / 2, cz + d / 2, cx + w / 2, cz + d / 2); edge(cx - w / 2, cz - d / 2, cx - w / 2, cz + d / 2); edge(cx + w / 2, cz - d / 2, cx + w / 2, cz + d / 2);
+    // تصادم: أربع جدران بفتحة بوابة في الأمام والخلف
+    for (const s of [-1, 1]) { K.plat({ x: cx + s * w / 2, y: 3.4, z: cz, w: 0.6, d, h: 3.4, hidden: true, rock: false, ledge: false }).active = true;
+      const half = (w / 2 - gap) / 2; for (const sz of [-1, 1]) K.plat({ x: cx + s * (gap + half), y: 3.4, z: cz + sz * d / 2, w: half * 2, d: 0.6, h: 3.4, hidden: true, rock: false, ledge: false }).active = true; }
+  };
+  const tent = (x, z, rot, col) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rot; g.userData.batchable = true; L.add(g);
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 3.2, 3.2, 4, 1), own(new THREE.MeshStandardMaterial({ color: col, roughness: 0.85 }))); body.position.y = 1.6; body.rotation.y = Math.PI / 4; body.castShadow = true; g.add(body); };
+  const curtain = (x, z, w, col, rot = 0) => { // ستارة المعسكر (ماكو) بشعار
+    const c = new THREE.Mesh(new THREE.PlaneGeometry(w, 2.2), own(new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.9 }))); c.position.set(x, 1.6, z); c.rotation.y = rot; c.castShadow = true; L.add(c);
+    for (let k = -1; k <= 1; k += 2) { const e = new THREE.Mesh(new THREE.CircleGeometry(0.55, 20), whiteM); e.position.set(x + Math.cos(rot) * k * w * 0.25, 1.6, z - Math.sin(rot) * k * w * 0.25); e.rotation.y = rot; e.position.z += 0.01 * Math.cos(rot); L.add(e); }
+  };
+  const camp = (cx, cz, col, team) => {
+    palisade(cx, cz, 60, 44, 7);
+    for (let i = 0; i < 6; i++) tent(cx - 20 + (i % 3) * 20, cz + (i < 3 ? -10 : 10) * (team ? -1 : 1) + (team ? 6 : -6), i * 0.7, team ? 0xd6cfc0 : 0xe8e2d4);
+    curtain(cx, cz + (team ? 10 : -10), 16, col);
+    for (const i of [-2, -1, 1, 2]) K.banner({ x: cx + i * 12, y: 5.5, z: cz + (team ? -22.6 : 22.6), color: col, rot: 0, h: 3.2 });
+    for (const s of [-1, 1]) K.lamp({ x: cx + s * 8, y: 0, z: cz + (team ? -23 : 23), color: 0xffa64d, light: true });
+  };
+  camp(0, -140, 0x1d4ed8, 0); camp(0, 140, 0xb91c1c, 1);
+  camp(-95, 105, 0xb91c1c, 1); camp(95, 105, 0xb91c1c, 1);
+  // قلعة العدو في الشمال (معلم بصري — نقتحمها في المرحلة ٩)
+  K.plat({ x: 0, y: 8, z: 185, w: 46, d: 22, h: 8, m: stoneM, rock: false, ledge: false });
+  K.plat({ x: 0, y: 15, z: 186, w: 30, d: 14, h: 7, m: whiteM, rock: false, ledge: false });
+  const roof = (y, w, d) => { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 1, 1, 4, 1), roofM); r.scale.set(w * 0.75, 4, d * 0.75); r.rotation.y = Math.PI / 4; r.position.set(0, y + 2, 186); r.castShadow = true; L.add(r); };
+  roof(15, 36, 20); K.plat({ x: 0, y: 23, z: 186, w: 18, d: 10, h: 4, m: whiteM, rock: false, ledge: false }); roof(23, 24, 14);
+  const crest = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.25, 8, 20, Math.PI), own(new THREE.MeshStandardMaterial({ color: 0xe0b44a, metalness: 0.9, roughness: 0.3 }))); crest.position.set(0, 29, 186); L.add(crest);
+  // تلال صخرية ومنحدرات + أشجار ساكورا
+  [[-60, -40, 26, 18, 3], [70, -20, 30, 20, 4], [-90, 30, 24, 30, 5], [110, 40, 20, 26, 3], [-48, 70, 18, 14, 2.5], [52, 75, 16, 12, 2]].forEach(([x, z, w, d, h]) => K.plat({ x, y: h, z, w, d, h: h + 2, m: 'rock', rock: false }));
+  const R = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+  for (let i = 0; i < 46; i++) { const a = R() * Math.PI * 2, r = 60 + R() * 130, x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x) < 18 || Math.hypot(x, z - 140) < 40 || Math.hypot(x, z + 140) < 40 || Math.hypot(Math.abs(x) - 95, z - 105) < 40) continue; K.tree({ x, y: 0, z, s: 1.1 + R() * 0.9, color: R() < 0.6 ? 0xf9a8d4 : 0xfb7185 }); }
+  // بتلات وجمر يطير في الهوا
+  const n2 = 500, g = new THREE.BufferGeometry(), pp = new Float32Array(n2 * 3); for (let i = 0; i < n2; i++) { pp[i * 3] = (Math.random() - 0.5) * 60; pp[i * 3 + 1] = Math.random() * 14; pp[i * 3 + 2] = (Math.random() - 0.5) * 60; }
+  g.setAttribute('position', new THREE.BufferAttribute(pp, 3));
+  const pet = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffb7c5, size: 0.2, transparent: true, opacity: 0.9, depthWrite: false })); pet.frustumCulled = false; pet.userData.dyn = true; L.add(pet); L.snowMesh = pet;
+  L.anim.push((dt, t) => { const a = g.attributes.position.array; for (let i = 0; i < a.length; i += 3) { a[i + 1] -= 0.9 * dt; a[i] += (Math.sin(t * 0.7 + i) * 0.8 + 1.6) * dt; a[i + 2] += Math.cos(t * 0.5 + i) * 0.5 * dt; if (a[i + 1] < 0) { a[i + 1] += 14; a[i] = (Math.random() - 0.5) * 60; } } g.attributes.position.needsUpdate = true; });
+  // الجيشان: ٢٠٠ مرسوم — والمنطقي: ٤٠٠ لنا و١٠٠٠ للعدو
+  L.battle = { max: 200, allyShare: 0.35, reserve: [400, 1000],
+    camps: [{ x: 0, z: -125, r: 26, team: 0 }, { x: -40, z: -100, r: 16, team: 0 }, { x: 40, z: -100, r: 16, team: 0 }, { x: 0, z: 125, r: 26, team: 1 }, { x: -95, z: 95, r: 18, team: 1 }, { x: 95, z: 95, r: 18, team: 1 }],
+    goals: [{ x: 0, z: 125 }, { x: 0, z: -125 }] };
+  K.checkpoint(0, 0, -100, 0);
+  K.portal({ x: 0, y: 0, z: -127, rot: 0, to: 'hub', label: 'رجوع لساحة البوابات 🌀', color: 0xffd166 });
+  K.trigger({ x: 0, z: -100, r: 6, text: '⚔️ ميدان الألف سيف! جيشنا الأزرق يتقدّم شمال… ألف جندي أحمر ينتظرونكم. اضرب، طيّرهم، وشوف كم تقدر تقتل! (هذي المرحلة ١ — القواعد والقادة جايين)' });
+  return cfg;
+}
+
+export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7, w8, w9, w10, w11, w12 };

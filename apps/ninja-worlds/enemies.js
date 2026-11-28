@@ -68,7 +68,7 @@ export class Enemies {
     this.list.push(e); return e;
   }
   alive(group) { return this.list.filter((e) => e.alive && (!group || e.group === group)).length; }
-  nearest(p, maxD) { let best = null, bd = maxD; for (const e of this.list) { if (!e.alive || e.st === 'rise') continue; const d = Math.hypot(e.pos.x - p.x, e.pos.z - p.z); if (d < bd && Math.abs(e.pos.y - p.y) < 2.5) { bd = d; best = e; } } return best; }
+  nearest(p, maxD) { let best = null, bd = maxD; for (const e of this.list) { if (!e.alive || e.st === 'rise') continue; const d = Math.hypot(e.pos.x - p.x, e.pos.z - p.z); if (d < bd && Math.abs(e.pos.y - p.y) < 2.5) { bd = d; best = e; } } if (this.g.crowd && this.g.crowd.on) { const c = this.g.crowd.nearest(p, bd); if (c) return c; } return best; }
   hurt(e, dmg, from, knock) {
     if (!e.alive || e.st === 'rise' || e.st === 'dying') return false;
     if (e.guard && !e.alert) {
@@ -94,9 +94,10 @@ export class Enemies {
       if (d > 0.6 && (dx * fx + dz * fz) / d < cosMin) continue;
       if (this.hurt(e, dmg, p, knock)) n++;
     }
+    if (this.g.crowd && this.g.crowd.on) n += this.g.crowd.hitArc(p, yaw, range, cosMin, dmg, knock);
     return n;
   }
-  hitRadius(p, r, dmg, knock) { let n = 0; for (const e of this.list) { if (!e.alive) continue; if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.boss ? 2 : e.big ? 0.6 : 0) && Math.abs(e.pos.y - p.y) < 2.5) if (this.hurt(e, dmg, p, knock)) n++; } return n; }
+  hitRadius(p, r, dmg, knock) { let n = 0; for (const e of this.list) { if (!e.alive) continue; if (Math.hypot(e.pos.x - p.x, e.pos.z - p.z) < r + (e.boss ? 2 : e.big ? 0.6 : 0) && Math.abs(e.pos.y - p.y) < 2.5) if (this.hurt(e, dmg, p, knock)) n++; } if (this.g.crowd && this.g.crowd.on) n += this.g.crowd.hitRadius(p, r, dmg, knock); return n; }
   update(dt, pl) {
     const attackers = this.list.filter((e) => e.st === 'windup' || e.st === 'strike').length;
     for (const e of this.list) {

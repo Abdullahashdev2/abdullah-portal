@@ -9,6 +9,7 @@ import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
 import { Stealth } from './stealth.js';
 import { Cars } from './cars.js';
+import { Crowd } from './battle/crowd.js';
 import { icon } from './icons.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
@@ -157,8 +158,8 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 const sparks = new Particles(900, true), dust = new Particles(400, false), motes = new Particles(500, true);
 scene.add(sparks.points, dust.points, motes.points);
 const sfx = new Sound();
-const SURF = { hub: 'conc', w1: 'conc', w2: 'grass', w3: 'snow', w4: 'conc', w5: 'conc', w6: 'conc', w7: 'metal', w8: 'conc', w9: 'conc', w10: 'wood', w11: 'snow' };
-const AMB = { hub: 'breeze', w1: 'breeze', w2: 'wind', w3: 'wind', w4: 'breeze', w5: 'night', w6: 'fire', w7: 'storm', w8: 'city', w9: 'wind', w10: 'breeze', w11: 'wind' };
+const SURF = { hub: 'conc', w1: 'conc', w2: 'grass', w3: 'snow', w4: 'conc', w5: 'conc', w6: 'conc', w7: 'metal', w8: 'conc', w9: 'conc', w10: 'wood', w11: 'snow', w12: 'grass' };
+const AMB = { hub: 'breeze', w1: 'breeze', w2: 'wind', w3: 'wind', w4: 'breeze', w5: 'night', w6: 'fire', w7: 'storm', w8: 'city', w9: 'wind', w10: 'breeze', w11: 'wind', w12: 'wind' };
 const ROOM = { w5: 0.2, w7: 0.12, w1: 0.12 };
 addEventListener('resize', resize); resize();
 
@@ -177,6 +178,7 @@ const G = {
   hud: () => hudUpdate(),
   onFall: () => respawn('fall'),
   onDeath: () => respawn('death'),
+  onCrowdKO: (n) => { if (n % 10 === 0) addCoins(2, player.pos); if (n % 40 === 0 && player.hp < player.maxHp) { player.hp++; hudUpdate(); say('❤️ ' + n + ' قتيل! رجع لك قلب'); } if (n === 100 || n === 250 || n === 500 || n === 1000) { banner('⚔️ ' + n + ' قتيل!', n >= 1000 ? 'أسطورة الميدان' : 'الجيش يهابك'); sfx.win(); } },
   onEnemyKilled: (e) => { G.hitstop(0.08); addCoins(e.boss ? 150 : e.big ? 20 : e.archer ? 8 : e.guard ? 6 : 5, e.pos); if (Math.random() < (player.hp <= 1 ? 0.45 : 0.18)) enemies.dropHeart(e.pos); },
   dropItem: (forced) => dropItem(forced),
   liteify: (r) => liteify(r), liteMat: (m) => liteMat(m),
@@ -241,7 +243,7 @@ function buy(key) {
   persist(); hudUpdate(); renderShop(); sfx.win(); say('🎁 اشتريت: ' + it.name);
 }
 hero = buildHero('ninja'); scene.add(hero.root);
-player = new Player(G, hero); enemies = new Enemies(G); cars = new Cars(G);
+player = new Player(G, hero); enemies = new Enemies(G); cars = new Cars(G); G.crowd = new Crowd(G, scene);
 skin = null; scarf = new Scarf(scene, 0xdc2626); trail = new Trail(scene, 0x9be7ff);
 
 /* ---------------- worlds ---------------- */
@@ -256,7 +258,7 @@ function applyAtmo(c) {
 }
 let checkpoint = null, cfg = null, radioPaused = false;
 function loadWorld(id, from) {
-  if (level) level.dispose(); enemies.clear(); if (cars) cars.clear(); if (player) player.driving = null; sparks.clear(); dust.clear(); motes.clear();
+  if (level) level.dispose(); enemies.clear(); G.crowd.clear(); $('#battleHud').classList.remove('on'); if (cars) cars.clear(); if (player) player.driving = null; sparks.clear(); dust.clear(); motes.clear();
   if (npc) { npc.root.removeFromParent(); npc = null; }
   level = new Level(scene); worldId = id; SAVE._from = from; $('#timer').classList.remove('on');
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
@@ -269,11 +271,12 @@ function loadWorld(id, from) {
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
   enemies.cullR = cfg.ship ? 55 : 0; for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
+  if (level.battle) { G.crowd.setup({ ...level.battle, ui: $('#battleHud') }); $('#battleHud').classList.add('on'); }
   for (const it of level.items) it.origin = it.home.clone();
   applyAtmo(cfg);
   if (level.npcDef) { const d = level.npcDef; npc = buildHero('calm'); npc.root.position.set(d.x, d.y, d.z); npc.root.rotation.y = d.yaw; scene.add(npc.root); npc.line = 0; }
   checkpoint = level.checkpoints[0] ? { pos: level.checkpoints[0].pos, yaw: level.checkpoints[0].yaw } : null;
-  computeUpg(); player.spawn(cfg.spawn.pos, cfg.spawn.yaw); player.hp = player.maxHp; breath = maxBreath(); normalFog = scene.fog; player.carry = null;
+  computeUpg(); if (cfg.battle) player.maxHp += 3; player.spawn(cfg.spawn.pos, cfg.spawn.yaw); player.hp = player.maxHp; breath = maxBreath(); normalFog = scene.fog; player.carry = null;
   if (!checkpoint) checkpoint = { pos: cfg.spawn.pos.clone(), yaw: cfg.spawn.yaw };
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
@@ -377,9 +380,10 @@ const WMETA = {
   w10: { sub: 'عالم الغوّاص', tease: 'شعاب ملوّنة، أسراب سمك، وحطام سفينة فيه كنوز… والقروش تحرسه', sky: ['#062a3a', '#0e7490', '#67e8f9'] },
   w11: { sub: 'عالم المتسلّق', tease: 'عاصفة ثلجية، جليد يزلّق، ووحوش ثلج… والقمة فوق الغيوم', sky: ['#64748b', '#cbd5e1', '#f8fafc'] },
   w8: { sub: 'عالم السيارات', tease: 'مدينة ما تنام… اسرق سيارة، طِر من المنحدرات، وسوق لأي عالم تبيه', sky: ['#0f0524', '#4c1d95', '#f472b6'] },
+  w12: { sub: 'عالم الساموراي', tease: 'وادي الضباب الأحمر… ألف سيف ينتظرونك، وجيشك يحتاجك', sky: ['#2a0a0a', '#9b1c1c', '#f59e0b'] },
   w7: { sub: 'عالم التسلّل', tease: 'ليلة عاصفة… سفينة مليانة حراس، وبوصلة الظل مخبّاة فوق الجسر', sky: ['#020617', '#1e293b', '#64748b'] },
 };
-const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة', w8: '🌃 مدينة النيون', w9: '🏜️ طريق الغروب', w10: '🤿 الشعاب العميقة', w11: '🏔️ قمم الثلج' };
+const WORLD_NAMES = { w12: '⚔️ ميدان الألف سيف', hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة', w8: '🌃 مدينة النيون', w9: '🏜️ طريق الغروب', w10: '🤿 الشعاب العميقة', w11: '🏔️ قمم الثلج' };
 const TIPS = ['💡 الجدار المضيء بالرونات تقدر تركض عليه.', '💡 اضغط قفز قدّام الجدار = تطلع عليه.', '💡 في السفينة: ادفع للجدار = تلتصق فيه وتطل من الزاوية.', '💡 السفينة: اقفز جنب الحاجز = تتعلّق برّا والحراس ما يشوفونك.', '💡 امسك الحارس من الخلف ⚔️ وارمه في البحر عند الحافة 🌊.', '💡 القنّاصة: احبس نفسك 🫁 عشان يثبت المنظار.', '💡 الموجة الكبيرة = الحراس يتمسكون وما يشوفون — استغلها!', '💡 اخنق حارس = تاخذ الراديو، وتقلّد صوت القائد 📻.', '💡 الكوينز تشتري فيها ترقيات من 🛒 المتجر.', '💡 لا تطوّل وأنت ماسك الحارس — بيفلت ويعلن الإنذار!'];
 function drawLoaderArt(id) {
   const cv = $('#ldArt'), dpr = Math.min(2, devicePixelRatio || 1), W = cv.width = Math.round(innerWidth * dpr), H = cv.height = Math.round(innerHeight * dpr), g = cv.getContext('2d');
@@ -1053,6 +1057,7 @@ function simulate(dt) {
     else player.update(STEP, inp);
     if (cars.list.length) cars.update(STEP, player, inp);
     enemies.update(STEP, player);
+    if (G.crowd.on) G.crowd.update(STEP, player);
     inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = false; acc -= STEP; n++;
   }
   if (n === 14) acc = 0;
@@ -1087,13 +1092,14 @@ function frame(now) {
   // underwater look
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
   scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw); if (sfx.ctx && uw !== sfx._uw) { sfx._uw = uw; sfx.amb(uw ? 'dive' : (AMB[cfg.id] || 'breeze')); }
+  if (G.crowd.on) G.crowd.render(tNow, camera);
   renderFrame();
   if (STREAM && now - streamLast >= 1000 / streamFps - 4) { streamLast = now; streamDraw(); }
 }
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; },
+window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get camera() { return camera; },
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },

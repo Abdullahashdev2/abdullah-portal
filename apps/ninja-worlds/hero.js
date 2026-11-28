@@ -221,10 +221,31 @@ export function setSpy(h, on, mode = 'spy') {
     const fl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.32), dM); fl.position.set(0, -0.04, 0.2); h.ftL.add(fl); const fr = fl.clone(); h.ftR.add(fr);
     h.diveGear = [t1, t2, mask, strap, fl, fr]; h.diveGear.forEach((m) => { m.castShadow = true; });
   }
+  if (!h.samGear) { // درع ساموراي: خوذة بهلال ذهبي + أكتاف + صدر + تنّورة صفائح
+    const parts = [], lac = new THREE.MeshStandardMaterial({ color: 0x1e2a4a, roughness: 0.35, metalness: 0.35 }), gold = new THREE.MeshStandardMaterial({ color: 0xe0b44a, roughness: 0.3, metalness: 0.85, emissive: 0x3a2400, emissiveIntensity: 0.4 }), cord = new THREE.MeshStandardMaterial({ color: 0x9b1c1c, roughness: 0.7 });
+    const put = (p2, m, x, y, z) => { m.position.set(x, y, z); m.castShadow = true; p2.add(m); parts.push(m); return m; };
+    put(h.head, new THREE.Mesh(new THREE.SphereGeometry(0.19, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), lac), 0, 0.03, 0);
+    const shk = put(h.head, new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.13, 18, 1, true), lac), 0, -0.03, -0.02); shk.material = lac;
+    put(h.head, new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.022, 6, 20, Math.PI), gold), 0, 0.27, 0.12).rotation.z = 0;
+    put(h.head, new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 0.03), gold), 0, 0.16, 0.17);
+    [-1, 1].forEach((sd) => { const s1 = put(sd < 0 ? h.shL : h.shR, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.24), lac), 0.07 * sd, -0.07, 0); s1.rotation.z = 0.25 * sd;
+      for (let i = 0; i < 3; i++) put(s1, new THREE.Mesh(new THREE.BoxGeometry(0.205, 0.014, 0.245), cord), 0, 0.09 - i * 0.08, 0); });
+    put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.4, 0.34), lac), 0, 0.27, 0.01);
+    for (let i = 0; i < 4; i++) put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.465, 0.016, 0.345), cord), 0, 0.14 + i * 0.08, 0.01);
+    put(h.spine, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.02), gold), 0, 0.33, 0.185);
+    for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2, pl = put(h.hips, new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.26, 0.03), lac), Math.sin(a) * 0.22, -0.08, Math.cos(a) * 0.22); pl.rotation.y = a; pl.rotation.x = 0.18 * Math.cos(0); }
+    const flag = put(h.spine, new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.6), new THREE.MeshStandardMaterial({ color: 0x1d4ed8, side: THREE.DoubleSide, roughness: 0.8 })), 0.17, 0.95, -0.24);
+    put(h.spine, new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.1, 6), gold), 0, 0.75, -0.24); flag.add(new THREE.Mesh(new THREE.CircleGeometry(0.09, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }))).position.z = 0.002;
+    h.samGear = parts;
+  }
+  h.samGear.forEach((m) => (m.visible = on && mode === 'samurai'));
   h.diveGear.forEach((m) => (m.visible = on && mode === 'diver'));
   if (on && mode === 'diver') { // بدلة غوص سوداء بخطوط صفراء
     S.suit.color.setHex(0x0f172a); S.suit.roughness = 0.35; S.suit.metalness = 0.1; S.suit2.color.setHex(0x0b1020);
     S.trim.color.setHex(0xfacc15); S.trim.emissive.setHex(0xb45309); S.trim.emissiveIntensity = 0.35; S.red.color.setHex(0xfacc15);
+  } else if (on && mode === 'samurai') { // بدلة تحت الدرع
+    S.suit.color.setHex(0x111827); S.suit.roughness = 0.7; S.suit.metalness = 0; S.suit2.color.setHex(0x0b1020);
+    S.trim.color.setHex(0xe0b44a); S.trim.emissive.setHex(0x3a2400); S.trim.emissiveIntensity = 0.3; S.red.color.setHex(0x9b1c1c);
   } else if (on && mode === 'parka') { // معطف ثلجي أبيض وأحمر
     S.suit.color.setHex(0xe2e8f0); S.suit.roughness = 0.9; S.suit.metalness = 0; S.suit2.color.setHex(0x334155);
     S.trim.color.setHex(0xdc2626); S.trim.emissive.setHex(0x7f1d1d); S.trim.emissiveIntensity = 0.3; S.red.color.setHex(0xdc2626);
