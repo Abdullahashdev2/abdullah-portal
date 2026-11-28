@@ -62,8 +62,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 #touch .btns button.off{opacity:.28!important;filter:grayscale(1) brightness(.7);box-shadow:none!important}#touch .btns button:not(.off){filter:none}
 body.m-hang.m-pull #atkBtn{display:grid!important;animation:pullGlow 1s infinite}@keyframes pullGlow{50%{box-shadow:0 0 22px #ffd166}}
 #rageBar{position:fixed;z-index:6;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom));width:min(46vw,300px);height:20px;border-radius:999px;background:#0009;border:2px solid #b45309;overflow:hidden;display:none;pointer-events:none}#rageBar.on{display:block}#rageBar i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#f59e0b,#ffd166);transition:width .15s}#rageBar b{position:relative;display:block;text-align:center;font-size:12px;line-height:16px;color:#fff;text-shadow:0 1px 3px #000}#rageBar.full{border-color:#ffd166;box-shadow:0 0 18px #ffb020;animation:rpulse .8s infinite}#rageBar.red i{background:linear-gradient(90deg,#b91c1c,#ff4d4d)}@keyframes rpulse{50%{box-shadow:0 0 30px #ff7a00}}
-#proneBtn{display:none;--c:148,163,184;width:50px;height:50px;right:186px;bottom:96px}body.shipmode #proneBtn{display:grid}body.m-hang #proneBtn,body.m-hold #proneBtn,body.m-drive #proneBtn{display:none!important}body.m-aim #proneBtn{right:112px;bottom:96px}body.bs-sym #proneBtn{right:236px;bottom:94px}
-#throwBtn{display:none;--c:226,232,240;width:50px;height:50px;right:186px;bottom:152px}body.shipmode #throwBtn{display:grid}body.m-hang #throwBtn,body.m-hold #throwBtn,body.m-drive #throwBtn,body.m-aim #throwBtn{display:none!important}body.bs-sym #throwBtn{right:236px;bottom:236px}
+#proneBtn{display:none;--c:148,163,184;width:50px;height:50px;right:186px;bottom:86px}body.shipmode #proneBtn{display:grid}body.m-hang #proneBtn,body.m-hold #proneBtn,body.m-drive #proneBtn{display:none!important}body.m-aim #proneBtn{right:112px;bottom:96px}body.bs-sym #proneBtn{right:236px;bottom:94px}
+#throwBtn{display:none;--c:226,232,240;width:50px;height:50px;right:186px;bottom:168px}body.shipmode #throwBtn{display:grid}body.m-hang #throwBtn,body.m-hold #throwBtn,body.m-drive #throwBtn,body.m-aim #throwBtn{display:none!important}body.bs-sym #throwBtn{right:236px;bottom:236px}
 #noiseM{display:none;position:fixed;z-index:6;left:12px;top:calc(232px + env(safe-area-inset-top));font-size:13px;font-weight:700;color:#e5e7eb;background:#0009;border-radius:999px;padding:3px 10px;align-items:center;gap:3px;pointer-events:none}body.shipmode #noiseM{display:flex}#noiseM i{display:inline-block;width:6px;height:12px;border-radius:2px;background:#334155}#noiseM i.on{background:#facc15}#noiseM i.on:nth-child(n+4){background:#ef4444}#noiseM b{color:#f87171}#noiseM span{color:#86efac}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
@@ -187,6 +187,17 @@ body.th-neon .btns button{box-shadow:0 0 16px rgba(var(--c),.55),inset 0 0 12px 
 body.th-ice .btns button{--c:186,230,253!important;background:linear-gradient(160deg,rgba(255,255,255,.2),rgba(14,40,64,.6))!important}
 body.th-mono .btns button{--c:241,245,249!important;background:rgba(0,0,0,.6)!important}
 body.th-custom .btns button{--c:var(--mine)!important}
+
+/* 💬 التنبيهات فوق بجنب الأزرار (مو بنص الشاشة) + زر ✕ — وعدّاد الحذر جنب الرادار */
+#toast{top:calc(8px + env(safe-area-inset-top))!important;left:66px!important;transform:translateY(-10px)!important;width:min(calc(56vw - 76px),540px)!important;padding:6px 8px!important;gap:8px!important;border-radius:14px!important;pointer-events:auto}
+#toast.on{transform:translateY(0)!important}
+#toast .av{flex:0 0 28px!important;height:28px!important;font-size:16px!important;border-radius:9px!important}
+#toast b{display:none!important}
+#toastText{font-size:12.5px!important;line-height:1.45!important;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#toastX{flex:0 0 26px;height:26px;margin-inline-start:auto;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#e5e7eb;font-size:13px;line-height:1;padding:0;cursor:pointer}
+@media (max-aspect-ratio:1/1){#toast{top:calc(62px + env(safe-area-inset-top))!important;left:10px!important;width:calc(100vw - 20px)!important}}
+#phase{top:calc(70px + env(safe-area-inset-top))!important;left:154px!important;transform:none!important;font-size:16px!important;background:rgba(0,0,0,.55);border-radius:999px;padding:2px 12px}
+body:not(.shipmode) #phase{left:12px!important}
 </style>
 <script type="importmap">{"imports":{"three":"../saeq-albatal/lib/three.module.min.js","sky":"../saeq-albatal/lib/Sky.js","gltf":"../saeq-albatal/lib/loaders/GLTFLoader.js"}}</script>
 </head>
@@ -216,7 +227,7 @@ body.th-custom .btns button{--c:var(--mine)!important}
   </div>
 </div>
 <div id="banner"><div id="bSub"></div><div id="bName"></div></div>
-<div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div></div>
+<div id="toast"><div class="av">🧘</div><div><b>البطل الهادئ</b><div id="toastText"></div></div><button id="toastX" aria-label="إغلاق">✕</button></div>
 <div id="prompt"></div>
 <div id="timer"></div><div id="battleHud"></div><div id="rageBar"></div><div id="noiseM"></div>
 <div id="breath"><div id="breathFill"></div></div>

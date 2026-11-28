@@ -355,6 +355,7 @@ function streamDraw() {
   }
   g.restore();
 }
+$('#toastX').addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); $('#toast').classList.remove('on'); toastT = 0; });
 function say(text) { $('#toastText').textContent = text; $('#toast').classList.add('on'); toastT = Math.min(11, 3.5 + text.length * 0.055); }
 function banner(name, sub) { bannerShowT = 3.4; $('#bName').textContent = name; $('#bSub').textContent = sub || ''; const b = $('#banner'); b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); }
 function hudUpdate() {

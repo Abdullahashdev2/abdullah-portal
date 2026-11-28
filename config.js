@@ -35,6 +35,18 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "toast-top",
+      date: "2026-11-28",
+      app: "ninja-worlds",
+      title: "💬 التنبيهات صارت فوق",
+      items: [
+        "💬 الرسائل والتحذيرات انتقلت لفوق بجنب الأزرار، صغيرة وما تغطي اللعب",
+        "✕ زر تسكّر فيه الرسالة على طول",
+        "⏱️ عدّاد الحذر صار صغير بجنب الرادار",
+        "🎮 تباعدت أزرار «ارمِ» و«انبطح» عشان ما يتراكبون",
+      ],
+    },
+    {
       id: "perf-1",
       date: "2026-11-28",
       app: "ninja-worlds",
@@ -743,7 +755,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "8.1",
+      version: "8.1.1",
       leaderboard: { unit: "💎" },
     },
     {
