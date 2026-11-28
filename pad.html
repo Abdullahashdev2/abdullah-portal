@@ -36,6 +36,25 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
 #hintBar{position:fixed;left:50%;top:56px;transform:translateX(-50%);z-index:7;max-width:92vw;background:rgba(15,23,42,.92);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:8px 14px;font:800 14px system-ui;display:none;text-align:center}#hintBar.on{display:block}
 #rot{display:none;position:fixed;inset:0;z-index:10;background:#07070f;align-items:center;justify-content:center;text-align:center;font-size:20px;padding:30px}
 @media (orientation:portrait){#rot.need{display:flex}}
+/* 🎮 شكل جهاز محمول (مثل PSP): جسم أسود لامع، أزرار الأشكال، أكتاف L/R */
+body.psp{background:linear-gradient(180deg,#1b1d24 0%,#0b0c10 55%,#14161c 100%)}
+body.psp::before{content:"";position:fixed;inset:6px;border-radius:28px;border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 2px 0 rgba(255,255,255,.06),inset 0 -20px 60px rgba(0,0,0,.6);pointer-events:none;z-index:0}
+body.psp #pad{width:300px;height:250px}
+#pad button.face{border:0;background:radial-gradient(circle at 40% 30%,#3a3d48,#15161b 70%);box-shadow:0 5px 0 #050507,0 8px 14px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.15)}
+#pad button.face svg{width:46%;height:46%;filter:drop-shadow(0 0 6px currentColor)}
+#pad button.face.down{transform:translateY(4px) scale(.96);box-shadow:0 1px 0 #050507,0 3px 6px rgba(0,0,0,.5),inset 0 0 18px currentColor}
+#pad button.face small{bottom:-20px;color:#e2e8f0;background:rgba(0,0,0,.55);padding:1px 8px;border-radius:999px;font-size:11px}
+.shoulder{position:fixed;top:calc(52px + env(safe-area-inset-top));z-index:5;width:120px;height:44px;border:0;color:#e5e7eb;font:900 15px system-ui;background:linear-gradient(180deg,#3b3e49,#17181d);box-shadow:0 4px 0 #050507,inset 0 1px 0 rgba(255,255,255,.18);touch-action:none;display:flex;align-items:center;justify-content:center;gap:6px}
+.shoulder.l{left:max(10px,env(safe-area-inset-left));border-radius:22px 10px 10px 22px}.shoulder.r{right:max(10px,env(safe-area-inset-right));border-radius:10px 22px 22px 10px}
+.shoulder b{font-size:18px;color:#94a3b8}.shoulder.down{transform:translateY(3px);box-shadow:0 1px 0 #050507}
+body.psp #base{border:3px solid #2a2d36;background:radial-gradient(circle,#1c1e25 55%,#101116);box-shadow:inset 0 4px 10px rgba(0,0,0,.7),0 0 0 6px rgba(255,255,255,.03)}
+body.psp #knob{background:radial-gradient(circle at 40% 35%,#6b7080,#2b2e37 70%);border:2px solid #4b5060;box-shadow:0 4px 8px rgba(0,0,0,.6)}
+.nubRest{position:fixed;left:max(70px,12vw);bottom:calc(70px + env(safe-area-inset-bottom));width:120px;height:120px;border-radius:50%;border:3px solid #23262e;background:radial-gradient(circle,#1a1c22 50%,#0e0f13);box-shadow:inset 0 4px 12px rgba(0,0,0,.8);z-index:1;pointer-events:none;display:none}
+body.psp .nubRest{display:block}body.psp .nubRest::after{content:"";position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#5b6070,#25272f 70%);box-shadow:0 3px 6px rgba(0,0,0,.6)}
+body.psp.joying .nubRest{opacity:.15}
+.sysBtns{position:fixed;left:50%;bottom:calc(10px + env(safe-area-inset-bottom));transform:translateX(-50%);display:none;gap:14px;z-index:5}body.psp .sysBtns{display:flex}
+.sysBtns{}body.psp #state{bottom:calc(40px + env(safe-area-inset-bottom))}
+.sysBtns button{height:22px;padding:0 14px;border-radius:999px;border:0;background:#2a2d36;color:#cbd5e1;font:800 11px system-ui;box-shadow:0 2px 0 #050507}
 </style>
 </head>
 <body>
@@ -60,6 +79,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:radial-gradient(ellips
   <button class="tb" id="menuB">🧭 قوائم</button>
   <button class="tb" id="pauseB" hidden>⏸</button>
 </div>
+<div class="nubRest"></div>
+<button class="shoulder l" id="shL" hidden><b>L</b><span></span></button><button class="shoulder r" id="shR" hidden><span></span><b>R</b></button>
+<div class="sysBtns"><button id="selB">SELECT · قوائم</button><button id="startB">START · ⏸</button></div>
 <div id="pad"></div>
 <div id="state">غير متصل</div>
 <div id="modeSel">
@@ -83,6 +105,11 @@ function press(id) { st.c[id] = (st.c[id] || 0) + 1; send(true); }
 
 /* ---------- buttons are drawn from what the big screen says the current game needs ---------- */
 const SLOTS = [{ r: 0, b: 6, s: 104 }, { r: 120, b: 0, s: 86 }, { r: 134, b: 110, s: 70 }, { r: 18, b: 128, s: 72 }, { r: 222, b: 70, s: 66 }, { r: 226, b: 160, s: 60 }];
+// ترتيب PSP: ✕ تحت، □ يسار، ○ يمين، △ فوق — والباقي على الأكتاف
+const FACE = [{ r: 96, b: 8, s: 78, sym: 'x', col: '#60a5fa' }, { r: 188, b: 92, s: 74, sym: 'sq', col: '#f472b6' }, { r: 4, b: 92, s: 74, sym: 'o', col: '#f87171' }, { r: 96, b: 172, s: 70, sym: 'tri', col: '#4ade80' }];
+const SYM = { x: '<path d="M14 14L50 50M50 14L14 50"/>', sq: '<rect x="14" y="14" width="36" height="36" rx="2"/>', o: '<circle cx="32" cy="32" r="19"/>', tri: '<path d="M32 12L54 50H10z"/>' };
+const svgSym = (k) => '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">' + SYM[k] + '</svg>';
+const PSP = !/[?&]classic\b/.test(location.search); if (PSP) document.body.classList.add('psp');
 const COLORS = ['rgba(125,211,252,.85)', 'rgba(255,120,120,.85)', 'rgba(255,255,255,.4)', 'rgba(255,209,102,.8)', 'rgba(167,139,250,.85)', 'rgba(52,211,153,.8)'];
 function render() {
   const pad = $('#pad'); pad.innerHTML = '';
@@ -93,13 +120,21 @@ function render() {
   $('#look').style.pointerEvents = layout.look && !M ? 'auto' : 'none';
   $('#hint').textContent = M ? '← العصا تتنقّل بين الأزرار على الشاشة' : layout.look ? '← العصا هنا • اسحب بالنص للكاميرا' : '← العصا هنا';
   const list = M ? [{ id: '__ok', label: '✅ اختيار' }] : (layout.buttons || []);
+  for (const k of ['shL', 'shR']) { const e = $('#' + k); e.hidden = true; e.onpointerdown = null; }
   list.slice(0, 6).forEach((b, i) => {
-    const sl = SLOTS[i], el = document.createElement('button'), parts = String(b.label).split(' ');
+    if (PSP && i >= 4) { // L/R
+      const e = $(i === 4 ? '#shR' : '#shL'), parts = String(b.label).split(' '); e.hidden = false; e.querySelector('span').textContent = parts.length > 1 ? parts.slice(1).join(' ') : b.label; const id = b.id;
+      e.onpointerdown = (ev) => { ev.preventDefault(); try { e.setPointerCapture(ev.pointerId); } catch (_) {} st.c[id] = (st.c[id] || 0) + 1; st.h[id] = true; e.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); };
+      e.onpointerup = e.onpointercancel = e.onlostpointercapture = () => { st.h[id] = false; e.classList.remove('down'); send(true); };
+      return;
+    }
+    const sl = PSP ? FACE[i] : SLOTS[i], el = document.createElement('button'), parts = String(b.label).split(' ');
     const icon = parts.length > 1 && /\p{Extended_Pictographic}/u.test(parts[0]) ? parts[0] : (b.icon || parts[0].slice(0, 2));
     const name = parts.length > 1 ? parts.slice(1).join(' ') : b.label;
     el.innerHTML = `<span></span><small></small>`; el.firstChild.textContent = icon; el.lastChild.textContent = name;
     Object.assign(el.style, { width: sl.s + 'px', height: sl.s + 'px', right: sl.r + 'px', bottom: sl.b + 'px', borderColor: COLORS[i] });
-    if (i === 0) el.style.fontSize = '36px';
+    if (PSP) { el.classList.add('face'); el.style.color = sl.col; el.firstChild.outerHTML; el.innerHTML = svgSym(sl.sym) + '<small></small>'; el.lastChild.textContent = name; }
+    else if (i === 0) el.style.fontSize = '36px';
     const id = b.id;
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_) {} st.c[id] = (st.c[id] || 0) + 1; st.h[id] = true; el.classList.add('down'); if (navigator.vibrate) navigator.vibrate(12); send(true); });
     const up = () => { st.h[id] = false; el.classList.remove('down'); send(true); };
@@ -171,6 +206,7 @@ $('#streamB').onclick = () => (streaming ? stopStream() : startStream());
 $('#menuB').onclick = () => { menu = !menu; st.h = {}; render(); send(true); };
 $('#homeB').onclick = () => { if (streaming) { stopStream(); return; } press('__back'); menu = false; };
 $('#pauseB').onclick = () => press('pause');
+$('#selB').onclick = () => $('#menuB').click(); $('#startB').onclick = () => press('pause');
 
 function connect() {
   const code = $('#code').value.replace(/\D/g, ''); if (code.length !== 4) return msg('الكود ٤ أرقام');
@@ -200,9 +236,9 @@ $('#code').addEventListener('keydown', (e) => { if (e.key === 'Enter') connect()
 
 /* ---------- stick + camera ---------- */
 let joy = null, look = null; const base = $('#base'), knob = $('#knob');
-$('#stickZone').addEventListener('pointerdown', (e) => { joy = { id: e.pointerId, x: e.clientX, y: e.clientY }; base.style.left = e.clientX + 'px'; base.style.top = e.clientY + 'px'; base.style.display = 'block'; e.target.setPointerCapture(e.pointerId); });
+$('#stickZone').addEventListener('pointerdown', (e) => { document.body.classList.add('joying'); joy = { id: e.pointerId, x: e.clientX, y: e.clientY }; base.style.left = e.clientX + 'px'; base.style.top = e.clientY + 'px'; base.style.display = 'block'; e.target.setPointerCapture(e.pointerId); });
 $('#stickZone').addEventListener('pointermove', (e) => { if (!joy || e.pointerId !== joy.id) return; let dx = e.clientX - joy.x, dy = e.clientY - joy.y; const l = Math.hypot(dx, dy), m = 62; if (l > m) { dx = dx / l * m; dy = dy / l * m; } st.x = dx / m; st.y = -dy / m; knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; });
-const endJoy = (e) => { if (joy && e.pointerId === joy.id) { joy = null; st.x = st.y = 0; base.style.display = 'none'; knob.style.transform = 'translate(-50%,-50%)'; } };
+const endJoy = (e) => { if (joy && e.pointerId === joy.id) { document.body.classList.remove('joying'); joy = null; st.x = st.y = 0; base.style.display = 'none'; knob.style.transform = 'translate(-50%,-50%)'; } };
 $('#stickZone').addEventListener('pointerup', endJoy); $('#stickZone').addEventListener('pointercancel', endJoy);
 $('#look').addEventListener('pointerdown', (e) => { look = { id: e.pointerId, x: e.clientX, y: e.clientY }; e.target.setPointerCapture(e.pointerId); });
 $('#look').addEventListener('pointermove', (e) => { if (!look || e.pointerId !== look.id) return; st.dx += (e.clientX - look.x) * 1.6; st.dy += (e.clientY - look.y) * 1.6; look.x = e.clientX; look.y = e.clientY; });

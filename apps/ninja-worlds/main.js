@@ -495,7 +495,7 @@ const tvHooks = {
   },
   look: (dx, dy) => { cam.dx += dx; cam.dy += dy; },
   onConnect: () => { window.KeepAwake && window.KeepAwake.on(); autoTV(); document.body.classList.add('tvmode'); $('#touch').classList.remove('on'); $('#tvBadge').classList.add('on'); say('📱 الجوال صار يد التحكم! الشاشة هذي للعرض بس 📺'); sendTV({ hp: player.hp, max: player.maxHp, sh: $('#shards').textContent, sp: !!G.upg.spin }); },
-  onDisconnect: () => { window.KeepAwake && window.KeepAwake.off(); $('#tvBadge').classList.remove('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
+  onDisconnect: () => { window.KeepAwake && window.KeepAwake.off(); $('#tvBadge').classList.remove('on'); document.body.classList.remove('tvmode'); if (TOUCH && started) $('#touch').classList.add('on'); say('⚠️ انقطع اتصال الجوال — افتح ⏸ ← 📺 عشان تربطه مرة ثانية.'); },
 };
 function autoTV() {
   let pref = null; try { pref = localStorage.getItem('nw_tv'); } catch (e) {}
@@ -539,7 +539,7 @@ $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
   if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
-  sfx.music(cfg.music); sfx.ear = camera; sfx.amb(AMB[cfg.id] || 'breeze'); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
+  sfx.music(cfg.music); sfx.ear = camera; sfx.amb(AMB[cfg.id] || 'breeze'); $('#hudWrap').classList.add('on'); if (TOUCH && !remote.on) $('#touch').classList.add('on');
   try { if (TOUCH && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
   if (RESUME && RESUME !== worldId) { const r = RESUME; RESUME = null; setTimeout(() => goWorld(r, null), 300); }
   setTimeout(() => { const t = level.triggers.find((t) => !t.fired && Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z) < t.r); if (t) { t.fired = true; say(t.text); } }, 900);

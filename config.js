@@ -35,6 +35,17 @@ window.PORTAL = {
   */
   news: [
     {
+      id: "psp-pad-1",
+      date: "2026-11-28",
+      app: "ninja-worlds",
+      title: "🎮 يد التحكم صارت مثل جهاز PSP + تنظيف البوابة",
+      items: [
+        "🎮 الجوال كيد تحكم صار بشكل جهاز محمول: أزرار ✕ ○ □ △ بألوانها، أكتاف L و R، عصا، و START / SELECT — وتحت كل زر وظيفته بالعربي",
+        "📺 لما تربط الجوال كيد تحكم، أزرار الشاشة تختفي من التابلت/التلفزيون — وترجع لو انقطع الاتصال",
+        "🧹 شلنا «الآلة الحاسبة» و«تعلّم الرسم» لأنها من مواقع ثانية — البوابة صارت لألعابنا بس",
+      ],
+    },
+    {
       id: "ship-mega-1",
       date: "2026-11-28",
       app: "ninja-worlds",
@@ -616,7 +627,7 @@ window.PORTAL = {
       category: "kids",
       url: "apps/ninja-worlds/",
       open: "inside",
-      version: "7.1",
+      version: "7.2",
       leaderboard: { unit: "💎" },
     },
     {
@@ -650,26 +661,6 @@ window.PORTAL = {
       url: "apps/memory-game/",
       open: "inside",
       leaderboard: { unit: "محاولة", lowerIsBetter: true },
-    },
-    {
-      id: "calculator",
-      name: "آلة حاسبة",
-      description: "حاسبة بسيطة وسريعة",
-      icon: "🧮",
-      color: "#d6f0ff",
-      category: "tools",
-      url: "https://www.desmos.com/scientific?lang=ar",
-      open: "tab",
-    },
-    {
-      id: "autodraw",
-      name: "تعلّم الرسم",
-      description: "ارسم ولوّن بحرية",
-      icon: "🎨",
-      color: "#e4ffd6",
-      category: "kids",
-      url: "https://www.autodraw.com/",
-      open: "tab",
     },
   ],
 };
