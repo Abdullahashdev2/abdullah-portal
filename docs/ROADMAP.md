@@ -4,6 +4,9 @@
 
 ملفات مهمة: apps/ninja-worlds/{main.js, worlds.js (w12 = الساموراي), battle/crowd.js, battle/combat.js, player.js, enemies.js, stealth.js, hero.js, kit.js, fx.js} | config.js (الإصدار والأخبار) | docs/samurai-master-plan.html
 
+## ⚡ قاعدة الأداء (كل مرحلة)
+أقل من ٤٠٠ قطعة ظاهرة لكل عالم، و٣٠ إطار أو أكثر. الأدوات: إخفاء ورا الأرضية (enemies: deck occlusion)، وLOD للحراس (m.proxy وm.small)، ودمج (userData.batchable)، ومدى رؤية (main: buildDrawDist/updateDrawDist)، وظلال قريبة. القياس: traverseVisible بدون material.visible=false. السفينة ٦٨١، والساموراي ٢٩٥ (٢٨ نوفمبر).
+
 | # | المسار | المرحلة | الحجم | الحالة |
 |---|---|---|---|---|
 | 1 | عالم الساموراي | القواعد والمعنويات | وسط | ⏳ التالية |

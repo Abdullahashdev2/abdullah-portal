@@ -272,7 +272,7 @@ function loadWorld(id, from) {
   if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
-  enemies.cullR = cfg.ship ? 55 : 0; for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
+  enemies.cullR = cfg.ship ? (matchMedia('(pointer: coarse)').matches ? 42 : 55) : 0; for (const d of level.enemyDefs) if (!d.group) enemies.spawn(d);
   if (level.battle) { G.crowd.setup({ ...level.battle, ui: $('#battleHud') }); $('#battleHud').classList.add('on'); G.charge.reset($('#rageBar')); }
   $('#rageBar').classList.toggle('on', !!level.battle); document.body.classList.toggle('battle', !!level.battle);
   for (const it of level.items) it.origin = it.home.clone();
@@ -284,8 +284,26 @@ function loadWorld(id, from) {
   cam.yaw = cfg.spawn.yaw; cam.pitch = 0.32; cam.target.copy(player.pos).add(new V(0, 1.5, 0)); cam.dist = cam.want;
   scarf.init = false; startTime = performance.now(); worldFalls = 0;
   level.useLights = QL[qLevel].lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = QL[qLevel].lights; });
-  level.buildGrid(); level.keys = {}; liteify(level.group); if (cfg.ship || cfg.batch) { try { level.batch(); } catch (e) { console.warn('batch failed', e); } } freezeStatic(level.group); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
+  level.buildGrid(); level.keys = {}; liteify(level.group); if (cfg.ship || cfg.batch) { try { level.batch(); } catch (e) { console.warn('batch failed', e); } } freezeStatic(level.group); buildDrawDist(); tuneEnv(); banner(cfg.name, cfg.sub); hudUpdate(); stealth.setup(level, cfg); stormT = 4;
   if (started) sfx.music(cfg.music);
+}
+/* 👁️ مدى الرؤية (مثل ببجي): القطع الصغيرة والكتابات البعيدة ما تنرسم — تظهر لما تقرّب. الكبيرة (جدران/أرضيات) دايماً ظاهرة */
+let drawList = [], drawT = 0; const _dv = new V();
+function buildDrawDist() {
+  drawList = []; if (!level || !(cfg.ship || cfg.battle || cfg.city || cfg.batch)) return;
+  const dynUp = (o) => { for (let p = o; p && p !== level.group; p = p.parent) if (p.userData.dyn) return true; return false; };
+  level.group.updateMatrixWorld(true);
+  level.group.traverse((o) => {
+    if (!(o.isMesh || o.isSprite) || o.userData.batched || !o.visible || (o.material && o.material.visible === false) || o.isInstancedMesh || dynUp(o)) return;
+    let r = 0.5; if (o.geometry) { if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); const s = new V(); o.getWorldScale(s); r = o.geometry.boundingSphere.radius * Math.max(s.x, s.y, s.z); }
+    if (!o.isSprite && r > 2.5) return; // كبيرة = تبقى
+    if (r < 0.3) o.castShadow = false; // القطع الصغيرة بدون ظل
+    drawList.push({ o, p: o.getWorldPosition(new V()), R: o.isSprite ? 24 : r < 0.4 ? 28 : 45 });
+  });
+}
+function updateDrawDist(dt) {
+  if (!drawList.length || (drawT -= dt) > 0) return; drawT = 0.25; const c = camera.position;
+  for (const it of drawList) { const v = it.p.distanceToSquared(c) < it.R * it.R; if (it.o.visible !== v) it.o.visible = v; }
 }
 function spawnGroup(g) { if (level.spawned[g]) return; level.spawned[g] = true; for (const d of level.enemyDefs) if (d.group === g) enemies.spawn(d, true); tuneEnv(); }
 function tuneEnv() { const k = (cfg && cfg.env) ?? 0.35; scene.traverse((o) => { if (o.material && o.material.isMeshStandardMaterial) o.material.envMapIntensity = k; }); }
@@ -1161,6 +1179,7 @@ function frame(now) {
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
   scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw); if (sfx.ctx && uw !== sfx._uw) { sfx._uw = uw; sfx.amb(uw ? 'dive' : (AMB[cfg.id] || 'breeze')); }
   if (G.crowd.on) G.crowd.render(tNow, camera);
+  updateDrawDist(dt);
   renderFrame();
   if (STREAM && now - streamLast >= 1000 / streamFps - 4) { streamLast = now; streamDraw(); }
 }

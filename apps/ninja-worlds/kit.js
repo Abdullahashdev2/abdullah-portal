@@ -217,7 +217,7 @@ export function makeKit(L) {
     return g;
   };
   K.tree = ({ x, y, z, s = 1, color = 0xf9a8d4 }) => {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); L.add(g); g.userData.batchable = true; // شجرة ثابتة = تندمج
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 2.4, 7), own(new THREE.MeshStandardMaterial({ color: 0x5b3a29, roughness: 0.9 }))); trunk.position.y = 1.2; trunk.rotation.z = 0.08; trunk.castShadow = true; g.add(trunk);
     const lm = own(new THREE.MeshStandardMaterial({ color, roughness: 0.8, flatShading: true, emissive: color, emissiveIntensity: 0.12 }));
     [[0, 2.8, 0, 1.3], [0.8, 2.5, 0.3, 0.9], [-0.7, 2.6, -0.2, 1], [0.1, 3.4, -0.4, 0.8]].forEach(([a, b, c, r]) => { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), lm); m.position.set(a, b, c); m.castShadow = true; g.add(m); });
@@ -557,7 +557,7 @@ export function makeKit(L) {
   };
   K.locker = ({ x, y = 0, z, rot = 0 }) => {
     L.lockers = L.lockers || [];
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; L.add(g);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; L.add(g); g.userData.batchable = true; // جسم الخزانة ثابت = يندمج (الباب متحرك ويبقى لحاله)
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.1, 0.8), own(new THREE.MeshStandardMaterial({ color: 0x5b6b7a, roughness: 0.5, metalness: 0.6 }))); body.position.y = 1.05; body.castShadow = true; g.add(body);
     for (let i = 0; i < 4; i++) { const v = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.02), mat('dark')); v.position.set(0, 1.6 + i * 0.08, 0.41); g.add(v); }
     const lab = textSprite('خزانة', { size: 40, scale: 0.35, glow: '#94a3b8' }); lab.position.y = 2.5; g.add(lab);

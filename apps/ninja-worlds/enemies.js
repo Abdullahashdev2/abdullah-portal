@@ -76,6 +76,13 @@ export class Enemies {
     if (boss) { Object.assign(e, { boss: true, hp: 40, maxHp: 40, reach: 4.4, speed: 2.4, summonT: 8 }); }
     if (rise) { m.inner.position.y = -2.2; this.g.fx.emit(new V(def.x, def.y + 0.3, def.z), { color: 0x8b5cf6, count: 40, speed: 4, up: 1, life: 0.9, size: 0.4, grav: -1 }); }
     if (this.g.liteify) { this.g.liteify(m.g); if (m.bodyM) m.bodyM = this.g.liteMat(m.bodyM); }
+    if (m.human) { // 🧍 نسخة مبسّطة (قطعتين) للحارس البعيد بدل ~٢٦ قطعة
+      const col = (m.bodyM && m.bodyM.color) ? m.bodyM.color.getHex() : 0x4b5340, px = new THREE.Group();
+      const pb = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.95, 2, 6), new THREE.MeshLambertMaterial({ color: col })); pb.position.y = 0.95; px.add(pb);
+      const ph = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), new THREE.MeshLambertMaterial({ color: 0x1f2329 })); ph.position.y = 1.72; px.add(ph);
+      if (def.heavy) px.scale.setScalar(1.12); px.visible = false; m.g.add(px); m.proxy = px; }
+    if (m.human) { m.small = []; m.g.updateMatrixWorld(true); const keep = new Set([m.cone, m.laser, ...(m.icons ? Object.values(m.icons) : [])]);
+      m.g.traverse((o) => { if (!o.isMesh || keep.has(o) || !o.geometry) return; o.geometry.computeBoundingSphere(); const s = new THREE.Vector3(); o.getWorldScale(s); if (o.geometry.boundingSphere.radius * s.x < 0.075) m.small.push(o); }); }
     this.list.push(e); return e;
   }
   alive(group) { return this.list.filter((e) => e.alive && (!group || e.group === group)).length; }
@@ -115,8 +122,14 @@ export class Enemies {
       e.t += dt; e.cd -= dt;
       const m = e.m, dx = pl.pos.x - e.pos.x, dz = pl.pos.z - e.pos.z, d = Math.hypot(dx, dz), dy = pl.pos.y - e.pos.y;
       // الجندي البعيد ما ينرسم (يوفّر عشرات أوامر الرسم لكل جندي) — المنطق يكمّل عادي
-      if (!e.hidden) { const far = this.cullR || 1e9; e.m.g.visible = d < far || e.st === 'alert' && d < far * 1.6; }
-      if (this.cullR) { const sh = d < 22; if (e._sh !== sh) { e._sh = sh; e.m.g.traverse((o) => { if (o.isMesh && o !== e.m.cone) o.castShadow = sh; }); } } // ظل الجنود البعيدين ما يبين — نوفّره
+      if (!e.hidden) { const far = this.cullR || 1e9; let vis = d < far || e.st === 'alert' && d < far * 1.6;
+        // 🧱 إخفاء اللي ورا الأرضية: أنت فوق السطح وهو تحت (أو العكس) وبعيد عن الدرج = ما تقدر تشوفه أصلاً
+        if (vis && e.ship && this.cullR && ((pl.pos.y < -3) !== (e.pos.y < -3)) && d > 9) vis = false;
+        e.m.g.visible = vis;
+        // 🔍 تفاصيل حسب المسافة: الأحزمة والجيوب والقطع الصغيرة تختفي من بعيد (العين ما تفرّقها)
+        if (vis && e.m.small) { const lod = d > 15 && !pl.aiming; if (e._lod !== lod) { e._lod = lod; for (const o of e.m.small) o.visible = !lod; } }
+        if (vis && e.m.proxy) { const far2 = d > 22 && !pl.aiming && e.alive && !['sleep', 'dragged', 'held', 'thrown', 'drowsy'].includes(e.st); if (e._far !== far2) { e._far = far2; e.m.proxy.visible = far2; e.m.h.root.visible = !far2; } } }
+      if (this.cullR) { const sh = d < 15; if (e._sh !== sh) { e._sh = sh; e.m.g.traverse((o) => { if (o.isMesh && o !== e.m.cone) o.castShadow = sh; }); } } // ظل الجنود البعيدين ما يبين — نوفّره
       const seen = d < 15 && Math.abs(dy) < 2.6 && pl.hp > 0, toYaw = Math.atan2(dx, dz);
       // knockback + zone clamp
       e.pos.x += e.kb.x * dt; e.pos.z += e.kb.z * dt; e.kb.multiplyScalar(Math.exp(-7 * dt));
