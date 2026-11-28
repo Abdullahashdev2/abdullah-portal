@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+window.__nwErr = (m) => { try { let d = document.getElementById('nwErr'); if (!d) { d = document.createElement('div'); d.id = 'nwErr'; d.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99;background:#7f1d1d;color:#fff;font:600 13px system-ui;padding:10px;border-radius:10px;direction:ltr;white-space:pre-wrap'; document.body.appendChild(d); } d.textContent = '⚠️ ' + m + '\n(صوّر هالرسالة وأرسلها)'; } catch (e) {} };
 import { Sky } from 'sky';
 import { Particles, Sound } from './fx.js';
 import { buildHero, blendPose, BASE, Scarf, Trail, setSpy, setDisguise } from './hero.js';
@@ -334,11 +335,25 @@ function hudUpdate() {
   else $('#shards').textContent = `💎 ${SAVE.shards.length}/60`;
   $('#wname').textContent = cfg.name;
 }
+const BONUS = { w5: { id: 'w5-10', hint: '🥷 الشظية العاشرة السرّية: خلّص القلعة بدون ولا إنذار (محد يشوفك)' }, w7: { id: 'w7-10', hint: '👻 الشظية العاشرة السرّية «شبح السفينة»: خلّص السفينة بدون ولا إنذار' } };
+function openProgress() {
+  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'], per = 10; let got = 0, done = 0;
+  const rows = ids.map((id) => {
+    const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id]) done++;
+    const b = SAVE.best[id], t = b ? `⏱️ ${Math.floor(b / 60)}:${String(b % 60).padStart(2, '0')}` : '';
+    const bonus = BONUS[id] && !SAVE.shards.includes(BONUS[id].id) ? `<div class="hint">${BONUS[id].hint}</div>` : '';
+    return `<div class="prow2"><b>${SAVE.done[id] ? '✅' : '⬜'} ${WORLD_NAMES[id]}</b><span>💎 ${n}/${per} ${t}</span><div class="bar2"><i style="width:${n * 10}%"></i></div>${bonus}</div>`;
+  }).join('');
+  const pct = Math.round(((got / (ids.length * per)) * 0.7 + (done / ids.length) * 0.3) * 100);
+  $('#progTotal').innerHTML = `<div><b>${pct}%</b><span>الإنجاز الكلّي</span></div><div><b>💎 ${got}/${ids.length * per}</b><span>الشظايا</span></div><div><b>🏁 ${done}/${ids.length}</b><span>عوالم مختومة</span></div><div><b>🪙 ${SAVE.coins || 0}</b><span>كوينز</span></div>`;
+  $('#progList').innerHTML = rows; $('#prog').classList.add('on');
+}
 function showDone() {
   const n = SAVE.shards.filter((s) => s.startsWith(cfg.id + '-')).length, sec = Math.round((performance.now() - startTime) / 1000);
   $('#doneTitle').textContent = `🏆 خلّصت «${cfg.name}»`;
   $('#doneStats').innerHTML = `<div><b>💎 ${n}/${cfg.shardTotal}</b><span>شظايا</span></div><div><b>⏱️ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}</b><span>الوقت</span></div><div><b>🪂 ${worldFalls}</b><span>سقطات</span></div>`;
   $('#doneMsg').textContent = cfg.id === 'w6' ? '🏆 خلّصت العوالم الستة كلها — أنت بطل بوابات العوالم! ارجع جمّع اللي فاتك 💎' : n < cfg.shardTotal ? 'باقي شظايا مخبّية — تقدر ترجع لهالعالم وتدوّرها 👀' : 'جمعت كل الشظايا! أسطورة 🌟';
+  if (BONUS[cfg.id] && !SAVE.shards.includes(BONUS[cfg.id].id)) $('#doneMsg').textContent = BONUS[cfg.id].hint + ' — ارجع وجرّب 💪';
   $('#done').classList.add('on'); paused = true;
 }
 $('#doneBtn').onclick = () => { $('#done').classList.remove('on'); paused = false; goWorld('hub', cfg.id); };
@@ -416,7 +431,7 @@ function togglePause(v) { if (!started || $('#done').classList.contains('on')) r
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
 let navIdx = 0, navCool = 0;
 function activeMenu() {
-  for (const s of ['#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
+  for (const s of ['#prog', '#radio', '#tv', '#done', '#pause']) { const e = $(s); if (e && e.classList.contains('on')) return e; }
   const t = document.getElementById('title'); if (t && !t.classList.contains('off')) return t;
   return null;
 }
@@ -428,7 +443,7 @@ function menuNav(dir) {
   bs[navIdx].classList.add('navfocus'); try { bs[navIdx].scrollIntoView({ block: 'nearest' }); } catch (e) {}
 }
 function menuSelect() { const m = activeMenu(); if (!m) return; const bs = menuButtons(m); const b = bs[Math.min(navIdx, bs.length - 1)]; if (b) { b.click(); setTimeout(() => { if (activeMenu()) menuNav(0); }, 60); } }
-function menuBack() { if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
+function menuBack() { if ($('#prog').classList.contains('on')) $('#prog').classList.remove('on'); else if ($('#radio').classList.contains('on')) stealth.closeRadio(); else if ($('#tv').classList.contains('on')) closeTV(); else if (paused && $('#pause').classList.contains('on')) togglePause(false); }
 let gpPrev = {};
 function menuPoll(dt) {
   navCool = Math.max(0, navCool - dt);
@@ -450,6 +465,7 @@ $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); goWorld('hub', null); };
 $('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
+$('#pProg').onclick = () => openProgress(); $('#progClose').onclick = () => $('#prog').classList.remove('on');
 $('#pHelp').onclick = () => $('#help').classList.toggle('on');
 /* ---------- big-screen mode: this device renders, a phone is the controller ---------- */
 const tvHooks = {
@@ -528,8 +544,10 @@ function touchLabels() {
   setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : lab('sword', 'ضرب'));
   setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
   setBtn('actBtn', aim ? lab(stealth.weapon === 'pistol' ? 'sniper' : 'pistol', stealth.weapon === 'pistol' ? 'قنّاصة' : 'مسدس') : hold ? lab('wave', 'ارمِ') : player.state === 'hug' ? lab('knock', 'طق') : hang ? lab('none', '—') : lab('hand', 'شيل'));
-  setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
-  setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
+  const swim = player.state === 'swim';
+  if (swim) { setBtn('jumpBtn', lab('swimup', 'اطلع لفوق')); setBtn('rollBtn', lab('dive', 'غوص')); setBtn('atkBtn', lab('sword', 'ضرب')); setBtn('actBtn', lab('hand', 'شيل')); }
+  else setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
+  if (!swim) setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
 function canGrab() {
@@ -608,6 +626,7 @@ function respawn(why) {
   const f = $('#fade'); f.classList.add('on');
   setTimeout(() => {
     player.spawn(checkpoint.pos.clone().add(new V(0, 0.05, 0)), checkpoint.yaw); player.inv = 1; breath = BREATH;
+    for (const e of enemies.list) if (e.boss && e.alive && e.hp < e.maxHp) { e.hp = e.maxHp; e.pos.set(e.def.x, e.def.y, e.def.z); e.st = 'idle'; setTimeout(() => say('🌋 العملاق رجع لقوته كاملة! هالمرة لا تطيح 😤'), 600); }
     if (why === 'death') { player.hp = player.maxHp; const lost = Math.floor((SAVE.coins || 0) * 0.2); if (lost) addCoins(-lost); say(lost ? `💀 طحت! خسرت ${lost} 🪙 ورجعت لآخر نقطة — ركّز أكثر.` : '💀 طحت! رجعت لآخر نقطة.'); }
     else if (why === 'fall' && worldFalls % 4 === 3) say('السقوط جزء من التدريب 🥷 — خذ نفس وجرّب مرة ثانية.');
     cam.yaw = checkpoint.yaw; scarf.init = false; hudUpdate();

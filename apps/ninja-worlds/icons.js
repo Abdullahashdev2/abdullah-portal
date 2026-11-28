@@ -25,6 +25,8 @@ const P = {
   radio: '<rect x="18" y="22" width="28" height="34" rx="4"/><path d="M38 22V8"/><path d="M24 30h16M24 36h16" opacity=".6"/><circle cx="32" cy="46" r="4"/>',
   zin: '<circle cx="28" cy="28" r="14"/><path d="M38 38l14 14"/><path d="M28 21v14M21 28h14"/>',
   zout: '<circle cx="28" cy="28" r="14"/><path d="M38 38l14 14"/><path d="M21 28h14"/>',
+  dive: '<path d="M32 12v34"/><path d="M20 36l12 12 12-12"/><path d="M8 18c4-3 8-3 12 0s8 3 12 0 8-3 12 0 8 3 12 0" opacity=".6"/>',
+  swimup: '<path d="M32 52V20"/><path d="M20 30l12-12 12 12"/><path d="M8 12c4-3 8-3 12 0s8 3 12 0 8-3 12 0 8 3 12 0" opacity=".6"/>',
   dash: '<path d="M8 32h20M14 24h14M14 40h14" opacity=".55"/><path d="M34 18l16 14-16 14"/>',
   none: '<circle cx="32" cy="32" r="3" fill="currentColor" opacity=".4"/>',
 };
