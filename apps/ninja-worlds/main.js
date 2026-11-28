@@ -8,6 +8,7 @@ import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
 import { WORLDS } from './worlds.js';
 import { Stealth } from './stealth.js';
+import { Cars } from './cars.js';
 import { icon } from './icons.js';
 import { remote, openTV, closeTV, sendTV, attachPortal } from './tv.js';
 import { Skin, saveSkinFile, loadSkinFile, clearSkinFile } from './skin.js';
@@ -159,7 +160,7 @@ const sfx = new Sound();
 addEventListener('resize', resize); resize();
 
 /* ---------------- game object shared with modules ---------------- */
-let skin = null; let level = null, player, enemies, hero, scarf, trail, npc = null, worldId = 'hub';
+let skin = null; let cars = null; let level = null, player, enemies, hero, scarf, trail, npc = null, worldId = 'hub';
 let shakeAmt = 0, stopT = 0, fading = false, startTime = 0, worldFalls = 0;
 const G = {
   scene, sfx,
@@ -236,7 +237,7 @@ function buy(key) {
   persist(); hudUpdate(); renderShop(); sfx.win(); say('🎁 اشتريت: ' + it.name);
 }
 hero = buildHero('ninja'); scene.add(hero.root);
-player = new Player(G, hero); enemies = new Enemies(G);
+player = new Player(G, hero); enemies = new Enemies(G); cars = new Cars(G);
 skin = null; scarf = new Scarf(scene, 0xdc2626); trail = new Trail(scene, 0x9be7ff);
 
 /* ---------------- worlds ---------------- */
@@ -251,13 +252,14 @@ function applyAtmo(c) {
 }
 let checkpoint = null, cfg = null, radioPaused = false;
 function loadWorld(id, from) {
-  if (level) level.dispose(); enemies.clear(); sparks.clear(); dust.clear(); motes.clear();
+  if (level) level.dispose(); enemies.clear(); if (cars) cars.clear(); if (player) player.driving = null; sparks.clear(); dust.clear(); motes.clear();
   if (npc) { npc.root.removeFromParent(); npc = null; }
   level = new Level(scene); worldId = id; SAVE._from = from; $('#timer').classList.remove('on');
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
   // السفينة أثقل عالم: على الجوال نبدأ فيها بجودة «متوسطة» (بدون bloom وMSAA) والتلقائي يرفعها لو الجوال قدر
-  setSpy(hero, !!cfg.ship); player.spy = !!cfg.ship; // في السفينة: بدلة تجسس وقتال بالأيدي
+  setSpy(hero, !!(cfg.ship || cfg.city), cfg.city ? 'street' : 'spy'); player.spy = !!cfg.ship; hero.sword.visible = !(cfg.ship || cfg.city);
+  for (const d of level.carDefs || []) cars.spawn(d); // في السفينة: بدلة تجسس وقتال بالأيدي
   if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
   level.emit = (p, o) => sparks.emit(p, o); level.alarms = 0;
   level.onCrumble = (b) => { sfx.crumble(); dust.emit(b.center.clone(), { color: 0xc4b5fd, count: 20, speed: 3, life: 0.8, size: 0.5, grav: 3, spread: 1.5 }); };
@@ -337,12 +339,12 @@ function hudUpdate() {
 }
 const BONUS = { w5: { id: 'w5-10', hint: '🥷 الشظية العاشرة السرّية: خلّص القلعة بدون ولا إنذار (محد يشوفك)' }, w7: { id: 'w7-10', hint: '👻 الشظية العاشرة السرّية «شبح السفينة»: خلّص السفينة بدون ولا إنذار' } };
 function openProgress() {
-  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7'], per = 10; let got = 0, done = 0;
+  const ids = ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w8'], per = 10; let got = 0, done = 0;
   const rows = ids.map((id) => {
-    const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id]) done++;
+    const n = SAVE.shards.filter((s) => s.startsWith(id + '-')).length; got += n; if (SAVE.done[id] || n >= per) done++;
     const b = SAVE.best[id], t = b ? `⏱️ ${Math.floor(b / 60)}:${String(b % 60).padStart(2, '0')}` : '';
     const bonus = BONUS[id] && !SAVE.shards.includes(BONUS[id].id) ? `<div class="hint">${BONUS[id].hint}</div>` : '';
-    return `<div class="prow2"><b>${SAVE.done[id] ? '✅' : '⬜'} ${WORLD_NAMES[id]}</b><span>💎 ${n}/${per} ${t}</span><div class="bar2"><i style="width:${n * 10}%"></i></div>${bonus}</div>`;
+    return `<div class="prow2"><b>${SAVE.done[id] || n >= per ? '✅' : '⬜'} ${WORLD_NAMES[id]}</b><span>💎 ${n}/${per} ${t}</span><div class="bar2"><i style="width:${n * 10}%"></i></div>${bonus}</div>`;
   }).join('');
   const pct = Math.round(((got / (ids.length * per)) * 0.7 + (done / ids.length) * 0.3) * 100);
   $('#progTotal').innerHTML = `<div><b>${pct}%</b><span>الإنجاز الكلّي</span></div><div><b>💎 ${got}/${ids.length * per}</b><span>الشظايا</span></div><div><b>🏁 ${done}/${ids.length}</b><span>عوالم مختومة</span></div><div><b>🪙 ${SAVE.coins || 0}</b><span>كوينز</span></div>`;
@@ -366,9 +368,10 @@ const WMETA = {
   w4: { sub: 'العالم الرابع', tease: 'تحت الماء… نفسك محدود، والأعماق ما ترحم', sky: ['#082f49', '#0e7490', '#67e8f9'] },
   w5: { sub: 'العالم الخامس', tease: 'قلعة الظلال… الحراس ما ينامون، والقمر يفضحك', sky: ['#020617', '#1e3a8a', '#a5b4fc'] },
   w6: { sub: 'العالم الأخير', tease: 'قلب البركان… العملاق صاحي', sky: ['#1c0a04', '#9a3412', '#fb923c'] },
+  w8: { sub: 'عالم السيارات', tease: 'مدينة ما تنام… اسرق سيارة، طِر من المنحدرات، وسوق لأي عالم تبيه', sky: ['#0f0524', '#4c1d95', '#f472b6'] },
   w7: { sub: 'عالم التسلّل', tease: 'ليلة عاصفة… سفينة مليانة حراس، وبوصلة الظل مخبّاة فوق الجسر', sky: ['#020617', '#1e293b', '#64748b'] },
 };
-const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة' };
+const WORLD_NAMES = { hub: '🌀 ساحة البوابات', w1: '📚 أطلال المكتبة البلورية', w2: '☁️ الجزر السماوية', w3: '🏜️ حصن الرمال الذهبية', w4: '🌊 الأعماق الزرقاء', w5: '🌙 قلعة الظلال الليلية', w6: '🌋 قلب البركان', w7: '🚢 سفينة العاصفة', w8: '🌃 مدينة النيون' };
 const TIPS = ['💡 الجدار المضيء بالرونات تقدر تركض عليه.', '💡 اضغط قفز قدّام الجدار = تطلع عليه.', '💡 في السفينة: ادفع للجدار = تلتصق فيه وتطل من الزاوية.', '💡 السفينة: اقفز جنب الحاجز = تتعلّق برّا والحراس ما يشوفونك.', '💡 امسك الحارس من الخلف ⚔️ وارمه في البحر عند الحافة 🌊.', '💡 القنّاصة: احبس نفسك 🫁 عشان يثبت المنظار.', '💡 الموجة الكبيرة = الحراس يتمسكون وما يشوفون — استغلها!', '💡 اخنق حارس = تاخذ الراديو، وتقلّد صوت القائد 📻.', '💡 الكوينز تشتري فيها ترقيات من 🛒 المتجر.', '💡 لا تطوّل وأنت ماسك الحارس — بيفلت ويعلن الإنذار!'];
 function drawLoaderArt(id) {
   const cv = $('#ldArt'), dpr = Math.min(2, devicePixelRatio || 1), W = cv.width = Math.round(innerWidth * dpr), H = cv.height = Math.round(innerHeight * dpr), g = cv.getContext('2d');
@@ -541,9 +544,12 @@ const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
 function touchLabels() {
   const bc = document.body.classList; bc.toggle('m-aim', !!stealth.aiming); bc.toggle('m-hold', !!stealth.holding); bc.toggle('m-hang', player.state === 'hang' && !!player.edgeHang); bc.toggle('m-hug', player.state === 'hug'); bc.toggle('m-radio', !!stealth.radioOpen);
   const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();
-  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : lab('sword', 'ضرب'));
+  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : cfg && cfg.city ? lab('fist', 'ضرب') : lab('sword', 'ضرب'));
   setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
   setBtn('actBtn', aim ? lab(stealth.weapon === 'pistol' ? 'sniper' : 'pistol', stealth.weapon === 'pistol' ? 'قنّاصة' : 'مسدس') : hold ? lab('wave', 'ارمِ') : player.state === 'hug' ? lab('knock', 'طق') : hang ? lab('none', '—') : lab('hand', 'شيل'));
+  document.body.classList.toggle('m-drive', !!player.driving);
+  if (player.driving) { setBtn('jumpBtn', lab('brake', 'فرامل يد')); setBtn('rollBtn', lab('dash', 'نيترو')); setBtn('atkBtn', lab('horn', 'بوري')); setBtn('actBtn', lab('back', 'انزل')); return; }
+  if (cfg && cfg.city && cars.nearest(player.pos, 3.3)) setBtn('actBtn', lab('car', 'اركب'));
   const swim = player.state === 'swim';
   if (swim) { setBtn('jumpBtn', lab('swimup', 'اطلع لفوق')); setBtn('rollBtn', lab('dive', 'غوص')); setBtn('atkBtn', lab('sword', 'ضرب')); setBtn('actBtn', lab('hand', 'شيل')); }
   else setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
@@ -590,6 +596,10 @@ function makeSenseMark() {
   s.scale.set(1.6, 2.6, 1); s.renderOrder = 999; s.userData.k = 0; s.visible = false; return s;
 }
 function interact() {
+  if (cfg && cfg.city) {
+    if (player.driving) { cars.exit(player); sfx.tone(140, 90, 0.2, 'triangle', 0.08); return; }
+    const c = cars.nearest(player.pos, 3.3); if (c && !player.carry) { cars.enter(c, player); if (!level._driveTip) { level._driveTip = true; say('🚗 العصا: فوق = بنزين، تحت = فرامل/رجوع، يمين/يسار = دركسون • 🅿️ = فرامل يد (تفحيط) • 💨 = نيترو • 📯 = بوري • ✋ = انزل'); } return; }
+  }
   for (const P of level.panels || []) if (!P.done && Math.hypot(P.front.x - player.pos.x, P.front.z - player.pos.z) < 1.5 && Math.abs(P.pos.y - player.pos.y) < 1.2) {
     P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.tone(600, 200, 0.4, 'sawtooth', 0.1); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
     const all = level.panels.filter((x) => x.group === P.group), left = all.filter((x) => !x.done).length;
@@ -738,7 +748,7 @@ function readInput() {
   const f = new V(Math.sin(cam.yaw), 0, Math.cos(cam.yaw)), r = new V(-Math.cos(cam.yaw), 0, Math.sin(cam.yaw));
   const mv = f.multiplyScalar(iy).add(r.multiplyScalar(ix));
   const inp = {
-    mx: mv.x, mz: mv.z,
+    mx: mv.x, mz: mv.z, ix, iy,
     jumpP: edge('jump', !!keys.Space) || edge('gj', gj) || vin.jump > 0,
     atkP: edge('atk', !!(keys.KeyJ || keys.KeyX)) || edge('ga', ga) || vin.atk > 0,
     rollP: edge('roll', !!(keys.KeyK || keys.ShiftLeft || keys.ShiftRight || keys.KeyC)) || edge('gr', gr) || vin.roll > 0,
@@ -787,15 +797,15 @@ function updateCamera(dt) {
   if (cam.dx || cam.dy) { cam.yaw -= cam.dx * 0.0055; cam.pitch = Math.max(-0.35, Math.min(1.15, cam.pitch + cam.dy * 0.004)); cam.lastManual = tNow; cam.dx = cam.dy = 0; }
   const hs = Math.hypot(player.vel.x, player.vel.z);
   if ((player.state === 'hang' || player.state === 'wallup' || player.state === 'climb') && tNow - cam.lastManual > 0.6) cam.yaw += angDiff(cam.yaw, player.yaw) * Math.min(1, dt * 2.5);
-  else if (tNow - cam.lastManual > 1.3 && hs > 1.5) {
-    const d = angDiff(cam.yaw, player.yaw), k = player.state === 'wallrun' ? 3 : 1.4;
+  else if (tNow - cam.lastManual > (player.driving ? 0.7 : 1.3) && hs > 1.5) {
+    const d = angDiff(cam.yaw, player.yaw), k = player.state === 'wallrun' ? 3 : player.driving ? 3.5 : 1.4;
     if (Math.abs(d) < 2.3) cam.yaw += d * Math.min(1, dt * k * Math.min(1, hs / 5));
   }
   // indoors: drop to shoulder height under low ceilings so the view is not just the floor
   ray.set(cam.target, new V(0, 1, 0)); ray.far = 3.2; const roof = ray.intersectObjects(level.camMeshes, false).length > 0;
   const restP = roof ? 0.1 : 0.32; cam.roof = roof;
   if (tNow - cam.lastManual > 2 || roof) cam.pitch += (restP - cam.pitch) * Math.min(1, dt * (roof ? 2.5 : 0.8));
-  cam.want = innerWidth < innerHeight ? 7.6 : 6.4; if (cam.hugK) cam.want += (((player.hug && player.hug.peek > 0.3) ? 2.6 : 4.2) - cam.want) * cam.hugK;
+  cam.want = player.driving ? (innerWidth < innerHeight ? 11 : 9.5) : innerWidth < innerHeight ? 7.6 : 6.4; if (cam.hugK) cam.want += (((player.hug && player.hug.peek > 0.3) ? 2.6 : 4.2) - cam.want) * cam.hugK;
   const dir = new V(-Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), -Math.cos(cam.yaw) * Math.cos(cam.pitch));
   ray.set(cam.target, dir); ray.far = cam.want + 0.4;
   const hits = ray.intersectObjects(level.camMeshes, false);
@@ -876,7 +886,7 @@ function worldLogic(dt) {
     sparks.emit(c.pos.clone().add(new V(0, 1.85, 0)), { color: 0x7dd3fc, count: 30, speed: 4, life: 0.8 });
   }
   // shards
-  for (const s of level.shards) if (!s.taken && Math.hypot(s.g.position.x - p.x, s.g.position.z - p.z) < 1.1 && Math.abs(s.g.position.y - (p.y + 0.9)) < 1.3) {
+  for (const s of level.shards) if (!s.taken && Math.hypot(s.g.position.x - p.x, s.g.position.z - p.z) < (player.driving ? 2.6 : 1.1) && Math.abs(s.g.position.y - (p.y + 0.9)) < (player.driving ? 2.4 : 1.3)) {
     s.taken = true; s.g.removeFromParent(); const before = SAVE.shards.length; if (!SAVE.shards.includes(s.id)) SAVE.shards.push(s.id); persist(); sfx.shard(); sendTV({ vib: [20, 30, 20] }); unlockCheck(before);
     sparks.emit(s.g.position, { color: 0xffd166, count: 36, speed: 5, life: 0.7, size: 0.3 }); hudUpdate();
     const n = SAVE.shards.filter((x) => x.startsWith(cfg.id + '-')).length; if (n === cfg.shardTotal) say('جمعت كل شظايا هالعالم! 💎🌟');
@@ -927,7 +937,7 @@ function worldLogic(dt) {
   // portals
   for (const P of level.portals) {
     const d = Math.hypot(P.pos.x - p.x, P.pos.z - p.z);
-    if (P.active && d < 1.1 && p.y - P.pos.y > -0.5 && p.y - P.pos.y < 2.5 && !fading) { enterPortal(P); break; }
+    if (P.active && d < (player.driving ? 3.4 : 1.1) && p.y - P.pos.y > -0.5 && p.y - P.pos.y < 2.5 && !fading) { enterPortal(P); break; }
     if (!P.active && P.locked && d < 2.6) { if (!P.warned) { P.warned = true; say(P.locked); } } else if (d > 5) P.warned = false;
   }
   // items following moving platforms / carried
@@ -939,8 +949,15 @@ function worldLogic(dt) {
   let label = '';
   { const spb = $('#spBtn'), want = !!(stealth.gadgetLabel() || G.upg.spin); if (spb && spb.dataset.v !== String(want)) { spb.dataset.v = String(want); spb.style.display = want ? '' : 'none'; } }
   touchLabels();
+  if (cfg.city && !stealth.on) {
+    let cl = '';
+    if (player.driving) { const c = player.driving; cl = `🚗 ${Math.round(Math.abs(c.speed) * 3.6)} كم/س  •  💨 ${'▮'.repeat(Math.round(c.nitro * 5))}${'▯'.repeat(5 - Math.round(c.nitro * 5))}`; }
+    else { const c = cars.nearest(player.pos, 3.3); if (c) cl = c.driver ? 'اسحب السائق واركب 🚗 ✋' : 'اركب السيارة 🚗 ✋'; }
+    if (cl) label = cl;
+  }
   const edgeN = stealth.on && stealth.seaEdge();
-  if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
+  if (label) {}
+  else if (stealth.holding) label = edgeN ? 'ارمه في البحر 🌊' : 'اخنقه ⚔️ • ارمه عند الحافة ✋';
   else if (stealth.dragging && edgeN) label = 'ارمه في البحر 🌊';
   else if (stealth.on && !stealth.dragging && canGrab()) label = 'امسكه من الخلف ⚔️';
   else if (stealth.on && !stealth.aiming && player.hullEdge && player.hullEdge()) label = 'اقفز 🦘 = تعلّق برّا السفينة وتختفي 🧗';
@@ -949,7 +966,7 @@ function worldLogic(dt) {
   else if (player.carry) label = nearPed() ? 'ضع ✨' : 'نزّل';
   else if (nearItem() && player.onGround) label = 'شيل';
   else if (nearNpc()) label = 'كلّمه';
-  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (/⚔️|🌊|🧗/.test(label) ? '' : TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
+  if (label !== promptKind) { promptKind = label; $('#prompt').textContent = label ? (/⚔️|🌊|🧗|🚗/.test(label) ? '' : TOUCH ? '✋ ' : '[E] ') + label : ''; $('#prompt').classList.toggle('on', !!label); $('#actBtn').classList.toggle('hot', !!label); }
   // ambience
   if (Math.random() < dt * 18) { const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 14; motes.emit(new V(p.x + Math.cos(a) * r, p.y + Math.random() * 6, p.z + Math.sin(a) * r), { color: cfg.motes, count: 1, speed: 0.3, life: 4, size: 0.12, grav: -0.06, drag: 0.2 }); }
   if (level.petalTrees && Math.random() < dt * 4) { const t = level.petalTrees[Math.floor(Math.random() * level.petalTrees.length)]; dust.emit(t.pos.clone().add(new V((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2)), { color: t.color, count: 1, speed: 0.6, life: 4.5, size: 0.14, grav: 0.35, drag: 0.6 }); }
@@ -988,7 +1005,11 @@ function simulate(dt) {
   if (inp.actP) interact();
   acc += dt; let n = 0;
   while (acc >= STEP && n < 14) {
-    level.update(STEP, player); player.update(STEP, inp); enemies.update(STEP, player);
+    level.update(STEP, player);
+    if (player.driving) { const c = player.driving; if (inp.atkP) { sfx.tone(392, 392, 0.3, 'square', 0.07); sfx.tone(494, 494, 0.3, 'square', 0.06); enemies.noise && enemies.noise(c.pos, 14); } player.pos.copy(c.pos); player.vel.set(Math.sin(c.yaw) * c.speed, 0, Math.cos(c.yaw) * c.speed); player.yaw = c.speed < -0.5 ? player.yaw : c.yaw; player.state = 'drive'; player.onGround = true; }
+    else player.update(STEP, inp);
+    if (cars.list.length) cars.update(STEP, player, inp);
+    enemies.update(STEP, player);
     inp.jumpP = inp.atkP = inp.rollP = inp.actP = inp.spP = false; acc -= STEP; n++;
   }
   if (n === 14) acc = 0;
@@ -1009,6 +1030,7 @@ function frame(now) {
   menuPoll(dt); player.animate(dt); animateNpc(dt);
   if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active) && !hero.spy;
   if (stealth.aiming || player.inLocker) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
+  if (player.driving) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
   hero.root.updateMatrixWorld(true);
   const r = new V(-Math.cos(player.yaw), 0, Math.sin(player.yaw));
   scarf.update(Math.min(dt, 1 / 30), hero.scarfAnchor.getWorldPosition(tmpA), r, player.vel, tNow);

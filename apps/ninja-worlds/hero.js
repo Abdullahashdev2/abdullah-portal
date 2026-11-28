@@ -184,7 +184,7 @@ export class Trail {
 }
 
 /* ---------- بدلة التجسس (عالم السفينة): بدون سيف ولا وشاح — بدلة رمادية ضيّقة، سماعة، قفازات، حزام تكتيكي ومسدس على الفخذ ---------- */
-export function setSpy(h, on) {
+export function setSpy(h, on, mode = 'spy') {
   if (!h.mats) return;
   if (!h.spyGear) {
     h.spyOrig = {}; for (const k in h.mats) h.spyOrig[k] = { c: h.mats[k].color.getHex(), e: h.mats[k].emissive.getHex(), ei: h.mats[k].emissiveIntensity, r: h.mats[k].roughness, m: h.mats[k].metalness };
@@ -212,13 +212,16 @@ export function setSpy(h, on) {
     h.spyGear = parts;
   }
   const S = h.mats, O = h.spyOrig;
-  if (on) {
+  if (on && mode === 'street') { // سائق المدينة: جاكيت جلد + خطوط نيون
+    S.suit.color.setHex(0x2a1f1a); S.suit.roughness = 0.45; S.suit.metalness = 0.25; S.suit2.color.setHex(0x111827);
+    S.trim.color.setHex(0xf472b6); S.trim.emissive.setHex(0xdb2777); S.trim.emissiveIntensity = 0.6; S.red.color.setHex(0xf1f5f9);
+  } else if (on) {
     S.suit.color.setHex(0x3a4250); S.suit.roughness = 0.55; S.suit.metalness = 0.15;
     S.suit2.color.setHex(0x22272f); S.suit2.roughness = 0.6;
     S.trim.color.setHex(0x4b5563); S.trim.emissive.setHex(0x0f766e); S.trim.emissiveIntensity = 0.35; S.trim.metalness = 0.4;
     S.red.color.setHex(0x1f2329); S.red.roughness = 0.8;
   } else for (const k in S) { const o = O[k]; S[k].color.setHex(o.c); S[k].emissive.setHex(o.e); S[k].emissiveIntensity = o.ei; S[k].roughness = o.r; S[k].metalness = o.m; }
-  h.spyGear.forEach((m) => (m.visible = on));
+  h.spyGear.forEach((m) => (m.visible = on && mode === 'spy'));
   h.sword.visible = !on; if (h.sheath) h.sheath.visible = !on; if (h.collar) h.collar.visible = !on;
   h.spy = on;
 }

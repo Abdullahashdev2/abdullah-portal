@@ -9,7 +9,7 @@ export function hub(K, L, S) {
   const cfg = {
     id: 'hub', name: 'ساحة البوابات', sub: 'مركز العوالم', music: 'hub', killY: -25, motes: 0xfff3c4,
     sky: { elev: 26, azim: 160, turb: 5, ray: 1.4, mie: 0.004, mieG: 0.8 }, exposure: 0.5, env: 0.3, fog: [0xb4cbe6, 0.0035], sun: [0xfff1d6, 2.8], hemi: [0xcfe8ff, 0x6b5a4a, 0.9],
-    spawn: from === 'w7' ? { pos: new V(-8, 0, -16), yaw: -Math.PI / 2 } : (from === 'w4' || from === 'w5' || from === 'w6') ? { pos: new V({ w4: -7, w5: 0, w6: 7 }[from], 0, -19), yaw: 0 } : from === 'w3' ? { pos: new V(6.5, 0.3, 0), yaw: -Math.PI / 2 } : from === 'w1' ? { pos: new V(0, 0.3, 6.5), yaw: Math.PI } : from === 'w2' ? { pos: new V(-6.5, 0.3, 0), yaw: Math.PI / 2 } : { pos: new V(0, 0, -7), yaw: 0 },
+    spawn: from === 'w7' ? { pos: new V(-8, 0, -16), yaw: -Math.PI / 2 } : from === 'w8' ? { pos: new V(8, 0, -16), yaw: Math.PI / 2 } : (from === 'w4' || from === 'w5' || from === 'w6') ? { pos: new V({ w4: -7, w5: 0, w6: 7 }[from], 0, -19), yaw: 0 } : from === 'w3' ? { pos: new V(6.5, 0.3, 0), yaw: -Math.PI / 2 } : from === 'w1' ? { pos: new V(0, 0.3, 6.5), yaw: Math.PI } : from === 'w2' ? { pos: new V(-6.5, 0.3, 0), yaw: Math.PI / 2 } : { pos: new V(0, 0, -7), yaw: 0 },
   };
   K.plat({ x: 0, y: 0, z: 0, w: 24, d: 24, h: 1.5, m: 'marble', tile: 3, rockDepth: 18 });
   K.plat({ x: 0, y: 0.3, z: 9.5, w: 6, d: 4, h: 0.3, m: 'gold', rock: false });
@@ -27,6 +27,9 @@ export function hub(K, L, S) {
     K.portal({ x, y: 0.3, z: -22.6, rot: Math.PI, to: id, label: open ? (S.done[id] ? '✓ ' : '') + nm : '🔒 ' + nm, color: col, active: open, locked: !open && 'هالبوابة تنفتح بعد ما تخلّص العالم اللي قبله 🔒' });
   });
   const w7open = !!S.done.w1;
+  const w8open = !!S.done.w1;
+  K.plat({ x: 10.4, y: 0.3, z: -16, w: 3, d: 4, h: 0.3, m: 'gold', rock: false });
+  K.portal({ x: 10.9, y: 0.3, z: -16, rot: -Math.PI / 2, to: 'w8', label: w8open ? (S.done.w8 ? '✓ ' : '') + 'مدينة النيون 🚗' : '🔒 مدينة النيون', color: 0xf472b6, active: w8open, locked: !w8open && 'خلّص «أطلال المكتبة» أول عشان تنفتح بوابة المدينة 🔒' });
   K.plat({ x: -10.4, y: 0.3, z: -16, w: 3, d: 4, h: 0.3, m: 'gold', rock: false });
   K.portal({ x: -10.9, y: 0.3, z: -16, rot: Math.PI / 2, to: 'w7', label: w7open ? (S.done.w7 ? '✓ ' : '') + 'سفينة العاصفة 🌧️' : '🔒 سفينة العاصفة', color: 0x38bdf8, active: w7open, locked: !w7open && 'خلّص «أطلال المكتبة» أول عشان تنفتح بوابة السفينة 🔒' });
   K.banner({ x: -11, y: 4, z: -23.4, color: 0x0e7490 }); K.banner({ x: 11, y: 4, z: -23.4, color: 0x9a3412 });
@@ -571,4 +574,91 @@ export function w7(K, L, S) {
   return cfg;
 }
 
-export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7 };
+
+
+/* ===================== W8: مدينة النيون — سرقة سيارات + سواقة + بوابات لكل العوالم ===================== */
+function windowTex(seed, tint) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#0b0f1c'; g.fillRect(0, 0, 128, 128); let s = seed * 9301 + 49297; const R = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  for (let y = 6; y < 128; y += 16) for (let x = 5; x < 128; x += 15) { const on = R() < 0.42; g.fillStyle = on ? (R() < 0.75 ? tint : '#e0f2fe') : '#141a2e'; g.fillRect(x, y, 9, 10); if (on) { g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x, y, 9, 2); } }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+export function w8(K, L, S) {
+  const cfg = {
+    id: 'w8', name: 'مدينة النيون', sub: 'عالم السيارات', music: 'w5', killY: -10, motes: 0xf0abfc, shardTotal: 10, city: true, batch: true,
+    sky: { elev: -2, azim: 200, turb: 3, ray: 0.5, mie: 0.004, mieG: 0.8 }, exposure: 0.78, env: 0.45, fog: [0x1a1033, 0.0055], sun: [0xc4b5fd, 1.2], hemi: [0x7c6fd0, 0x120a24, 1.0],
+    spawn: { pos: new V(0, 0, -6), yaw: Math.PI },
+  };
+  const sh = (n, x, y, z) => K.shard('w8-' + n, x, y, z, S.shards.includes('w8-' + n));
+  // الأرض + الشوارع
+  K.plat({ x: 0, y: 0, z: 0, w: 300, d: 300, h: 1, m: 'dark', rock: false, tile: 6, ledge: false });
+  const asphalt = new THREE.MeshStandardMaterial({ color: 0x1b1f2a, roughness: 0.55, metalness: 0.2 }), walk = new THREE.MeshStandardMaterial({ color: 0x3a3f52, roughness: 0.9 });
+  const lineM = new THREE.MeshBasicMaterial({ color: 0xfacc15 }), white = new THREE.MeshBasicMaterial({ color: 0xe5e7eb });
+  const flat = (x, z, w, d, m, y = 0.012) => { const me = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), m); me.position.set(x, y, z); me.receiveShadow = true; L.add(me); return me; };
+  const ROADS = [-120, -72, -24, 24, 72, 120], RW = 14;
+  for (const r of ROADS) { flat(r, 0, RW, 254, asphalt); flat(0, r, 254, RW, asphalt, 0.014); }
+  for (const r of ROADS) for (let t = -122; t < 122; t += 8) { flat(r, t, 0.25, 3.2, lineM, 0.03); flat(t, r, 3.2, 0.25, lineM, 0.032); }
+  for (const r of ROADS) for (const s of [-1, 1]) { flat(r + s * 6.6, 0, 0.18, 254, white, 0.03); flat(0, r + s * 6.6, 254, 0.18, white, 0.032); }
+  // المباني (شبابيك مضيئة) + أشرطة نيون
+  const TEX = [windowTex(3, '#fde68a'), windowTex(7, '#a5f3fc'), windowTex(11, '#f9a8d4')];
+  const BM = TEX.map((t) => { const m = new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0xffffff, emissiveIntensity: 0.85, roughness: 0.7, metalness: 0.2 }); m.userData.own = true; return m; });
+  const NEON = [0xf472b6, 0x22d3ee, 0xa78bfa, 0xfacc15, 0x4ade80];
+  const neonM = NEON.map((c) => new THREE.MeshBasicMaterial({ color: c }));
+  let seed = 5; const R = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  const lowRoofs = [];
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    const x0 = ROADS[i] + RW / 2, x1 = ROADS[i + 1] - RW / 2, z0 = ROADS[j] + RW / 2, z1 = ROADS[j + 1] - RW / 2, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    flat(cx, cz, x1 - x0, z1 - z0, walk, 0.02);
+    if (i === 2 && j === 2) continue; // الساحة الوسطى للبوابات
+    const lots = [[cx - 8.5, cz - 8.5], [cx + 8.5, cz - 8.5], [cx - 8.5, cz + 8.5], [cx + 8.5, cz + 8.5]];
+    lots.forEach(([lx, lz], k) => {
+      if ((i + j + k) % 5 === 0) return; // فراغ/زقاق
+      const low = (i * 5 + j + k) % 7 === 0, h = low ? 6 : 10 + Math.floor(R() * 34), w = 13 + R() * 2.5, d = 13 + R() * 2.5;
+      K.plat({ x: lx, y: h, z: lz, w, d, h, m: BM[(i + j + k) % 3], rock: false, tile: 8, ledge: low });
+      if (low) lowRoofs.push([lx, h, lz, w]);
+      const nc = neonM[(i * 3 + j + k) % 5];
+      for (const yy of [h * 0.33, h * 0.66, h - 0.3]) { if (low && yy < h - 0.5) continue; const n1 = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, 0.18, 0.12), nc); n1.position.set(lx, yy, lz - d / 2 - 0.05); L.add(n1); const n2 = n1.clone(); n2.position.z = lz + d / 2 + 0.05; L.add(n2); }
+    });
+  }
+  // حدود المدينة (مرفأ وسور)
+  for (const s of [-1, 1]) { K.wall({ x: s * 136, y: 4, z: 0, w: 2, d: 276, h: 5, m: 'metal', ledge: false }); K.wall({ x: 0, y: 4, z: s * 136, w: 276, d: 2, h: 5, m: 'metal', ledge: false }); }
+  // أعمدة إنارة
+  for (const r of [-72, 72]) for (let t = -110; t <= 110; t += 44) { K.lamp({ x: r + 7.5, y: 6, z: t, color: 0xfde68a, light: Math.abs(t) < 50 }); }
+  // الساحة: بوابات لكل العوالم (تدخلها بالسيارة أو مشي)
+  const prevOf = { w1: null, w2: 'w1', w3: 'w2', w4: 'w3', w5: 'w4', w6: 'w5', w7: 'w1' };
+  const GATES = [['hub', 'ساحة البوابات 🌀', 0xffffff], ['w1', 'أطلال المكتبة', 0xffc94d], ['w2', 'الجزر السماوية', 0xc084fc], ['w3', 'حصن الرمال', 0xffb020], ['w4', 'الأعماق الزرقاء', 0x22d3ee], ['w5', 'قلعة الظلال', 0x818cf8], ['w6', 'قلب البركان', 0xff6a00], ['w7', 'سفينة العاصفة 🌧️', 0x38bdf8]];
+  GATES.forEach(([id, nm, col], k) => {
+    const a = (k / GATES.length) * Math.PI * 2, x = Math.sin(a) * 12.5, z = Math.cos(a) * 12.5, open = id === 'hub' || id === 'w1' || !!S.done[prevOf[id]];
+    K.portal({ x, y: 0, z, rot: a + Math.PI, to: id, label: open ? (S.done[id] ? '✓ ' : '') + nm : '🔒 ' + nm, color: col, active: open, locked: !open && 'هالبوابة تنفتح بعد ما تخلّص العالم اللي قبله 🔒' });
+  });
+  // منحدرات القفز (بالسيارة) + شظايا في الهوا
+  const rampM = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.5, metalness: 0.3 });
+  L.ramps = [];
+  const ramp = (x, z, dx, dz) => {
+    const me = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 7), rampM); me.position.set(x, 0.75, z); me.rotation.order = 'YXZ'; me.rotation.y = Math.atan2(dx, dz); me.rotation.x = -0.22; me.castShadow = true; L.add(me);
+    const st = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.15, 0.4), new THREE.MeshBasicMaterial({ color: 0x111827 })); st.position.set(x + dx * 3.4, 1.5, z + dz * 3.4); st.rotation.y = me.rotation.y; L.add(st);
+    L.ramps.push({ x0: x - 3, x1: x + 3, z0: z - 3, z1: z + 3, dx, dz });
+  };
+  ramp(-72, -40, 0, 1); sh(1, -72, 4.6, -18);
+  ramp(72, 40, 0, -1); sh(2, 72, 4.6, 18);
+  ramp(-40, 120, 1, 0); sh(3, -18, 4.6, 120);
+  ramp(40, -120, -1, 0); sh(4, 18, 4.6, -120);
+  // سطوح قصيرة: صناديق تتسلّقها + شظية فوق
+  lowRoofs.slice(0, 4).forEach(([x, h, z, w], n) => { K.crates({ x: x - w / 2 - 1.4, z: z - 2, n: 5, s: 1.25 }); K.plat({ x: x - w / 2 - 1.2, y: 3.6, z: z + 1.5, w: 2.2, d: 2.2, h: 1.1, m: 'wood', rock: false }); sh(5 + n, x, h + 0.9, z); });
+  // سقالات برج تحت الإنشاء: درج لين ١٦م
+  const TX = 96, TZ = -96; let y = 0;
+  for (let f = 0; f < 8; f++) { const ox = f % 2 ? 3 : -3; y += 2; K.plat({ x: TX + ox, y, z: TZ, w: 4, d: 4, h: 0.3, m: 'metal', rock: false }); }
+  sh(9, TX - 3, y + 2.4, TZ);
+  // زقاق خلفي
+  sh(10, -96, 0.9, 96);
+  // السيارات: زحمة + واقفة
+  const loop = (a, dir) => { const p = [[-a, -a], [a, -a], [a, a], [-a, a]]; return dir > 0 ? p : p.reverse(); };
+  L.carDefs = [];
+  [[27.5, 1], [20.5, -1], [75.5, 1], [68.5, -1], [123.5, 1], [116.5, -1]].forEach(([a, d], k) => { for (let m = 0; m < 2; m++) L.carDefs.push({ path: loop(a, d), pi: m * 2 + (k % 2), x: 0, z: 0 }); });
+  [[-75, -100, 0], [-69, -112, 0, 'sport', 0xfacc15], [75, 100, Math.PI], [69, 112, Math.PI], [100, -77, -Math.PI / 2], [-100, 77, Math.PI / 2, 'sport', 0xef4444], [6, -14, Math.PI, 'sport', 0x22d3ee], [-6, -14, Math.PI]].forEach(([x, z, yaw, kind, color]) => L.carDefs.push({ x, z, yaw, kind, color }));
+  K.checkpoint(0, 0, -6, Math.PI);
+  K.trigger({ x: 0, z: -6, r: 4, text: '🌃 مدينة النيون! تقدر تسرق أي سيارة: روح جنبها واضغط ✋ (لو فيها سائق تسحبه 😅). وبالسيارة تقدر تدخل أي بوابة في الساحة — المدينة مربوطة بكل العوالم!' });
+  return cfg;
+}
+
+export const WORLDS = { hub, w1, w2, w3, w4, w5, w6, w7, w8 };

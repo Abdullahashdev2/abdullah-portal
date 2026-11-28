@@ -27,6 +27,10 @@ const P = {
   zout: '<circle cx="28" cy="28" r="14"/><path d="M38 38l14 14"/><path d="M21 28h14"/>',
   dive: '<path d="M32 12v34"/><path d="M20 36l12 12 12-12"/><path d="M8 18c4-3 8-3 12 0s8 3 12 0 8-3 12 0 8 3 12 0" opacity=".6"/>',
   swimup: '<path d="M32 52V20"/><path d="M20 30l12-12 12 12"/><path d="M8 12c4-3 8-3 12 0s8 3 12 0 8-3 12 0 8 3 12 0" opacity=".6"/>',
+  wheel: '<circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="5"/><path d="M14 28h13M37 28h13M32 37v15"/>',
+  horn: '<path d="M10 26h10l18-10v32L20 38H10z"/><path d="M44 24c3 3 3 13 0 16M50 18c6 6 6 22 0 28" opacity=".8"/>',
+  brake: '<circle cx="32" cy="32" r="18"/><text x="32" y="40" text-anchor="middle" font-size="22" font-weight="900" fill="currentColor" stroke="none">P</text><path d="M8 20a26 26 0 0 0 0 24M56 20a26 26 0 0 1 0 24" opacity=".7"/>',
+  car: '<path d="M8 40v-8l6-12h36l6 12v8z"/><path d="M16 32h32" opacity=".6"/><circle cx="18" cy="42" r="5"/><circle cx="46" cy="42" r="5"/>',
   dash: '<path d="M8 32h20M14 24h14M14 40h14" opacity=".55"/><path d="M34 18l16 14-16 14"/>',
   none: '<circle cx="32" cy="32" r="3" fill="currentColor" opacity=".4"/>',
 };
