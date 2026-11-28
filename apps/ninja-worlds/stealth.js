@@ -35,6 +35,8 @@ export class Stealth {
     if (!this.on) { inp.aimP = false; return; }
     const P = this.c.player;
     if (inp.spP && !this.aiming && !this.holding && this.gadget()) inp.spP = false;
+    // 🧗 متعلّق برّا السفينة: حارس واقف فوقك جنب الحافة؟ مدّ يدك واسحبه من رجله للبحر
+    if (P.state === 'hang' && P.edgeHang && inp.atkP) { inp.atkP = false; const e = this.pullTarget(); if (e) this.pullOver(e); else this.c.say('🤚 ما فيه أحد قريب من الحافة فوقك — انتظر لين يقرّب حارس'); }
     if (this.holding) { // ماسك حارس من الخلف
       if (inp.atkP) { inp.atkP = false; this.choke(); }
       if (inp.actP) { inp.actP = false; if (!this.throwBody(this.holding)) this.c.say('🌊 قرّب من حافة السفينة (السطح المكشوف) عشان ترميه في البحر — أو اضغط ⚔️ عشان تخنقه لين يغمى عليه'); }
@@ -115,6 +117,27 @@ export class Stealth {
   }
   seaEdge() {
     const P = this.c.player, f = this.L.seaEdge; return f ? f(P.pos) : null;
+  }
+  pullTarget() {
+    const P = this.c.player; if (!(P.state === 'hang' && P.edgeHang)) return null;
+    let best = null, bd = 1.9;
+    for (const e of this.c.enemies.list) { if (!e.ship || !e.alive || e.hidden || ['sleep', 'dragged', 'held', 'thrown', 'dying'].includes(e.st)) continue;
+      const dy = e.pos.y - P.pos.y, d = Math.hypot(e.pos.x - P.pos.x, e.pos.z - P.pos.z); if (dy > 0.3 && dy < 2.8 && d < bd) { bd = d; best = e; } }
+    return best;
+  }
+  pullOver(e) {
+    const P = this.c.player, n = (P.hang && P.hang.n) ? P.hang.n.clone().setY(0).normalize() : new V(Math.sin(P.yaw + Math.PI), 0, Math.cos(P.yaw + Math.PI));
+    if (n.lengthSq() < 0.5) n.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
+    e.st = 'thrown'; e.alive = false; e.thrownT = 0; e.cone && (e.cone.visible = false);
+    const from = e.pos.clone(), to = P.pos.clone().addScaledVector(n, 3.2); to.y = -3.2;
+    this.flying.push({ e, from, to, t: 0, n, pull: true }); P.pullE = e; P.pullT = 0.55;
+    this.c.sfx.tone(180, 90, 0.25, 'sawtooth', 0.1); this.c.sfx.noise(0.3, 500, 0.8, 0.2, 'bandpass', 0.15, 200); this.c.shake(0.25);
+    if (Math.random() < 0.8) this.c.sfx.speak && this.c.sfx.speak(['آآآه!', 'لااا!', 'يا ويلي!'][Math.floor(Math.random() * 3)], { pitch: 0.7 });
+    this.L.thrown = (this.L.thrown || 0) + 1; this.c.addCoins(10, P.pos);
+    // اللي شاف المشهد يعلن الإنذار
+    for (const o of this.c.enemies.list) if (o !== e && o.ship && o.alive && o.st !== 'sleep' && o.pos.distanceTo(e.pos) < 9 && this.c.enemies.sees && this.c.enemies.sees(o, P, o.pos.distanceTo(P.pos), P.pos.y - o.pos.y, P.pos.x - o.pos.x, P.pos.z - o.pos.z)) { this.c.onSpotted && this.c.onSpotted(o); break; }
+    if (e.captain) { this.c.onCaptainDown && this.c.onCaptainDown(e, 'sea'); return; }
+    this.c.say(this.L.pulled ? '🌊 سحبته للبحر! (' + this.L.thrown + ')' : '🌊 سحبته من رجله للبحر وأنت متعلّق! الحارس اللي يشوف المشهد يعلن الإنذار — اختار وقتك.'); this.L.pulled = true;
   }
   throwBody(e) {
     const n = this.seaEdge(); if (!n || !e) return false;

@@ -75,11 +75,11 @@ export class Enemies {
       const fx = Math.sin(e.yaw), fz = Math.cos(e.yaw), dx0 = from.x - e.pos.x, dz0 = from.z - e.pos.z, l0 = Math.hypot(dx0, dz0) || 1;
       if ((dx0 * fx + dz0 * fz) / l0 < 0.35) { if (e.ship && e.st !== 'sleep') { this.sleep(e, true); this.g.onTakedown && this.g.onTakedown(e); return true; } dmg = 99; this.g.onTakedown && this.g.onTakedown(e); } else if (!e.ship) this.alarm(e);
     }
-    e.hp -= dmg; e.flash = 0.18;
+    e.hp -= dmg; e.flash = 0.18; e.hitT = 0.32; e.hitYaw = Math.atan2(e.pos.x - from.x, e.pos.z - from.z); // راسه يرتد للخلف من الضربة
     if (e.m.human && e.hp <= 0) { e.hp = e.maxHp; this.sleep(e); e.sleepT = 90; this.g.sfx.hit(); this.g.fx.emit(e.pos.clone().add(new V(0, 1.2, 0)), { color: 0xffffff, count: 16, speed: 5, life: 0.3 }); return true; }
     const dx = e.pos.x - from.x, dz = e.pos.z - from.z, l = Math.hypot(dx, dz) || 1;
     const kr = e.boss ? 10 : e.big ? 2.2 : 1; e.kb.set((dx / l) * knock / kr, 0, (dz / l) * knock / kr);
-    const hitP = e.pos.clone(); hitP.y += e.big ? 1.6 : 1.1;
+    const hitP = e.pos.clone(); hitP.y += e.big ? 1.6 : e.m.human ? 1.5 : 1.1; if (e.m.human) { hitP.x -= Math.sin(e.hitYaw) * 0.2; hitP.z -= Math.cos(e.hitYaw) * 0.2; } // الشرارة على الوجه نفسه
     this.g.fx.emit(hitP, { color: 0xffffff, count: 14, speed: 7, life: 0.25, size: 0.18, grav: 4 });
     this.g.fx.emit(hitP, { color: e.big ? 0xff6a3d : 0xc084fc, count: 18, speed: 4, life: 0.5, size: 0.3, grav: 2 });
     if (e.hp <= 0) { e.st = 'dying'; e.t = 0; e.alive = false; this.g.sfx.enemyDie(); this.g.onEnemyKilled(e); }
@@ -119,7 +119,12 @@ export class Enemies {
         case 'idle': case 'chase':
           if (seen && e.archer) {
             e.yaw += angDiff(e.yaw, toYaw) * Math.min(1, dt * 6);
-            if (d < 5.5) { e.pos.x -= (dx / d) * e.speed * dt; e.pos.z -= (dz / d) * e.speed * dt; anim = 'walk'; }
+            if (e.ship) { // ينتشرون على قوس حولك — كل واحد بمكان (ما يتكدّسون في نقطة وحدة) ويوقفون لما يوصلون
+              const k = ((this.list.indexOf(e) * 5) % 7) - 3, want = 6 + Math.abs(k) * 0.8, base = Math.atan2(-dx, -dz) + k * 0.38;
+              const tx = pl.pos.x + Math.sin(base) * want, tz = pl.pos.z + Math.cos(base) * want, mx = tx - e.pos.x, mz = tz - e.pos.z, ml = Math.hypot(mx, mz);
+              if (ml > 1.0) { const sp = e.speed * 0.75; e.pos.x += (mx / ml) * sp * dt; e.pos.z += (mz / ml) * sp * dt; anim = 'walk'; }
+            }
+            else if (d < 5.5) { e.pos.x -= (dx / d) * e.speed * dt; e.pos.z -= (dz / d) * e.speed * dt; anim = 'walk'; }
             else if (d > 12) { e.pos.x += (dx / d) * e.speed * dt; e.pos.z += (dz / d) * e.speed * dt; anim = 'walk'; }
             if (e.cd <= 0 && d < 16) { e.st = 'windup'; e.t = 0; this.g.sfx.enemyAtk(); }
           } else if (seen) {
@@ -154,7 +159,7 @@ export class Enemies {
       const z = e.zone; e.pos.x = Math.max(z.x0, Math.min(z.x1, e.pos.x)); e.pos.z = Math.max(z.z0, Math.min(z.z1, e.pos.z));
       // separation
       for (const o of this.list) { if (o === e || !o.alive || o.st === 'sleep' || o.st === 'dragged' || e.st === 'dragged' || o.st === 'held' || e.st === 'held') continue; const sx = e.pos.x - o.pos.x, sz = e.pos.z - o.pos.z, sd = Math.hypot(sx, sz), md = (e.boss || o.boss) ? 4 : (e.big || o.big) ? 2 : 1.2; if (sd < md && sd > 1e-3) { e.pos.x += (sx / sd) * (md - sd) * 0.5; e.pos.z += (sz / sd) * (md - sd) * 0.5; } }
-      const pr = e.boss ? 2.4 : 0.75; if (e.alive && e.st !== 'sleep' && e.st !== 'dragged' && e.st !== 'held' && d < pr && Math.abs(dy) < 1.5) { if (e.boss) { pl.pos.x += (dx / (d || 1)) * (pr - d); pl.pos.z += (dz / (d || 1)) * (pr - d); } else { e.pos.x -= (dx / (d || 1)) * (pr - d); e.pos.z -= (dz / (d || 1)) * (pr - d); } }
+      const pr = e.boss ? 2.4 : e.m.human ? 0.52 : 0.75; if (e.alive && e.st !== 'sleep' && e.st !== 'dragged' && e.st !== 'held' && d < pr && Math.abs(dy) < 1.5) { if (e.boss) { pl.pos.x += (dx / (d || 1)) * (pr - d); pl.pos.z += (dz / (d || 1)) * (pr - d); } else { e.pos.x -= (dx / (d || 1)) * (pr - d); e.pos.z -= (dz / (d || 1)) * (pr - d); } }
       // visuals
       m.g.rotation.y = e.yaw;
       if (e.st !== 'dying' && e.st !== 'rise') m.inner.position.y = Math.sin(e.t * 3 + e.def.x) * 0.06;
@@ -285,11 +290,21 @@ export class Enemies {
     if (!e.alert && phase === 'alert') { e.alert = true; e.cd = 1; }
     if (e.alert && phase !== 'alert') {
       // search the last place the player was seen
-      const lp = this.g.level.lastSeen || e.pos, vx = lp.x - e.pos.x, vz = lp.z - e.pos.z, l = Math.hypot(vx, vz);
-      if (l > 1.2) { e.pos.x += (vx / l) * 2.6 * dt; e.pos.z += (vz / l) * 2.6 * dt; e.yaw += angDiff(e.yaw, Math.atan2(vx, vz)) * Math.min(1, dt * 4); } else e.yaw += dt * 1.4;
+      // 🔎 بحث واقعي: كل حارس ياخذ نقطة مختلفة حول آخر مكان شافوك فيه، يمشي لها بسرعته، يوقف ويتلفّت، ثم نقطة ثانية
+      const lp = this.g.level.lastSeen || e.pos, idx = this.list.indexOf(e);
+      if (!e.sp || e.spSrc !== lp || e.spT <= 0) {
+        const first = e.spSrc !== lp, a = first ? idx * 2.399 + Math.random() * 0.6 : Math.random() * Math.PI * 2, r = first ? 1.2 + (idx % 4) * 1.3 : 2 + Math.random() * 4.5;
+        e.sp = { x: lp.x + Math.sin(a) * r, z: lp.z + Math.cos(a) * r }; e.spSrc = lp; e.spT = 3 + Math.random() * 3; e.lookA = e.yaw; e.spd = 1.9 + (idx % 5) * 0.2;
+        if (idx % 4 === 3 && first) { e.sp = { x: e.pos.x, z: e.pos.z }; e.spT = 6; } // واحد يبقى بمكانه ويراقب
+      }
+      const vx = e.sp.x - e.pos.x, vz = e.sp.z - e.pos.z, l = Math.hypot(vx, vz);
+      if (l > 0.6) { e.pos.x += (vx / l) * e.spd * dt; e.pos.z += (vz / l) * e.spd * dt; e.yaw += angDiff(e.yaw, Math.atan2(vx, vz)) * Math.min(1, dt * 4); }
+      else { e.spT -= dt; const tgt = e.lookA + Math.sin(e.t * 0.9 + idx) * 1.2; e.yaw += angDiff(e.yaw, tgt) * Math.min(1, dt * 2.2); } // يتلفّت يمين ويسار
+      if (l > 0.6 && e.stuck !== undefined) { const moved = Math.hypot(e.pos.x - e.stuck.x, e.pos.z - e.stuck.z); if (moved < 0.01) e.spT = 0; }
+      e.stuck = { x: e.pos.x, z: e.pos.z };
       if (phase === 'normal') { e.alert = false; e.sus = 0; e.wait = 1; }
       else if (this.sees(e, pl, d, dy, dx, dz)) this.g.onSpotted && this.g.onSpotted(e, true);
-      return l > 1.2 ? 'walk' : 'idle';
+      return l > 0.6 ? 'walk' : 'idle';
     }
     if (e.st === 'inv' && !e.alert) {
       const vx = e.invPos.x - e.pos.x, vz = e.invPos.z - e.pos.z, l = Math.hypot(vx, vz); let anim = 'idle';
@@ -314,7 +329,9 @@ export class Enemies {
     else if (e.st === 'held') { const sq = Math.sin(e.t * 18) * 0.25 * (1 - (e.choke || 0)); P.headX = -0.5; P.spineX = -0.2; P.shLx = 2.2 + sq; P.shRx = 2.0 - sq; P.elL = P.elR = 1.6; P.shLz = P.shRz = 0.3; P.knL = 0.3 + (e.choke || 0) * 0.6; P.knR = 0.2 + (e.choke || 0) * 0.6; P.thLx = 0.2 + sq * 0.5; }
     else if (e.st === 'thrown') { P.shLz = P.shRz = 2.2; P.thLx = 0.8; P.thRx = -0.6; P.knL = P.knR = 0.4; P.spineX = -0.4; }
     else if (e.st === 'sleep' || e.st === 'dragged') { P.rootPitch = -1.5; P.hipY = -0.42; P.shLz = 1.1; P.shRz = 1.1; P.shLx = P.shRx = 0.3; P.elL = P.elR = 0.3; P.knL = 0.3; P.knR = 0.1; P.headY = 0.4; }
-    blendPose(h, P, dt, e.st === 'sleep' ? 5 : 12);
+    if (e.hitT > 0 && e.st !== 'sleep' && e.st !== 'held') { e.hitT -= dt; const k = e.hitT / 0.32, back = Math.cos(angDiff(e.yaw, e.hitYaw)); // ضربة من قدّام = الراس يرجع لورا
+      P.headX = -0.75 * k * back; P.spineX = -0.35 * k * back; P.headY = 0.5 * k * Math.sin(angDiff(e.yaw, e.hitYaw)); P.knL = P.knR = 0.35 * k; P.shLx = P.shRx = 0.3; }
+    blendPose(h, P, dt, e.hitT > 0 ? 30 : e.st === 'sleep' ? 5 : 12);
   }
   /* ⚓ القائد «عاصفة»: يصطادك على مهبط المقدمة — يطلق ٣ طلقات ثم يعبّي (فرصتك) — ما ينخنق، بس ينرمى في البحر أو ينام بالمهدّئ */
   captainThink(e, dt, pl, d, dy, dx, dz, toYaw) {

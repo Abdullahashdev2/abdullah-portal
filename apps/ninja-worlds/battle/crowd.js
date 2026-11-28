@@ -14,7 +14,7 @@ export class Crowd {
   /* opts: { max, camps:[{x,z,team}], goals:[{x,z}], reserve:[ally, enemy], ui } */
   setup(o) {
     this.clear(); this.on = true; const N = this.n = o.max || 200;
-    this.camps = o.camps; this.goals = o.goals; this.reserve = o.reserve.slice(); this.total = o.reserve.slice(); this.ko = 0; this.combo = 0; this.comboT = 0; this.windups = 0;
+    this.camps = o.camps; this.goals = o.goals; this.obst = o.obst || []; this.pens = o.pens || []; this.reserve = o.reserve.slice(); this.total = o.reserve.slice(); this.ko = 0; this.combo = 0; this.comboT = 0; this.windups = 0;
     const F = (k) => new Float32Array(N), I = (k) => new Int16Array(N);
     Object.assign(this, { rt: F(), x: F(), z: F(), y: F(), vx: F(), vy: F(), vz: F(), yaw: F(), hp: F(), t: F(), cd: F(), ph: F(), spin: F(), team: I(), st: I(), tgt: I(), lod: I() });
     const g = this.group = new THREE.Group(); g.userData.dyn = true; this.scene.add(g);
@@ -123,12 +123,16 @@ export class Crowd {
       if (this.tgt[i] === -2) { tx = px; tz = pz; ring = 1.7 + (i % 5) * 0.28; }
       else if (this.tgt[i] >= 0 && this.alive(this.tgt[i])) { tx = this.x[this.tgt[i]]; tz = this.z[this.tgt[i]]; }
       else { const gl = this.goals[tm]; tx = gl.x + Math.sin(i * 2.4) * 22; tz = gl.z + Math.cos(i * 1.7) * 12; ring = 3; this.tgt[i] = -3; }
+      // داخل المعسكر والهدف برّا؟ يطلع من البوابة أول (والعكس)
+      for (const P of this.pens) { const inS = this.x[i] > P.x0 && this.x[i] < P.x1 && this.z[i] > P.z0 && this.z[i] < P.z1, inT = tx > P.x0 && tx < P.x1 && tz > P.z0 && tz < P.z1;
+        if (inS !== inT) { const g = P.gates.reduce((b, q) => (Math.hypot(q[0] - tx, q[1] - tz) < Math.hypot(b[0] - tx, b[1] - tz) ? q : b)); const gz = g[1] + (inS ? (g[1] > (P.z0 + P.z1) / 2 ? 2 : -2) : (g[1] > (P.z0 + P.z1) / 2 ? -2 : 2));
+          if (Math.hypot(this.x[i] - g[0], this.z[i] - gz) > 1.5) { tx = g[0] + ((i % 5) - 2) * 0.9; tz = gz; ring = 0.5; } break; } }
       const dx = tx - this.x[i], dz = tz - this.z[i], d = Math.hypot(dx, dz) || 1;
       this.yaw[i] += angDiff(this.yaw[i], Math.atan2(dx, dz)) * Math.min(1, dt * 7);
       if (s === ST.WIND) { // رفع الرمح… ثم طعنة
         if (this.t[i] > 0.62) {
           this.st[i] = ST.FIGHT; this.t[i] = 0; this.cd[i] = 2.2 + Math.random() * 2.2;
-          if (this.tgt[i] === -2 && d < 2.6 && pl.hp > 0 && pl.state !== 'roll') pl.damage(1, this._v.set(this.x[i], 0, this.z[i]));
+          if (this.tgt[i] === -2 && d < 2.6 && pl.hp > 0 && pl.state !== 'roll') { if (Math.random() < 0.5) pl.damage(1, this._v.set(this.x[i], 0, this.z[i])); else this.g.fx.emit(this._v.set((this.x[i] + px) / 2, 1.2, (this.z[i] + pz) / 2), { color: 0xffe08a, count: 6, speed: 5, life: 0.2, size: 0.14, grav: 3 }); }
           else if (this.tgt[i] >= 0 && d < 2.2 && Math.random() < 0.3) { const j = this.tgt[i]; if (--this.hp[j] <= 0) { this.st[j] = ST.FLY; this.t[j] = 0; this.vx[j] = dx / d * 2; this.vz[j] = dz / d * 2; this.vy[j] = 3; this.spin[j] = 3; } }
         }
         continue;
@@ -143,6 +147,8 @@ export class Crowd {
       }
       // تباعد (ما يتراكبون)
       this.near(this.x[i], this.z[i], 1.2, (j) => { if (j === i) return; const ex = this.x[i] - this.x[j], ez = this.z[i] - this.z[j], e2 = ex * ex + ez * ez; if (e2 < 0.7 && e2 > 1e-4) { const e = Math.sqrt(e2), k = (0.84 - e) * 0.5; this.x[i] += ex / e * k; this.z[i] += ez / e * k; } });
+      // تصادم مع السياج والتلال والقلعة: يندفع لأقرب حافة (ويمشي على طولها لين يلقى البوابة)
+      for (const r of this.obst) { const x = this.x[i], z = this.z[i]; if (x > r[0] && x < r[1] && z > r[2] && z < r[3]) { const a = x - r[0], b = r[1] - x, c = z - r[2], d2 = r[3] - z, m = Math.min(a, b, c, d2); if (m === a) this.x[i] = r[0]; else if (m === b) this.x[i] = r[1]; else if (m === c) this.z[i] = r[2]; else this.z[i] = r[3]; } }
       // ما يدخلون جوّا اللاعب
       const qx = this.x[i] - px, qz = this.z[i] - pz, q = Math.hypot(qx, qz); if (q < 0.95 && q > 1e-3) { this.x[i] = px + qx / q * 0.95; this.z[i] = pz + qz / q * 0.95; }
     }

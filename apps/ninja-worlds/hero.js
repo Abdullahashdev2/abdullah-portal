@@ -351,3 +351,17 @@ export function compactRig(root) {
     }
   }
 }
+
+/* 🤲 IK للذراع: نعطيه نقطة في العالم (رقبة الحارس / وجهه) ويحسب الكتف والكوع عشان الكف يوصل لها فعلاً */
+const _ikT = new THREE.Vector3(), _ikE = new THREE.Vector3(), _ikQ = new THREE.Quaternion();
+export function armIK(h, side, target, w = 1) {
+  if (w <= 0.001) return;
+  const sh = side === 'L' ? h.shL : h.shR, el = side === 'L' ? h.elL : h.elR, L1 = 0.3, L2 = 0.28;
+  h.root.updateMatrixWorld(true);
+  const p = sh.parent.worldToLocal(_ikT.copy(target)).sub(sh.position);
+  const D = Math.max(0.14, Math.min(p.length(), (L1 + L2) * 0.995));
+  const inner = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - D * D) / (2 * L1 * L2)))), beta = Math.PI - inner;
+  _ikE.set(0, -L1 - L2 * Math.cos(beta), L2 * Math.sin(beta)).normalize();
+  _ikQ.setFromUnitVectors(_ikE, p.normalize());
+  sh.quaternion.slerp(_ikQ, Math.min(1, w)); el.rotation.x += (-beta - el.rotation.x) * Math.min(1, w);
+}

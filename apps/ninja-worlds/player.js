@@ -293,16 +293,21 @@ export class Player {
     if (this.spy && this.g.tryGrab && this.g.tryGrab()) return; // وراه وما انتبه؟ امسكه
     this.combo = this.t - this.lastAtkEnd < 0.45 && this.combo < 3 ? this.combo + 1 : 1;
     this.state = 'attack'; this.st.aT = 0; this.st.hit = false; this.st.queued = false;
-    const e = this.g.enemies.nearest(this.pos, 4.5); if (e) this.yaw = Math.atan2(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
+    const e = this.g.enemies.nearest(this.pos, 4.5); this.st.tgt = e || null; if (e) this.yaw = Math.atan2(e.pos.x - this.pos.x, e.pos.z - this.pos.z);
     if (this.spy) { this.g.sfx.noise(0.08, 500, 1, 0.12, 'bandpass'); } else this.g.sfx.slash(this.combo);
   }
   attackUpd(dt, inp) {
-    this.st.aT += dt; const dur = ATK[this.combo], k = this.st.aT / dur, f = this.fwd, lunge = k < 0.35 ? (this.combo === 3 ? 7 : 5) * (1 - k / 0.35) * (this.spy ? 0.55 : 1) : 0;
+    this.st.aT += dt; const dur = ATK[this.combo], k = this.st.aT / dur, f = this.fwd; this.atkK = k;
+    let lunge = k < 0.35 ? (this.combo === 3 ? 7 : 5) * (1 - k / 0.35) * (this.spy ? 0.55 : 1) : 0;
+    // 🎯 نقرّب للمسافة الصحيحة بالضبط عشان الضربة توصل للوجه/الصدر (مو في الهوا ولا داخل جسمه)
+    const T = this.st.tgt;
+    if (T && k < 0.4 && (T.alive !== false)) { const dx = T.pos.x - this.pos.x, dz = T.pos.z - this.pos.z, dd = Math.hypot(dx, dz), want = this.spy ? (this.combo === 3 ? 1.0 : 0.62) : 1.25;
+      this.yaw += angDiff(this.yaw, Math.atan2(dx, dz)) * Math.min(1, dt * 20); lunge = Math.max(-3, Math.min(16, (dd - want) / Math.max(1 / 60, dur * (0.36 - k)))); }
     this.vel.x = f.x * lunge; this.vel.z = f.z * lunge; this.phys(dt);
     if (!this.st.hit && k >= 0.38) {
       this.st.hit = true; const big = this.combo === 3;
       // بدلة التجسس: لكمة، لكمة، ركلة دوّارة — مدى أقصر من السيف
-      const n = this.spy ? this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.0 : 1.75, 0.35, big ? 2 : 1, big ? 7 : 2.5) : this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
+      const n = this.spy ? this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.0 : 1.75, 0.35, big ? 2 : 1, big ? 7 : 1.2) : this.g.enemies.hitArc(this.pos, this.yaw, big ? 2.8 : 2.5, 0.25, (big ? 2 : 1) + this.g.upg.dmg, big ? 9 : 3.5);
       if (n) { this.g.hitstop(big ? 0.09 : 0.055); this.g.shake(big ? 0.3 : 0.14); this.g.sfx.hit(); }
     }
     if (inp.atkP) this.st.queued = true;

@@ -58,6 +58,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#0b0b16;color:#fff;fon
 #spBtn{--c:192,132,252;width:54px;height:54px;right:180px;bottom:104px}#spBtn.cool{opacity:.35}
 #upgList{display:none;text-align:right;margin:6px 0}#upgList.on{display:block}#upgList .u{background:rgba(255,255,255,.05);border-radius:12px;padding:8px 10px;margin:6px 0;opacity:.6}#upgList .u.on{opacity:1;border:1px solid rgba(255,209,102,.4)}#upgList b{display:block;font-size:14px}#upgList span{font-size:12px;color:#94a3b8}
 #battleHud{position:fixed;z-index:6;top:calc(64px + env(safe-area-inset-top));right:14px;display:none;flex-direction:column;align-items:flex-end;gap:2px;pointer-events:none;font-family:inherit}#battleHud.on{display:flex}#battleHud b{font-size:30px;font-weight:900;color:#fff;text-shadow:0 0 14px #dc2626,0 3px 6px #000}#battleHud i{font-style:normal;font-size:22px;font-weight:900;color:#ffd166;text-shadow:0 0 12px #ff7a00,0 2px 4px #000;animation:cpop .25s}#battleHud span{font-size:13px;font-weight:700;color:#e5e7eb;background:#0009;border-radius:999px;padding:2px 10px}@keyframes cpop{from{transform:scale(1.5)}to{transform:scale(1)}}
+.dd{display:grid;gap:6px;margin:-4px 0 8px;padding:8px;border-radius:14px;background:#0b1020;border:1px solid #334155;animation:ddIn .15s}.dd button{margin:0!important;padding:10px!important;font-size:15px!important;background:#111827!important}.dd button.cur{border-color:#ffd166!important;color:#ffd166}.ddOpen{border-color:#ffd166!important}@keyframes ddIn{from{opacity:0;transform:translateY(-6px)}}
+#touch .btns button.off{opacity:.28!important;filter:grayscale(1) brightness(.7);box-shadow:none!important}#touch .btns button:not(.off){filter:none}
+body.m-hang.m-pull #atkBtn{display:grid!important;animation:pullGlow 1s infinite}@keyframes pullGlow{50%{box-shadow:0 0 22px #ffd166}}
 #timer{position:fixed;z-index:6;top:calc(70px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);font-size:30px;font-weight:900;color:#ffd166;text-shadow:0 0 18px #ff7a00,0 3px 6px #000;display:none}#timer.on{display:block}
 @media (pointer:coarse){#prompt{display:none}}
 #hurt{position:fixed;inset:0;z-index:4;pointer-events:none;box-shadow:inset 0 0 120px 40px rgba(255,0,40,.0)}
@@ -227,7 +230,7 @@ body.mirror .btns button{opacity:.22}body.mirror .btns button.down{opacity:.6}bo
   <button class="main" id="pResume">كمّل ▶</button>
   <button id="pCheck">🔄 ارجع لآخر نقطة حفظ</button>
   <button id="pHub">🏛️ الرجوع لساحة البوابات</button>
-  <button id="pSound">🔊 الصوت: شغّال</button>
+  <button id="pSound">🔊 الصوت: شغّال ▾</button>
   <button id="pUpg">🛒 المتجر (الترقيات)</button>
   <div id="upgList"></div>
   <button id="pTV">📺 الشاشة الكبيرة (الجوال يد تحكم)</button>

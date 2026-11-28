@@ -2,7 +2,7 @@ import * as THREE from 'three';
 window.__nwErr = (m) => { try { let d = document.getElementById('nwErr'); if (!d) { d = document.createElement('div'); d.id = 'nwErr'; d.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:99;background:#7f1d1d;color:#fff;font:600 13px system-ui;padding:10px;border-radius:10px;direction:ltr;white-space:pre-wrap'; document.body.appendChild(d); } d.textContent = '⚠️ ' + m + '\n(صوّر هالرسالة وأرسلها)'; } catch (e) {} };
 import { Sky } from 'sky';
 import { Particles, Sound } from './fx.js';
-import { buildHero, blendPose, BASE, Scarf, Trail, setSpy, setDisguise } from './hero.js';
+import { buildHero, blendPose, BASE, Scarf, Trail, setSpy, setDisguise, armIK } from './hero.js';
 import { Player } from './player.js';
 import { Enemies } from './enemies.js';
 import { Level, makeKit } from './kit.js';
@@ -104,7 +104,7 @@ function applyQuality(i) {
   if (level) { level.useLights = q.lights; level.group.traverse((o) => { if (o.isPointLight) o.visible = q.lights; }); }
   qChanged = performance.now(); resize(); qLabel();
 }
-function qLabel() { const t = document.getElementById('pTVmode'); if (t) t.textContent = LITE ? `📺 وضع التلفزيون: شغّال (${LITE_W[liteLvl]}p${lock30 ? ' · ٣٠ إطار' : ''})` : '📺 وضع التلفزيون (للشاشات الضعيفة): طافي'; const b = document.getElementById('pHQ'); if (LITE && b) { b.textContent = `🎮 ${Math.round(fpsAvg)} إطار`; return; } if (b) b.textContent = `🎮 الجودة: ${qMode === 'auto' ? 'تلقائي (' + QL[qLevel].name + ')' : QL[qLevel].name} · ${Math.round(fpsAvg)} إطار`; }
+function qLabel() { const t = document.getElementById('pTVmode'); if (t) t.textContent = LITE ? `📺 وضع التلفزيون: شغّال (${LITE_W[liteLvl]}p${lock30 ? ' · ٣٠ إطار' : ''}) ▾` : '📺 وضع التلفزيون (للشاشات الضعيفة): طافي ▾'; const b = document.getElementById('pHQ'); if (LITE && b) { b.textContent = `🎮 ${Math.round(fpsAvg)} إطار`; return; } if (b) b.textContent = `🎮 الجودة: ${qMode === 'auto' ? 'تلقائي (' + QL[qLevel].name + ')' : QL[qLevel].name} · ${Math.round(fpsAvg)} إطار ▾`; }
 function qTick(dt) {
   ftAcc += dt; ftN++;
   if (ftAcc < 1.2) return;
@@ -445,7 +445,10 @@ function goWorld(id, from) {
   }), 60);
 }
 function fadeTo(fn) { const f = $('#fade'); f.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => f.classList.remove('on'), 80); }, 380); }
-function togglePause(v) { if (!started || $('#done').classList.contains('on')) return; paused = v ?? !paused; $('#pause').classList.toggle('on', paused); $('#pHub').hidden = worldId === 'hub'; navIdx = 0; if (paused) setTimeout(() => menuNav(0), 30); }
+// ⏸️ الإيقاف يوقف كل الأصوات (المطر، الموسيقى، الأجواء، كلام الحراس) — مو بس الحركة
+function holdAudio(on) { try { if (sfx.ctx) on ? sfx.ctx.suspend() : sfx.ctx.resume(); if (on) speechSynthesis.cancel(); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.hidden) holdAudio(true); else if (!paused) holdAudio(false); });
+function togglePause(v) { if (!started || $('#done').classList.contains('on')) return; paused = v ?? !paused; $('#pause').classList.toggle('on', paused); holdAudio(paused); document.querySelectorAll('.dd').forEach((d) => d.remove()); document.querySelectorAll('.ddOpen').forEach((b) => b.classList.remove('ddOpen')); $('#pHub').hidden = worldId === 'hub'; navIdx = 0; if (paused) setTimeout(() => menuNav(0), 30); }
 /* ---------- console-style menu navigation (phone controller / gamepad): stick moves, jump selects, roll goes back ---------- */
 let navIdx = 0, navCool = 0;
 function activeMenu() {
@@ -482,7 +485,7 @@ $('#pauseBtn').onclick = () => togglePause(true);
 $('#pResume').onclick = () => togglePause(false);
 $('#pCheck').onclick = () => { togglePause(false); respawn('manual'); };
 $('#pHub').onclick = () => { togglePause(false); goWorld('hub', null); };
-$('#pSound').onclick = () => { $('#pSound').textContent = sfx.toggle() ? '🔊 الصوت: شغّال' : '🔇 الصوت: مطفي'; };
+$('#pSound').onclick = () => dropdown($('#pSound'), [[true, '🔊 شغّال'], [false, '🔇 مطفي']], sfx.on, (v) => { if (v !== sfx.on) sfx.toggle(); $('#pSound').textContent = sfx.on ? '🔊 الصوت: شغّال ▾' : '🔇 الصوت: مطفي ▾'; });
 $('#pVol').onclick = () => { document.querySelectorAll('#volSheet input').forEach((r) => { r.value = sfx.vol[r.dataset.k]; }); $('#volSheet').classList.add('on'); };
 document.querySelectorAll('#volSheet input').forEach((r) => { r.addEventListener('input', () => sfx.setVol(r.dataset.k, +r.value)); r.addEventListener('pointerdown', (e) => e.stopPropagation()); });
 $('#volClose').onclick = () => $('#volSheet').classList.remove('on');
@@ -508,12 +511,12 @@ function autoTV() {
 let MIRROR = false; try { MIRROR = localStorage.getItem('nw_mirror') === '1'; } catch (e) {}
 function applyMirror() {
   document.body.classList.toggle('mirror', MIRROR);
-  $('#pMirror').textContent = '🪞 وضع المرآة (لما تبث شاشة الجوال للتلفزيون): ' + (MIRROR ? 'شغّال ✅' : 'طافي');
+  $('#pMirror').textContent = '🪞 وضع المرآة (لما تبث شاشة الجوال للتلفزيون): ' + (MIRROR ? 'شغّال ✅' : 'طافي') + ' ▾';
   if (MIRROR) { if (LITE) { LITE = false; try { localStorage.setItem('nw_tv', '0'); } catch (e) {} } try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }
 }
 applyMirror();
-$('#pMirror').onclick = () => { MIRROR = !MIRROR; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); };
-$('#pTVmode').onclick = () => { LITE = !LITE; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); };
+$('#pMirror').onclick = () => dropdown($('#pMirror'), [[false, 'طافي'], [true, 'شغّال (أزرار شفافة للبث)']], MIRROR, (v) => { if (v === MIRROR) return; MIRROR = v; try { localStorage.setItem('nw_mirror', MIRROR ? '1' : '0'); } catch (e) {} applyMirror(); if (MIRROR) say('🪞 وضع المرآة: الأزرار صارت شفافة عشان الصورة تطلع نظيفة على التلفزيون — اللعبة بأعلى جودة الجوال'); });
+$('#pTVmode').onclick = () => dropdown($('#pTVmode'), [[false, 'طافي (عادي)'], [true, 'شغّال (للشاشات الضعيفة)']], LITE, (v) => { if (v === LITE) return; LITE = v; try { localStorage.setItem('nw_tv', LITE ? '1' : '0'); } catch (e) {} if (LITE) applyQuality(1); else location.reload(); });
 const openBig = () => { sfx.init(); try { if (window.parent !== window && window.parent.PortalCast) { window.parent.PortalCast.open(); return; } } catch (e) {} openTV(tvHooks); };
 const ninjaLayout = () => ({ title: 'النينجا المعصوب', stick: true, look: true, pause: true, buttons: [{ id: 'jump', label: stealth.aiming ? '🫁 احبس نفسك (مطوّل)' : player && player.hullEdge && player.hullEdge() ? '🧗 تعلّق برّا' : '🦘 قفز' }, { id: 'atk', label: stealth.aiming ? '🎯 أطلق' : stealth.holding ? '😵 اخنق' : player && player.spy ? '👊 ضرب' : '⚔️ ضرب' }, { id: 'roll', label: '🌀 تدحرج' }, { id: 'act', label: stealth.aiming ? '🔁 سلاح' : stealth.holding ? '🌊 ارمِ' : player && player.state === 'hug' ? '🤜 طق' : '✋ شيل' }].concat(cfg && cfg.ship ? [{ id: 'aim', label: stealth.aiming ? '❌ إلغاء التصويب' : '🔫 مسدس' }] : []).concat(stealth.aiming ? [{ id: 'zin', label: '🔍＋' }, { id: 'zout', label: '🔍－' }] : []).concat(stealth.gadgetLabel() ? [{ id: 'sp', label: stealth.gadgetLabel() }] : G.upg.spin ? [{ id: 'sp', label: '✴️ دوّامة' }] : []) });
 attachPortal(tvHooks, ninjaLayout);
@@ -539,7 +542,16 @@ $('#skinFile').onchange = async (e) => {
 };
 $('#pSkinOff').onclick = () => { skin.clear(); clearSkinFile(); $('#pSkinOff').hidden = true; togglePause(false); say('↩️ رجع النينجا المعصوب الأصلي.'); };
 loadSkinFile().then((buf) => { if (buf) applySkin(buf, false); });
-$('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL.length - 1) qMode++; else qMode = 'auto'; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); };
+/* ▾ قائمة منسدلة: تضغط الإعداد تنفتح كل الخيارات تحته وتختار مباشرة (بدل الضغط المتكرر) */
+function dropdown(btn, opts, cur, pick) {
+  const open = btn.nextElementSibling && btn.nextElementSibling.classList.contains('dd');
+  document.querySelectorAll('.dd').forEach((d) => d.remove()); document.querySelectorAll('.ddOpen').forEach((b) => b.classList.remove('ddOpen'));
+  if (open) return;
+  const d = document.createElement('div'); d.className = 'dd'; btn.classList.add('ddOpen');
+  opts.forEach(([v, label]) => { const o = document.createElement('button'); o.textContent = (v === cur ? '✓ ' : '') + label; if (v === cur) o.className = 'cur'; o.onclick = (ev) => { ev.stopPropagation(); d.remove(); btn.classList.remove('ddOpen'); pick(v); sfx.click && sfx.click(); }; d.appendChild(o); });
+  btn.after(d); const m = activeMenu(); if (m) { const bs = menuButtons(m); navIdx = Math.max(0, bs.indexOf(d.querySelector('.cur') || d.firstChild)); menuNav(0); }
+}
+$('#pHQ').onclick = () => dropdown($('#pHQ'), [['auto', 'تلقائي (حسب جوالك)'], ...QL.map((q, i) => [i, q.name])], qMode, (v) => { qMode = v; try { localStorage.setItem('nw_q', String(qMode)); } catch (e) {} applyQuality(qMode === 'auto' ? (LOW ? 2 : 1) : qMode); });
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
   if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
@@ -558,12 +570,14 @@ let knockCd = 0;
 /* أزرار اللمس تتغيّر حسب الوضع (ضرب/أطلق/اخنق…) */
 const PISTOL_SVG = '<svg viewBox="0 0 64 40" width="34" height="22" aria-hidden="true"><path fill="#e5e7eb" d="M4 8h44l4-4h8v10h-6l-2 3H30l-3 4h-6l-4 15H7l5-17H4z"/><rect x="48" y="9" width="12" height="3" fill="#9ca3af"/><circle cx="24" cy="16" r="3" fill="#111827"/></svg>';
 const touchCache = {};
+function setOff(id, off) { const b = document.getElementById(id); if (b && b.classList.contains('off') !== off) b.classList.toggle('off', off); }
 function setBtn(id, html) { if (touchCache[id] === html) return; touchCache[id] = html; const b = document.getElementById(id); if (b) b.innerHTML = html; }
 const lab = (ic, t) => icon(ic) + '<small>' + t + '</small>';
 function touchLabels() {
   const bc = document.body.classList; bc.toggle('m-aim', !!stealth.aiming); bc.toggle('m-hold', !!stealth.holding); bc.toggle('m-hang', player.state === 'hang' && !!player.edgeHang); bc.toggle('m-hug', player.state === 'hug'); bc.toggle('m-radio', !!stealth.radioOpen);
   const sh = cfg && cfg.ship, aim = stealth.aiming, hold = stealth.holding, hang = player.state === 'hang' && player.edgeHang, edge = sh && !aim && player.hullEdge && player.hullEdge();
-  setBtn('atkBtn', aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : cfg && (cfg.city || cfg.outfit === 'diver') ? lab('fist', 'ضرب') : lab('sword', 'ضرب'));
+  const pullE = hang && stealth.pullTarget && stealth.pullTarget(); document.body.classList.toggle('m-pull', !!pullE);
+  setBtn('atkBtn', pullE ? lab('grab', 'اسحبه') : aim ? lab('fire', 'أطلق') : hold ? lab('choke', 'اخنق') : sh ? (canGrab() ? lab('grab', 'امسكه') : lab('fist', 'ضرب')) : cfg && (cfg.city || cfg.outfit === 'diver') ? lab('fist', 'ضرب') : lab('sword', 'ضرب'));
   setBtn('aimBtn', aim ? lab('cancel', 'إلغاء') : lab('pistol', 'مسدس'));
   setBtn('actBtn', aim ? lab(stealth.weapon === 'pistol' ? 'sniper' : 'pistol', stealth.weapon === 'pistol' ? 'قنّاصة' : 'مسدس') : hold ? lab('wave', 'ارمِ') : player.state === 'hug' ? lab('knock', 'طق') : hang ? lab('none', '—') : lab('hand', 'شيل'));
   document.body.classList.toggle('m-drive', !!player.driving);
@@ -573,6 +587,15 @@ function touchLabels() {
   if (swim) { setBtn('jumpBtn', lab('swimup', 'اطلع لفوق')); setBtn('rollBtn', lab('dive', 'غوص')); setBtn('atkBtn', lab(cfg && cfg.outfit === 'diver' ? 'fist' : 'sword', 'ضرب')); setBtn('actBtn', lab('hand', 'شيل')); }
   else setBtn('jumpBtn', aim ? lab('breath', 'احبس نفسك') : edge ? lab('climb', 'تعلّق برّا') : hang ? lab('up', 'اطلع') : lab('jump', 'قفز'));
   if (!swim) setBtn('rollBtn', aim ? lab('back', 'رجوع') : hold ? lab('shove', 'دفّه') : hang ? lab('none', '—') : player.state === 'hang' ? lab('back', 'نزول') : lab(G.upg.dash ? 'dash' : 'roll', 'تدحرج'));
+  // 💡 الأزرار اللي تقدر تستخدمها الحين تضوي — واللي ما لها فايدة الحين تطفى
+  const P = player.pos, near = (q, r) => q && Math.hypot(q.x - P.x, q.z - P.z) < r && Math.abs(q.y - P.y) < 1.4;
+  const actOK = player.driving || aim || hold || player.state === 'hug' || !!player.carry || player.inLocker || !!stealth.dragging
+    || (cfg && cfg.city && !!cars.nearest(P, 3.3)) || !!nearItem()
+    || (level.panels || []).some((x) => !x.done && near(x.front, 1.5)) || (level.keypads || []).some((x) => !x.open && near(x.front, 1.4)) || (level.notes || []).some((x) => x.pos.distanceTo(P) < 1.8)
+    || (stealth.on && (enemies.list.some((x) => x.ship && x.alive && x.st === 'sleep' && !x.hidden && x.pos.distanceTo(P) < 1.8) || !!(stealth.nearLocker && stealth.nearLocker(1.4))));
+  const ammoOK = !stealth.on || stealth.ammo.pistol > 0 || stealth.ammo.sniper > 0;
+  setOff('actBtn', !actOK || (hang && !player.driving)); setOff('aimBtn', !aim && !ammoOK); setOff('rollBtn', hang && !player.driving && !swim);
+  setOff('atkBtn', aim && stealth.ammo[stealth.weapon] <= 0);
   const gl = stealth.gadgetLabel(); setBtn('spBtn', gl ? lab(gl.includes('📻') ? 'radio' : 'disguise', gl.replace(/^\S+\s/, '')) : lab('spin', 'دوّامة'));
 }
 let kpCur = null, kpVal = '';
@@ -691,7 +714,7 @@ const keys = {}, prev = {};
 const vin = { jump: 0, atk: 0, roll: 0, act: 0, sp: 0, aim: 0 }, held = { jump: false, roll: false };
 const virt = { mx: 0, my: 0 }; // joystick
 const cam = { yaw: 0, pitch: 0.32, dist: 6.4, want: 6.4, target: new V(), lastManual: -9, dx: 0, dy: 0 };
-const stealth = new Stealth({ onCaptainDown: (e, how) => captainDown(e, how), setDisguise: (on) => setDisguise(hero, on), pauseFor: (v) => { if (v) { if (!paused) { paused = true; radioPaused = true; } } else if (radioPaused) { paused = false; radioPaused = false; } }, camera, cam, scene, sfx, sparks, say: (t) => say(t), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
+const stealth = new Stealth({ onCaptainDown: (e, how) => captainDown(e, how), setDisguise: (on) => setDisguise(hero, on), pauseFor: (v) => { if (v) { if (!paused) { paused = true; radioPaused = true; } } else if (radioPaused) { paused = false; radioPaused = false; } }, camera, cam, scene, sfx, sparks, say: (t) => say(t), shake: (a) => G.shake(a), onSpotted: (e) => G.onSpotted(e), addCoins: (n, at) => addCoins(n, at), level: () => level, upg: () => G.upg, get player() { return player; }, get enemies() { return enemies; }, get hero() { return hero; } });
 let stormT = 4, flash = 0;
 addEventListener('keydown', (e) => {
   /* TV remote / keyboard menu navigation: arrows move, OK/Enter selects, Back returns */
@@ -1044,6 +1067,22 @@ function animateNpc(dt) {
 
 /* ---------------- main loop ---------------- */
 let last = performance.now(), acc = 0, manual = false, tvSendT = 0; const STEP = LITE ? 1 / 60 : 1 / 120;
+/* 🤲 الكفوف توصل فعلاً: المسكة على رقبة الحارس، واللكمة على وجهه */
+const _hA = new V(), _hB = new V(), _hF = new V();
+function handIK() {
+  const e = stealth.holding;
+  if (e && e.m && e.m.h) { e.m.g.updateMatrixWorld(true); const nk = e.m.h.neck.getWorldPosition(_hA), f = _hF.set(Math.sin(player.yaw), 0, Math.cos(player.yaw)), r = _hB.set(f.z, 0, -f.x);
+    armIK(hero, 'R', nk.clone().addScaledVector(f, 0.1).addScaledVector(r, -0.06).add(new V(0, 0.02, 0)), 1); // ذراع تلف الرقبة من قدّام
+    armIK(hero, 'L', nk.clone().addScaledVector(f, -0.12).addScaledVector(r, 0.1).add(new V(0, 0.1, 0)), 1); return; } // والثانية تضغط على راسه من ورا
+  if (player.pullT > 0 && player.pullE && player.pullE.m) { // اليد تمسك رجل الحارس وتسحبه
+    player.pullT -= 1 / 60; const pe = player.pullE; pe.m.g.updateMatrixWorld(true); armIK(hero, 'R', pe.m.h.ftL.getWorldPosition(_hA), Math.min(1, player.pullT * 3)); }
+  const T = player.st && player.st.tgt;
+  if (player.state === 'attack' && player.spy && T && T.m && T.m.h && player.combo < 3) {
+    const k = player.atkK || 0, w = k < 0.38 ? Math.max(0, (k - 0.08) / 0.3) : Math.max(0, 1 - (k - 0.5) / 0.4); // تمد القبضة وتوصل للوجه بلحظة الضربة
+    T.m.g.updateMatrixWorld(true); const hd = T.m.h.head.getWorldPosition(_hA);
+    armIK(hero, player.combo === 2 ? 'L' : 'R', hd, w); // القبضة تروح للوجه نفسه
+  }
+}
 function simulate(dt) {
   if (stopT > 0) { stopT -= dt; dt *= 0.06; }
   tNow += dt;
@@ -1075,7 +1114,7 @@ function frame(now) {
     // title: slow orbit around the plaza
     tNow += dt; cam.yaw += dt * 0.08; level.update(dt, player);
   }
-  menuPoll(dt); player.animate(dt); animateNpc(dt);
+  menuPoll(dt); player.animate(dt); handIK(); animateNpc(dt);
   if (skin && skin.active) skin.update(dt, player); scarf.mesh.visible = !(skin && skin.active) && !hero.spy;
   if (stealth.aiming || player.inLocker) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
   if (player.driving) { hero.root.visible = false; scarf.mesh.visible = false; trail.mesh.visible = false; }
@@ -1100,7 +1139,7 @@ requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
 window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get camera() { return camera; },
-  get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
+  get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, get heroObj() { return hero; }, handIK: () => handIK(), THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
   manual: (v) => { manual = v; },
