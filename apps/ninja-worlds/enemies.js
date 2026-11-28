@@ -61,6 +61,17 @@ export class Enemies {
       Object.assign(e, { ship: true, archer: true, hp: 3, maxHp: 3, speed: 3.2 });
       const ex = textSprite('!', { size: 110, color: '#ff4040', glow: '#ff0000', scale: 0.55 }), qu = textSprite('?', { size: 110, color: '#ffd23f', glow: '#ffaa00', scale: 0.55 }), zz = textSprite('Zzz', { size: 70, color: '#bfdbfe', glow: '#3b82f6', scale: 0.45 });
       [ex, qu, zz].forEach((x) => { x.position.y = 2.45; x.visible = false; m.g.add(x); }); m.icons = { ex, qu, zz };
+      const H = m.h, M2 = (c, r = 0.4, mt = 0.6) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: mt });
+      if (def.heavy) { // 🛡️ مدرّع: خوذة + صدرية — ما ينخنق، والسهم ما يأثر إلا في الراس
+        e.heavy = true; e.hp = e.maxHp = 6; e.speed = 2.6; m.g.scale.setScalar(1.12);
+        const hm = new THREE.Mesh(new THREE.SphereGeometry(0.19, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), M2(0x3f4a3c)); hm.position.y = 0.05; H.head.add(hm);
+        const vest = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.42, 0.36), M2(0x2b3326, 0.6, 0.3)); vest.position.y = 0.25; H.spine.add(vest);
+        for (let i = 0; i < 3; i++) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.04), M2(0x1f2419)); pl.position.set((i - 1) * 0.15, 0.27, 0.19); H.spine.add(pl); }
+      }
+      if (def.sniper) { // 🎯 قنّاص الصاري: يشوف بعيد بس بشعاع ضيق، والليزر يبيّن وين يطالع
+        e.sniper = true; e.baseYaw = def.yaw || 0; e.yaw = e.baseYaw;
+        const lz = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 24, 4), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0.55, depthWrite: false })); lz.rotation.x = Math.PI / 2; lz.position.set(0.12, 1.5, 12); m.g.add(lz); m.laser = lz;
+      }
     }
     if (boss) { Object.assign(e, { boss: true, hp: 40, maxHp: 40, reach: 4.4, speed: 2.4, summonT: 8 }); }
     if (rise) { m.inner.position.y = -2.2; this.g.fx.emit(new V(def.x, def.y + 0.3, def.z), { color: 0x8b5cf6, count: 40, speed: 4, up: 1, life: 0.9, size: 0.4, grav: -1 }); }
@@ -214,10 +225,11 @@ export class Enemies {
     if (dis && !dis.reveal && !e.captain) { if (d > 3.4 || Math.abs(dy) > 2.5) return 0; if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.5) return 0; return 0.16; }
     const hug = pl.state === 'hug' && pl.hug, flat = hug && !pl.hug.peek && pl.hug.still > 0.3;
     const prone = pl.prone, still = prone && Math.hypot(pl.vel.x, pl.vel.z) < 0.3;
-    const range = hidden ? 2.4 : (e.captain ? 19 : e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1) * (still ? 0.45 : prone ? 0.6 : 1); // منبطح = أصعب تنشاف // ملزوق بالجدار وساكن = أصعب تنشاف
+    if (e.sniper) { if (d > 24 || Math.abs(dy) > 16 || (dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.965 || (pl.prone && d > 9)) return 0; }
+    const range = hidden ? 2.4 : e.sniper ? 24 : (e.captain ? 19 : e.ship ? 11 : 9) * (flat ? 0.6 : hug ? 0.8 : 1) * (still ? 0.45 : prone ? 0.6 : 1); // منبطح = أصعب تنشاف // ملزوق بالجدار وساكن = أصعب تنشاف
     if (d < 1.3 && Math.abs(dy) < 1.6) return 2;
-    if (d > range || Math.abs(dy) > 3.5) return 0;
-    if ((dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
+    if (d > range || Math.abs(dy) > (e.sniper ? 16 : 3.5)) return 0;
+    if (!e.sniper && (dx * Math.sin(e.yaw) + dz * Math.cos(e.yaw)) / (d || 1) < 0.8) return 0;
     const a = e.pos.clone().add(new V(0, 1.6, 0)), b = pl.pos.clone().add(new V(0, pl.prone ? 0.3 : 1.1, 0)), n = Math.ceil(a.distanceTo(b) / 0.5), BX = this.g.level.segBoxes(a, b);
     for (let i = 1; i < n; i++) { const p = a.clone().lerp(b, i / n); for (const x of BX) if (x.active && p.x > x.min.x && p.x < x.max.x && p.y > x.min.y && p.y < x.max.y && p.z > x.min.z && p.z < x.max.z) return 0; }
     return 1 + (9 - d) / 9;
@@ -245,6 +257,7 @@ export class Enemies {
       else { e.st = 'drowsy'; e.drowsyT = 0.9; e.t = 0; this.g.say && this.g.say(head ? `🎯 رأس! القائد يترنّح — باقي ${e.capHp}` : `💉 أصبته — باقي ${e.capHp} (الرأس يحسب ٢)`); }
       return true;
     }
+    if (e.heavy && !head) { e.flash = 0.2; this.g.fx.emit(e.pos.clone().add(new V(0, 1.2, 0)), { color: 0xcbd5e1, count: 10, speed: 3, life: 0.3, size: 0.15 }); this.g.say && this.g.say('🛡️ الدرع صدّ السهم! هذا مدرّع — صوّب على الراس'); this.alarm && !e.alert && (e.sus = 1); return true; }
     if (head || e.st === 'drowsy') this.sleep(e); else { e.st = 'drowsy'; e.drowsyT = 2.4; e.t = 0; }
     this.g.fx.emit(e.pos.clone().add(new V(0, head ? 1.7 : 1.1, 0)), { color: 0x93c5fd, count: 12, speed: 3, life: 0.4, size: 0.2 });
     return true;
@@ -283,6 +296,8 @@ export class Enemies {
     const phase = this.g.level.phase || 'normal';
     if (e.st === 'dragged' || e.st === 'held') return 'idle';
     if (e.captain) return this.captainThink(e, dt, pl, d, dy, dx, dz, toYaw);
+    if (e.sniper && e.m.laser) e.m.laser.visible = e.alive && e.st !== 'sleep' && e.st !== 'drowsy';
+    if (e.sniper && !e.alert && (e.st === 'idle' || e.st === 'chase' || e.st === 'inv')) { e.st = 'idle'; e.yaw = e.baseYaw + Math.sin(e.t * 0.35) * 0.75; const s2 = this.sees(e, pl, d, dy, dx, dz); if (s2) { e.sus += dt * 1.6 * s2; if (e.sus >= 1) { e.st = 'radio'; e.radioT = 1.0; this.g.onSpotted && this.g.onSpotted(e); } } else e.sus = Math.max(0, e.sus - dt * 0.4); return 'idle'; } // يكشح بالليزر يمين ويسار
     if (this.g.level.waveHit > 0 && e.pos.y > -0.6 && e.pos.y < 1.6 && !['sleep', 'thrown'].includes(e.st) && !(e.pos.z > 117 && e.pos.z < 157 && Math.abs(e.pos.x) < 9)) return 'idle'; // متمسك بالحديد
     if (e.st === 'sleep') { e.sleepT -= dt; if (Math.random() < dt * 0.8) this.g.fx.emit(e.pos.clone().add(new V(0, 0.8, 0)), { color: 0xbfdbfe, count: 1, speed: 0.4, up: 1, life: 1.4, size: 0.18, grav: -0.6 });
       if (e.sleepT <= 0 && !e.hidden) { e.st = 'idle'; e.sus = 0; e.wait = 1.5; this.g.onGuardWoke && this.g.onGuardWoke(e); } return 'idle'; }

@@ -26,7 +26,7 @@ export class Stealth {
     this.on = !!cfg.ship; this.exitAim(); this.drop(); this.release(true); this.leaveLocker(true); this.flying = [];
     this.radio = false; this.radioSus = 0; this.radioCd = 0; this.chatT = 18; this.setDisguise(false, true); this.closeRadio(true);
     const d = this.c.upg().darts || 0;
-    this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d }; this.cans = 5; this.cansFly = []; this.noiseLv = 0; this.noiseT = 0; this.wasAir = false;
+    this.ammo = { pistol: 8 + 4 * d, sniper: 3 + 2 * d }; this.cans = 5; this.cansFly = []; this.setupDogs(level); this.checkT = 50; this.noiseLv = 0; this.noiseT = 0; this.wasAir = false;
     level.phase = 'normal'; level.phaseT = 0; level.lastSeen = null;
     document.body.classList.toggle('shipmode', this.on); this.hud(true);
   }
@@ -40,6 +40,7 @@ export class Stealth {
     if (inp.throwP) { inp.throwP = false; if (!this.aiming && !this.holding && !P.inLocker && P.state !== 'hang') this.throwCan(); }
     if (this.holding) { // ماسك حارس من الخلف
       if (inp.atkP) { inp.atkP = false; this.choke(); }
+      if (inp.spP) { inp.spP = false; this.interrogate(); }
       if (inp.actP) { inp.actP = false; if (!this.throwBody(this.holding)) this.c.say('🌊 قرّب من حافة السفينة (السطح المكشوف) عشان ترميه في البحر — أو اضغط ⚔️ عشان تخنقه لين يغمى عليه'); }
       if (inp.rollP) { inp.rollP = false; this.release(false, true); }
       inp.jumpP = false; inp.aimP = false; inp.spP = false;
@@ -100,6 +101,7 @@ export class Stealth {
   }
   choke() {
     const e = this.holding; if (!e) return;
+    if (e.heavy) { this.c.say('🛡️ مدرّع — ما ينخنق! ارمه في البحر عند الحافة (✋)، أو استجوبه، أو فكّه واهرب'); return; }
     if (e.captain) { this.c.say('💪 القائد أقوى من إنك تخنقه! جرّه لحافة السفينة وارمه في البحر 🌊 — بسرعة قبل يفلت!'); return; }
     e.choke = Math.min(1, e.choke + 0.17 + (this.c.upg().dmg || 0) * 0.04); e.flash = 0.08;
     this.c.sfx.tone(140 + e.choke * 80, 110, 0.12, 'sawtooth', 0.05);
@@ -174,6 +176,7 @@ export class Stealth {
   gadgetLabel() {
     if (!this.on || this.aiming) return null;
     if (!this.holding && !this.dragging && !this.disguise && this.nearBody()) return '🧥 البس زيّه';
+    if (this.holding && !this.holding.asked) return '🗣️ استجوبه';
     if (this.radio) return '📻 راديو';
     return null;
   }
@@ -245,6 +248,7 @@ export class Stealth {
     for (const SH of this.L.shootables || []) { if (SH.done) continue; const tv = o.clone().sub(SH.pos), b = tv.dot(dir), cc = tv.lengthSq() - SH.r * SH.r, disc = b * b - cc; if (disc < 0) continue; const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt + 0.3) { bt = tt; best = null; this.c.sparks.emit(SH.pos.clone(), { color: 0xfde68a, count: 30, speed: 5, life: 0.5 }); this.c.sfx.S('dg_zap_two_tone', 0.7); SH.fn(); break; } }
     const end = o.clone().addScaledVector(dir, Math.min(bt, far));
     this.tracer(o.clone().addScaledVector(dir, 0.6).add(new V(0, -0.08, 0)), end);
+    const dh = this.hitDog(o, dir, bt); if (dh) { dh.d.st = 'sleep'; dh.d.sleepT = 90; this.c.sparks.emit(dh.d.p.clone().add(new V(0, 0.7, 0)), { color: 0x93c5fd, count: 12, speed: 3, life: 0.4 }); this.c.say('🐕💤 نام الكلب!'); this.tracer(o.clone().addScaledVector(dir, 0.6), o.clone().addScaledVector(dir, dh.t)); return; }
     if (best) {
       const e = best.e;
       if (e.ship) { this.c.enemies.tranq(e, best.isHead); const dm = Math.round(bt); if (best.isHead) this.c.say(dm > 25 ? `🎯 رأس من ${dm} متر! نام على طول 😴` : '🎯 في الراس! نام على طول 😴'); this.hitMark = { t: 0.6, head: best.isHead }; }
@@ -258,6 +262,67 @@ export class Stealth {
   }
   /* ---------- per frame ---------- */
   /* 🥫 الإلهاء: ترمي علبة قدّامك (قوس ~٩م)، تطق بالأرض أو بالجدار، والحراس القريبين يروحون يشوفون وش الصوت */
+  /* 🗣️ الاستجواب: وأنت ماسكه من الخلف — يعطيك معلومة وحدة مفيدة */
+  interrogate() {
+    const e = this.holding; if (!e || e.asked) return; e.asked = true; const L = this.L, P = this.c.player;
+    const kp = (L.keypads || []).find((k) => !k.open && !k.told), dog = (this.dogs || []).find((d) => d.st !== 'sleep'), amm = (L.ammo || []).filter((a) => !a.taken).sort((a, b) => a.pos.distanceTo(P.pos) - b.pos.distanceTo(P.pos))[0];
+    let line;
+    if (kp) { kp.told = true; line = `«لا تذبحني! كود ${kp.label} هو ${kp.code.split('').join(' ')}»`; }
+    else if (amm) { const dz = amm.pos.z - P.pos.z; line = `«فيه صندوق ذخيرة ${dz > 4 ? 'قدّام' : dz < -4 ? 'ورا' : 'قريب'} — تقريباً ${Math.round(amm.pos.distanceTo(P.pos))} متر»`; }
+    else if (dog) line = '«الكلاب تشم الريحة… انبطح أو ارمِ علبة تلهيها»';
+    else line = '«القائد عاصفة على المهبط بالمقدمة… يعبّي سلاحه بعد كل ٣ طلقات»';
+    this.c.say('🗣️ ' + line); this.c.sfx.speak && this.c.sfx.speak(line.replace(/[«»]/g, ''), { pitch: 0.75 }); e.heldT = Math.max(0, e.heldT - 1.5);
+  }
+  /* 📻 نداء الراديو: كل فترة الحرس يتفقدون بعض — إذا واحد ما رد (نايم/مخفي/بالبحر) يروحون يدورونه */
+  radioCheck(dt) {
+    const L = this.L; if (L.phase !== 'normal' || (this.checkT -= dt) > 0) return; this.checkT = 45 + Math.random() * 25;
+    const gs = this.c.enemies.list.filter((e) => e.ship && !e.captain && !e.sniper && e.def); if (!gs.length) return;
+    const e = gs[Math.floor(Math.random() * gs.length)], ok = e.alive && !['sleep', 'dragged', 'held', 'thrown'].includes(e.st) && !e.hidden;
+    const n = gs.indexOf(e) + 1;
+    if (ok) { this.chatter && this.chatter('📻 «وحدة ' + n + '، الوضع؟» — «تمام، كله هادي»'); return; }
+    this.c.say('📻 «وحدة ' + n + '… وحدة ' + n + ' رد!» … ما رد! الحراس بيروحون يدورونه'); this.c.sfx.voice && this.c.sfx.voice('call_for_backup', this.c.player.pos, 0.4);
+    this.setPhase('caution'); L.lastSeen = new V(e.def.x, e.def.y || 0, e.def.z);
+    for (const o of this.c.enemies.list) if (o.ship && o.alive && o.st !== 'sleep' && !o.sniper && !o.captain && Math.hypot(o.pos.x - e.def.x, o.pos.z - e.def.z) < 40) o.alert = true;
+  }
+  /* 🐕 كلاب الحراسة: تمشي دورية، تشم ريحتك من قريب، تنبح وتجيب الحرس — السهم ينوّمها والعلبة تلهيها */
+  setupDogs(level) {
+    for (const d of this.dogs || []) d.g.removeFromParent(); this.dogs = [];
+    for (const D of level.dogs || []) {
+      const g = new THREE.Group(), M = (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }), fur = M(0x3b2a1e), dark = M(0x1a120c);
+      const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+      add(new THREE.BoxGeometry(0.32, 0.32, 0.8), fur, 0, 0.55, 0); const head = add(new THREE.BoxGeometry(0.26, 0.26, 0.3), fur, 0, 0.78, 0.5); add(new THREE.BoxGeometry(0.14, 0.12, 0.2), dark, 0, 0.72, 0.7);
+      [-1, 1].forEach((s) => { const ear = add(new THREE.ConeGeometry(0.06, 0.16, 4), dark, s * 0.09, 0.97, 0.46); ear.rotation.z = -s * 0.2; });
+      const legs = [[-0.11, 0.3], [0.11, 0.3], [-0.11, -0.3], [0.11, -0.3]].map(([x, z]) => { const l = add(new THREE.BoxGeometry(0.08, 0.42, 0.08), dark, x, 0.21, z); return l; });
+      const tail = add(new THREE.BoxGeometry(0.05, 0.05, 0.3), fur, 0, 0.7, -0.5); tail.rotation.x = -0.6;
+      const p = new V(D.path[0][0], D.y, D.path[0][1]); g.position.copy(p); this.c.scene.add(g);
+      this.dogs.push({ g, head, legs, tail, p, path: D.path, wi: 1, st: 'walk', t: 0, yaw: 0, barkT: 0 });
+    }
+  }
+  updateDogs(dt) {
+    const P = this.c.player, hs = Math.hypot(P.vel.x, P.vel.z);
+    for (const d of this.dogs) {
+      d.t += dt; let tgt = null, sp = 1.6;
+      if (d.st === 'sleep') { d.sleepT -= dt; d.g.rotation.z = 1.4; if (d.sleepT <= 0) { d.st = 'walk'; d.g.rotation.z = 0; } continue; }
+      const dist = d.p.distanceTo(P.pos), smell = P.inLocker || P.state === 'hang' ? 0 : P.prone ? 2.5 : hs > 5 ? 8 : 5.5;
+      if (d.st !== 'sniff' && dist < smell && Math.abs(P.pos.y - d.p.y) < 2) { if (d.st !== 'bark') { d.st = 'bark'; d.barkT = 0; } }
+      if (d.st === 'bark') {
+        if (dist > 12) { d.st = 'walk'; } else { tgt = dist > 2.2 ? P.pos : null; sp = 4.2; d.barkT -= dt;
+          if (d.barkT <= 0) { d.barkT = 1.1; this.c.sfx.tone(320, 180, 0.12, 'sawtooth', 0.14); this.c.sfx.tone(300, 170, 0.1, 'sawtooth', 0.12, 0.18); this.c.enemies.noise(P.pos.clone(), 13); if (!this.L._dogTip) { this.L._dogTip = true; this.c.say('🐕 كلب الحراسة شمّك وينبح! الحراس بيجون — نوّمه بسهم 🎯 أو ارمِ علبة 🥫 بعيد يلهيه، والانبطاح يخفي ريحتك'); } }
+          d.yaw = Math.atan2(P.pos.x - d.p.x, P.pos.z - d.p.z); }
+      } else if (d.st === 'sniff') { tgt = d.p.distanceTo(d.tgt) > 0.8 ? d.tgt : null; sp = 3.5; if (!tgt && d.t > 5) { d.st = 'walk'; } }
+      else { const w = d.path[d.wi]; tgt = new V(w[0], d.p.y, w[1]); if (Math.hypot(w[0] - d.p.x, w[1] - d.p.z) < 0.6) { d.wi = (d.wi + 1) % d.path.length; } }
+      if (tgt) { const vx = tgt.x - d.p.x, vz = tgt.z - d.p.z, l = Math.hypot(vx, vz) || 1; d.p.x += vx / l * sp * dt; d.p.z += vz / l * sp * dt; d.yaw += (Math.atan2(vx, vz) - d.yaw + Math.PI * 3) % (Math.PI * 2) - Math.PI > 0 ? Math.min(dt * 6, 1) * 0 : 0; d.yaw = Math.atan2(vx, vz); }
+      const mv = tgt ? 1 : 0, ph = d.t * (sp > 3 ? 16 : 9);
+      d.legs.forEach((l, i) => { l.rotation.x = Math.sin(ph + (i % 2 ? Math.PI : 0) + (i > 1 ? Math.PI : 0)) * 0.6 * mv; });
+      d.tail.rotation.y = Math.sin(d.t * (d.st === 'bark' ? 20 : 6)) * 0.5; d.head.position.y = 0.78 + (d.st === 'bark' ? Math.abs(Math.sin(d.t * 9)) * 0.06 : 0);
+      d.g.position.copy(d.p); d.g.rotation.y = d.yaw;
+    }
+  }
+  hitDog(o, dir, maxT) { // سهم المسدس/القنّاصة
+    let best = null, bt = maxT;
+    for (const d of this.dogs || []) { if (d.st === 'sleep') continue; const c = d.p.clone().add(new V(0, 0.6, 0)), tv = o.clone().sub(c), b = tv.dot(dir), cc = tv.lengthSq() - 0.45 * 0.45, disc = b * b - cc; if (disc < 0) continue; const tt = -b - Math.sqrt(disc); if (tt > 0 && tt < bt) { bt = tt; best = d; } }
+    return best ? { d: best, t: bt } : null;
+  }
   throwCan() {
     const P = this.c.player; if ((this.cans || 0) <= 0) { this.c.say('🥫 خلصت العلب — تلقى علب زيادة مع صناديق الذخيرة'); return; }
     this.cans--; const f = new V(Math.sin(P.yaw), 0, Math.cos(P.yaw)), from = P.pos.clone().add(new V(0, P.prone ? 0.5 : 1.5, 0)).addScaledVector(f, 0.4);
@@ -275,7 +340,7 @@ export class Stealth {
         c.done = true; c.m.removeFromParent(); const at = c.p.clone(); at.y = Math.max(at.y, c.y0);
         this.c.sfx.tone(1900, 1500, 0.07, 'square', 0.12); this.c.sfx.tone(2400, 1800, 0.05, 'square', 0.08, 0.09); this.c.sfx.tone(1700, 1400, 0.04, 'square', 0.05, 0.18); // طق طق طق
         this.c.sparks.emit(at.clone().add(new V(0, 0.1, 0)), { color: 0xe2e8f0, count: 10, speed: 2, up: 2, life: 0.3, size: 0.12, grav: 8 });
-        this.c.enemies.noise(at, 9); this.ring(at);
+        this.c.enemies.noise(at, 9); this.ring(at); for (const d of this.dogs || []) if (d.st !== 'sleep' && d.p.distanceTo(at) < 12) { d.st = 'sniff'; d.tgt = at.clone(); d.t = 0; } // الكلب يروح يشم العلبة
       } else { c.p.copy(nx); c.m.position.copy(nx); c.m.rotation.x += dt * 14; }
     }
     this.cansFly = this.cansFly.filter((c) => !c.done);
@@ -295,7 +360,7 @@ export class Stealth {
     const el = document.getElementById('noiseM'); if (el) { const lv = Math.round(this.noiseLv / 7 * 5); if (el.dataset.lv !== String(lv)) { el.dataset.lv = lv; el.innerHTML = '👣 ' + [0, 1, 2, 3, 4].map((i) => '<i class="' + (i < lv ? 'on' : '') + '"></i>').join('') + (lv >= 4 ? ' <b>عالي!</b>' : lv === 0 ? ' <span>صامت</span>' : ''); } }
   }
   update(dt) {
-    if (this.on) { this.updateCans(dt); this.footNoise(dt); }
+    if (this.on) { this.updateCans(dt); this.footNoise(dt); this.updateDogs(dt); this.radioCheck(dt); }
     for (const t of this.tracers) { t.t -= dt; t.l.material.opacity = Math.max(0, t.t / 0.15); if (t.t <= 0) { t.l.removeFromParent(); t.l.geometry.dispose(); } }
     this.tracers = this.tracers.filter((t) => t.t > 0);
     if (!this.on) return;

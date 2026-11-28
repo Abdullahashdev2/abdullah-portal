@@ -663,6 +663,10 @@ export function w7(K, L, S) {
   K.note({ x: 6, y: 0, z: 228, title: 'ورقة ٤', text: 'الرقم الأخير: ١' });
   K.trigger({ x: 0, z: 418, r: 6, text: '🚁 المهبط الأخير — المروحية تنتظرك… بس القائد «عاصفة» هنا!' });
   L.reinforce.push({ y: 0, zone: MID, points: [[-3, 300], [3, 300]] }, { y: -6, zone: LAB, points: [[0, 300], [3, 300]] });
+  // 🛡️ حراس مدرّعين (بعض الدوريات) + 🎯 قنّاص على سطح الجسر + 🐕 كلاب حراسة
+  L.enemyDefs.filter((d) => d.type === 'guard' && !d.group).forEach((d, i) => { if (i % 6 === 4) d.heavy = true; });
+  K.enemy({ x: 0.8, y: 12, z: 155.2, type: 'guard', path: [[0.8, 155.2]], zone: { x0: 0, x1: 1.6, z0: 154.6, z1: 155.6 }, sniper: true, yaw: 0 });
+  L.dogs = [{ path: [[-9, 60], [-9, 92], [9, 92], [9, 60]], y: 0 }, { path: [[-8, 178], [8, 178], [8, 206], [-8, 206]], y: 0 }, { path: [[-9, 255], [9, 255], [9, 285], [-9, 285]], y: 0 }];
   return cfg;
 }
 
