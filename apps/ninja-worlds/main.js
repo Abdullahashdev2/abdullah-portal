@@ -578,9 +578,9 @@ skin = new Skin(hero);
 async function applySkin(buf, announce) {
   try {
     const clips = await skin.load(buf); $('#pSkinOff').hidden = false;
-    if (announce) say('🧍 شخصيتك الجديدة جاهزة! الحركات اللي لقيتها: ' + (clips.length ? clips.join('، ') : 'ما فيه حركات — بتظهر واقفة') + ' 🎉');
+    if (announce) say(skin.mode === 'life' ? (skin.autoRigged ? '✨ شخصيتك صارت حيّة! ما كان فيها هيكل — حلّلنا شكلها وبنينا لها عظام، وتتحرك الحين بحركات النينجا كلها 🎉' : '✨ شخصيتك صارت حيّة! لقينا عظامها وتتحرك بحركات النينجا كلها 🎉') : '🧍 شخصيتك جاهزة بحركاتها: ' + clips.join('، ') + ' 🎉');
     return true;
-  } catch (e) { console.error(e); if (announce) say('⚠️ ما قدرت أقرأ الملف — لازم يكون GLB فيه هيكل (rig).'); return false; }
+  } catch (e) { console.error(e); if (announce) say('⚠️ ما قدرت أقرأ الملف — تأكد إنه ملف GLB سليم.'); return false; }
 }
 $('#pSkin').onclick = () => $('#skinFile').click();
 $('#skinFile').onchange = async (e) => {
@@ -1216,7 +1216,7 @@ requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
 window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; }, get crowd() { return G.crowd; }, get net() { return net; }, get charge() { return G.charge; }, get camera() { return camera; },
-  get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, get heroObj() { return hero; }, handIK: () => handIK(), THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
+  get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, get heroObj() { return hero; }, get skinObj() { return skin; }, handIK: () => handIK(), THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
   manual: (v) => { manual = v; },
