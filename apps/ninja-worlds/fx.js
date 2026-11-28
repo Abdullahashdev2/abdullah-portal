@@ -179,6 +179,7 @@ const MUSIC = {
   w7: { bpm: 86, chords: [[45, 52, 57, 60], [44, 51, 56, 59], [41, 48, 53, 57], [43, 50, 55, 58]], scale: [57, 59, 60, 62, 64, 65, 68], arp: 0.45, lead: 0.12, drum: true },
   w2: { bpm: 84, chords: [[52, 59, 64, 67], [48, 55, 60, 64], [55, 62, 67, 71], [50, 57, 62, 66]], scale: [64, 66, 67, 71, 74, 76, 79], arp: 0.7, lead: 0.3, drum: true },
 };
+const SFX_FILES = ["bell0", "bell1", "bell2", "bell3", "bell4", "belt_handle_1", "chop", "cloth1", "cloth2", "cloth3", "cloth4", "cloth_belt", "creak1", "creak2", "creak3", "dg_pep_sound_2", "dg_phase_jump_2", "dg_power_up_11", "dg_power_up_3", "dg_power_up_7", "dg_three_tone_1", "dg_tone_1", "dg_zap_two_tone", "door_c1", "door_c2", "door_c3", "door_o1", "door_o2", "door_o3", "drop_leather", "handle_coins", "handle_coins_2", "metal_click", "metal_h0", "metal_h1", "metal_h2", "metal_h3", "metal_h4", "metal_l0", "metal_l1", "metal_l2", "metal_l3", "metal_l4", "metal_latch", "metal_m0", "metal_m1", "metal_m2", "metal_m3", "metal_m4", "metal_pot_1", "mine0", "mine1", "mine2", "mine3", "mine4", "nf_big_kill", "nf_coin", "nf_confirm", "nf_dash", "nf_gem", "nf_hurt", "nf_kill", "nf_land", "nf_level_up", "punch_h0", "punch_h1", "punch_h2", "punch_h3", "punch_m0", "punch_m1", "punch_m2", "punch_m3", "sf_computer_noise_000", "sf_computer_noise_002", "sf_door_close_000", "sf_door_open_000", "sf_engine_circular_000", "sf_explosion_crunch_000", "sf_force_field_000", "sf_force_field_002", "sf_laser_small_000", "sf_low_frequency_explosion_000", "sf_space_engine_low_000", "sf_thruster_fire_000", "sf_thruster_fire_002", "soft_h0", "soft_h1", "soft_h2", "soft_h3", "soft_h4", "st_conc0", "st_conc1", "st_conc2", "st_conc3", "st_conc4", "st_grass0", "st_grass1", "st_grass2", "st_grass3", "st_grass4", "st_metal0", "st_metal1", "st_metal2", "st_metal3", "st_metal4", "st_snow0", "st_snow1", "st_snow2", "st_snow3", "st_snow4", "st_wood0", "st_wood1", "st_wood2", "st_wood3", "st_wood4", "swish0", "swish1", "swish2", "swish3", "swish4", "vo_call_for_backup", "vo_congratulations", "vo_cover_me", "vo_get_down", "vo_go", "vo_go_go_go", "vo_hold", "vo_look_out", "vo_medic", "vo_mission_completed", "vo_objective_achieved", "vo_power_up", "vo_ready", "vo_reloading", "vo_sniper", "vo_suppressing_fire", "vo_target_engaged", "vo_watch_my_back", "wood_h0", "wood_h1", "wood_h2", "wood_h3", "wood_h4"];
 export class Sound {
   constructor() { this.ctx = null; this.on = true; }
   init(extCtx, toStream) {
@@ -195,6 +196,81 @@ export class Sound {
     this.verb = c.createConvolver(); this.verb.buffer = ir; const vg = c.createGain(); vg.gain.value = 0.55; this.verb.connect(vg); vg.connect(this.master);
     this.delay = c.createDelay(1); this.delay.delayTime.value = 0.36; const fb = c.createGain(); fb.gain.value = 0.32; this.delay.connect(fb); fb.connect(this.delay); this.delay.connect(this.verb);
     const nb = c.createBuffer(1, c.sampleRate, c.sampleRate), nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1; this.noiseBuf = nb;
+    this.loadSamples();
+  }
+  /* ---------- أصوات حقيقية مسجّلة (CC0) ---------- */
+  loadSamples() {
+    if (this.buf) return; this.buf = {}; this.groups = {}; const c = this.ctx, base = new URL('sfx/', import.meta.url).href;
+    const pr = ['st_', 'cloth', 'swish', 'punch', 'nf_', 'metal_', 'soft_h', 'dg_power_up', 'handle_coins', 'vo_', 'sf_door', 'creak', 'metal_latch', 'metal_click'], rank = (n) => { const k = pr.findIndex((p) => n.startsWith(p)); return k < 0 ? 99 : k; };
+    const LIST = SFX_FILES.slice().sort((a, b) => rank(a) - rank(b));
+    let i = 0; const next = () => { if (i >= LIST.length) return; const n = LIST[i++];
+      fetch(base + n + '.ogg').then((r) => r.ok ? r.arrayBuffer() : Promise.reject()).then((ab) => new Promise((res, rej) => c.decodeAudioData(ab, res, rej))).then((b) => { this.buf[n] = b; const g = n.replace(/\d+$/, ''); (this.groups[g] = this.groups[g] || []).push(b); }).catch(() => {}).finally(next); };
+    for (let k = 0; k < 6; k++) next();
+  }
+  has(n) { return !!(this.buf && (this.buf[n] || (this.groups && this.groups[n] && this.groups[n].length))); }
+  // S('اسم أو مجموعة', الصوت, {rate, rv, verb, pan, delay, at})
+  S(n, vol = 0.6, o = {}) {
+    if (!this.ctx || !this.buf) return false; const g = this.groups[n], b = this.buf[n] || (g && g[Math.floor(Math.random() * g.length)]); if (!b) return false;
+    const c = this.ctx, src = c.createBufferSource(), gn = c.createGain(); src.buffer = b;
+    src.playbackRate.value = (o.rate || 1) * (1 + ((Math.random() - 0.5) * 2) * (o.rv ?? 0.06));
+    let v = vol, pan = o.pan || 0;
+    if (o.at && this.ear) { const e = this.ear, dx = o.at.x - e.position.x, dy = o.at.y - e.position.y, dz = o.at.z - e.position.z, d = Math.hypot(dx, dy, dz); v *= 1 / Math.pow(1 + d / 9, 1.25); if (v < 0.01) return true; const r = this._right || (this._right = new e.position.constructor()); r.set(1, 0, 0).applyQuaternion(e.quaternion); pan = Math.max(-1, Math.min(1, (dx * r.x + dz * r.z) / (d || 1))) * 0.8; }
+    gn.gain.value = v; src.connect(gn);
+    let out = gn; if (pan && c.createStereoPanner) { const p = c.createStereoPanner(); p.pan.value = pan; gn.connect(p); out = p; }
+    out.connect(this.sfxBus); if (o.verb && this.verb) { const vs = c.createGain(); vs.gain.value = o.verb; out.connect(vs); vs.connect(this.verb); }
+    src.start(c.currentTime + (o.delay || 0)); return true;
+  }
+  surfaceStep(v = 0.42, at) { return this.S('st_' + (this.surface || 'conc'), v, { at, verb: this.room || 0 }); }
+  knock() { this.S('metal_h', 0.95, { verb: 0.25 }) || this.tone(180, 120, 0.07, 'square', 0.12); this.S('metal_h', 0.8, { delay: 0.14, verb: 0.25 }); }
+  metal(v = 0.7, at) { this.S('metal_m', v, { at, verb: 0.2 }); }
+  door(open = true, at) { this.S(open ? 'sf_door_open_' : 'sf_door_close_', 0.8, { at, rv: 0.03 }) || this.gate(); this.S('metal_h', 0.35, { at, rate: 0.6 }); }
+  locker(at) { this.S('creak', 0.7, { at }); this.S('metal_latch', 0.6, { at, delay: 0.08 }); }
+  click() { this.S('metal_click', 0.7) || this.tone(1400, 1200, 0.03, 'square', 0.05); }
+  panel() { this.S('sf_computer_noise_', 0.6) ; this.S('dg_zap_two_tone', 0.4, { delay: 0.1 }); }
+  keycard() { this.S('metal_click', 0.6); this.S('dg_power_up_3', 0.45, { delay: 0.05, verb: 0.2 }); }
+  splash(at) { this.S('soft_h', 0.9, { rate: 0.6, at }); this.noise(0.7, 900, 0.5, 0.22, 'lowpass', 0.02); this.noise(0.4, 2400, 0.6, 0.1, 'bandpass', 0.08); }
+  shot(sniper) { this.S('punch_m', sniper ? 0.9 : 0.7, { rate: sniper ? 1.1 : 1.6 }); this.noise(0.12, sniper ? 900 : 1600, 1.2, sniper ? 0.25 : 0.16, 'bandpass', 0, 300); }
+  bolt() { this.S('metal_latch', 0.6, { rate: 1.1 }); this.S('metal_click', 0.55, { delay: 0.2 }); }
+  coin() { this.S('nf_coin', 0.45) || this.pickup(); }
+  crash(v = 0.6, at) { this.S('metal_h', Math.min(1, v), { at, rate: 0.85 }); this.S('soft_h', v * 0.6, { at }); }
+  nitro() { this.S('sf_thruster_fire_', 0.5); }
+  voice(n, at, vol = 1) { const t = performance.now(); if (t - (this._vt || 0) < 900) return; this._vt = t; this.S('vo_' + n, vol, { at, rv: 0.02, verb: this.room || 0.05 }); }
+  // عربي من صوت الجوال نفسه (إذا متوفر)
+  speak(text, o = {}) {
+    try { const ss = window.speechSynthesis; if (!ss || !this.on) return; const t = performance.now(); if (t - (this._st || 0) < 1500) return; this._st = t;
+      const u = new SpeechSynthesisUtterance(text); const vs = ss.getVoices(); const ar = vs.find((v) => /^ar/i.test(v.lang)); if (ar) u.voice = ar; u.lang = ar ? ar.lang : 'ar-SA';
+      u.pitch = o.pitch ?? 0.75; u.rate = o.rate ?? 1.0; u.volume = Math.max(0, Math.min(1, o.vol ?? 0.9)); ss.cancel(); ss.speak(u); } catch (e) {}
+  }
+  thunder() { this.noise(2.8, 220, 0.6, 0.55, 'lowpass'); this.noise(0.25, 1200, 0.8, 0.25, 'bandpass'); this.S('sf_low_frequency_explosion_', 0.5, { rate: 0.6, verb: 0.4 }); }
+  /* ---------- أجواء العوالم (من «الرحّال») ---------- */
+  amb(kind, vol = 0.35) {
+    if (!this.ctx) return; const a = this.ctx;
+    if (kind === this.ambKind) { if (this.ambGain) this.ambGain.gain.setTargetAtTime(vol, a.currentTime, 0.4); return; }
+    this.ambStop(); this.ambKind = kind; if (!kind) return;
+    const g = a.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(vol, a.currentTime, 0.9); g.connect(this.master); this.ambGain = g; this.ambNodes = [];
+    const noise = (type, freq, q, v) => { const s = a.createBufferSource(); s.buffer = this.noiseBuf; s.loop = true; const f = a.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 0.7; const gg = a.createGain(); gg.gain.value = v; s.connect(f); f.connect(gg); gg.connect(g); s.start(0, Math.random()); this.ambNodes.push(s); return { f, gg }; };
+    const osc = (type, freq, v) => { const o = a.createOscillator(); o.type = type; o.frequency.value = freq; const gg = a.createGain(); gg.gain.value = v; o.connect(gg); gg.connect(g); o.start(); this.ambNodes.push(o); return { o, gg }; };
+    const lfo = (param, rate, depth) => { const o = a.createOscillator(); o.frequency.value = rate; const gg = a.createGain(); gg.gain.value = depth; o.connect(gg); gg.connect(param); o.start(); this.ambNodes.push(o); };
+    const wind = (v) => { const n = noise('lowpass', 480, 0.8, v); lfo(n.f.frequency, 0.13, 260); lfo(n.gg.gain, 0.09, v * 0.5); };
+    const rain = (v) => { noise('bandpass', 1700, 0.5, v); noise('highpass', 4000, 0.5, v * 0.35); noise('lowpass', 350, 1, v * 0.4); };
+    const sea = (v) => { const w1 = noise('lowpass', 650, 0.6, v); lfo(w1.gg.gain, 0.11, v * 0.8); const w2 = noise('bandpass', 1200, 0.4, v * 0.35); lfo(w2.gg.gain, 0.08, v * 0.3); };
+    switch (kind) {
+      case 'storm': rain(0.5); wind(0.35); sea(0.3); break;
+      case 'rain': rain(0.45); break;
+      case 'wind': wind(0.4); break;
+      case 'breeze': wind(0.18); break;
+      case 'night': wind(0.12); { const c1 = osc('sine', 4200, 0.004); lfo(c1.gg.gain, 7, 0.004); const c2 = osc('sine', 3800, 0.003); lfo(c2.gg.gain, 5.3, 0.003); } break; // صراصير خفيفة
+      case 'dive': { const a1 = noise('lowpass', 220, 0.6, 0.45); lfo(a1.gg.gain, 0.07, 0.15); const b1 = noise('bandpass', 700, 0.8, 0.05); lfo(b1.gg.gain, 0.3, 0.04); } break;
+      case 'fire': wind(0.3); noise('highpass', 2500, 0.5, 0.06); { const r = noise('lowpass', 90, 1, 0.35); lfo(r.gg.gain, 0.2, 0.15); } break;
+      case 'scary': osc('sine', 55, 0.06); osc('sine', 58.3, 0.05); wind(0.25); break;
+      case 'city': noise('lowpass', 140, 1, 0.45); osc('sine', 52, 0.03); noise('bandpass', 900, 0.4, 0.05); wind(0.12); break; // زحمة بعيدة
+      default: wind(0.2);
+    }
+  }
+  ambStop() { (this.ambNodes || []).forEach((n) => { try { n.stop(); } catch (e) {} }); this.ambNodes = []; if (this.ambGain) { try { this.ambGain.disconnect(); } catch (e) {} } this.ambGain = null; this.ambKind = null; }
+  musicFile(n, vol = 0.5) {
+    if (!this.ctx || !this.buf || !this.buf[n]) { if (this.buf && !this.buf[n] && !this._mf) { this._mf = true; fetch(new URL('sfx/' + n + '.ogg', import.meta.url).href).then((r) => r.arrayBuffer()).then((ab) => new Promise((res, rej) => this.ctx.decodeAudioData(ab, res, rej))).then((b) => { this.buf[n] = b; this._mf = false; this.musicFile(n, vol); }).catch(() => { this._mf = false; }); } return; }
+    this.stopMusic(); const s = this.ctx.createBufferSource(), g = this.ctx.createGain(); s.buffer = this.buf[n]; s.loop = true; g.gain.value = vol; s.connect(g); g.connect(this.musBus); s.start(); this.musSrc = s;
   }
   toggle() { this.on = !this.on; if (this.master) this.master.gain.value = this.on ? 0.8 : 0; return this.on; }
   get t() { return this.ctx ? this.ctx.currentTime : 0; }
@@ -210,33 +286,33 @@ export class Sound {
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(f); f.connect(g); g.connect(this.sfxBus); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
   }
-  jump() { this.noise(0.18, 900, 0.8, 0.12, 'bandpass', 0, 2600); this.tone(220, 360, 0.12, 'triangle', 0.05); }
-  land(h = 1) { this.noise(0.12, 300, 0.7, 0.14 * h, 'lowpass'); }
-  step() { this.noise(0.05, 500 + Math.random() * 300, 1.2, 0.05, 'bandpass'); }
-  slash(i = 1) { this.noise(0.22, 1800 + i * 500, 1.5, 0.22, 'bandpass', 0, 500 + i * 200); this.tone(900 + i * 120, 400, 0.12, 'sawtooth', 0.025); }
-  hit() { this.noise(0.14, 260, 0.6, 0.35, 'lowpass'); this.tone(140, 60, 0.18, 'square', 0.12); this.tone(1400, 900, 0.08, 'triangle', 0.08); }
-  enemyDie() { this.tone(500, 60, 0.6, 'sawtooth', 0.12); this.noise(0.5, 1200, 0.6, 0.15, 'bandpass', 0, 200); }
+  jump() { if (this.S('cloth', 0.32, { rate: 1.2 })) { this.surfaceStep(0.3); return; } this.noise(0.18, 900, 0.8, 0.12, 'bandpass', 0, 2600); this.tone(220, 360, 0.12, 'triangle', 0.05); }
+  land(h = 1) { if (this.S('nf_land', 0.45 * h)) { this.surfaceStep(0.5 * h); return; } this.noise(0.12, 300, 0.7, 0.14 * h, 'lowpass'); }
+  step() { if (this.surfaceStep(0.4)) return; this.noise(0.05, 500 + Math.random() * 300, 1.2, 0.05, 'bandpass'); }
+  slash(i = 1) { if (this.S('swish', 0.5, { rate: 0.9 + i * 0.12 })) return; this.noise(0.22, 1800 + i * 500, 1.5, 0.22, 'bandpass', 0, 500 + i * 200); this.tone(900 + i * 120, 400, 0.12, 'sawtooth', 0.025); }
+  hit() { if (this.S('punch_h', 0.85)) { this.S('punch_m', 0.4, { delay: 0.02 }); return; } this.noise(0.14, 260, 0.6, 0.35, 'lowpass'); this.tone(140, 60, 0.18, 'square', 0.12); this.tone(1400, 900, 0.08, 'triangle', 0.08); }
+  enemyDie() { if (this.S('nf_kill', 0.55)) { this.S('soft_h', 0.7, { delay: 0.05 }); return; } this.tone(500, 60, 0.6, 'sawtooth', 0.12); this.noise(0.5, 1200, 0.6, 0.15, 'bandpass', 0, 200); }
   enemyAtk() { this.tone(160, 320, 0.3, 'sawtooth', 0.06); }
-  hurt() { this.tone(330, 160, 0.25, 'square', 0.12); this.noise(0.2, 600, 0.8, 0.2, 'lowpass'); }
+  hurt() { if (this.S('nf_hurt', 0.75)) { this.S('punch_m', 0.45); return; } this.tone(330, 160, 0.25, 'square', 0.12); this.noise(0.2, 600, 0.8, 0.2, 'lowpass'); }
   wallrun() { this.noise(0.4, 600, 0.6, 0.12, 'bandpass', 0, 1600); }
-  roll() { this.noise(0.3, 400, 0.6, 0.12, 'lowpass', 0, 1400); }
-  grab() { this.noise(0.08, 700, 1, 0.14, 'bandpass'); this.tone(300, 260, 0.08, 'triangle', 0.05); }
-  shard() { [0, 4, 7, 12].forEach((s, i) => this.tone(mtof(84 + s), 0, 0.5, 'triangle', 0.09, i * 0.06)); }
-  heart() { [0, 7, 12].forEach((s, i) => this.tone(mtof(76 + s), 0, 0.35, 'sine', 0.1, i * 0.07)); }
-  pickup() { this.tone(440, 880, 0.25, 'sine', 0.12); }
-  place() { this.tone(330, 0, 0.5, 'triangle', 0.15); this.tone(495, 0, 0.6, 'triangle', 0.12, 0.08); this.tone(660, 0, 0.8, 'sine', 0.1, 0.16); }
-  gate() { this.noise(1.6, 120, 0.5, 0.35, 'lowpass'); this.tone(80, 50, 1.6, 'sawtooth', 0.08); }
-  checkpoint() { [0, 5, 9, 12].forEach((s, i) => this.tone(mtof(72 + s), 0, 0.6, 'sine', 0.08, i * 0.09)); }
-  portal() { this.tone(200, 1200, 1.0, 'sine', 0.15); this.noise(1.0, 400, 2, 0.15, 'bandpass', 0, 3000); }
-  slam() { this.noise(0.5, 180, 0.5, 0.5, 'lowpass'); this.tone(90, 40, 0.5, 'square', 0.18); }
-  win() { [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(mtof(67 + s), 0, 0.8, 'triangle', 0.08, i * 0.1)); }
-  crumble() { this.noise(0.6, 200, 0.5, 0.25, 'lowpass', 0, 80); }
+  roll() { if (this.S('cloth', 0.5, { rate: 0.8 })) return; this.noise(0.3, 400, 0.6, 0.12, 'lowpass', 0, 1400); }
+  grab() { if (this.S('cloth_belt', 0.6)) return; this.noise(0.08, 700, 1, 0.14, 'bandpass'); this.tone(300, 260, 0.08, 'triangle', 0.05); }
+  shard() { if (this.S('nf_gem', 0.7, { verb: 0.25 })) { this.S('dg_power_up_7', 0.3, { delay: 0.06, verb: 0.4 }); return; } [0, 4, 7, 12].forEach((s, i) => this.tone(mtof(84 + s), 0, 0.5, 'triangle', 0.09, i * 0.06)); }
+  heart() { if (this.S('dg_power_up_3', 0.5, { verb: 0.3 })) return; [0, 7, 12].forEach((s, i) => this.tone(mtof(76 + s), 0, 0.35, 'sine', 0.1, i * 0.07)); }
+  pickup() { if (this.S('handle_coins', 0.55)) return; this.tone(440, 880, 0.25, 'sine', 0.12); }
+  place() { if (this.S('bell', 0.4, { verb: 0.5 })) return; this.tone(330, 0, 0.5, 'triangle', 0.15); this.tone(495, 0, 0.6, 'triangle', 0.12, 0.08); this.tone(660, 0, 0.8, 'sine', 0.1, 0.16); }
+  gate() { if (this.S('sf_door_open_', 0.8, { rate: 0.7 })) { this.S('metal_h', 0.5, { rate: 0.55, verb: 0.3 }); return; } this.noise(1.6, 120, 0.5, 0.35, 'lowpass'); this.tone(80, 50, 1.6, 'sawtooth', 0.08); }
+  checkpoint() { if (this.S('dg_power_up_11', 0.45, { verb: 0.35 })) return; [0, 5, 9, 12].forEach((s, i) => this.tone(mtof(72 + s), 0, 0.6, 'sine', 0.08, i * 0.09)); }
+  portal() { if (this.S('sf_force_field_', 0.7)) { this.S('dg_phase_jump_2', 0.45, { delay: 0.15, verb: 0.4 }); return; } this.tone(200, 1200, 1.0, 'sine', 0.15); this.noise(1.0, 400, 2, 0.15, 'bandpass', 0, 3000); }
+  slam() { if (this.S('sf_low_frequency_explosion_', 0.8)) { this.S('mine', 0.6); return; } this.noise(0.5, 180, 0.5, 0.5, 'lowpass'); this.tone(90, 40, 0.5, 'square', 0.18); }
+  win() { if (this.S('nf_level_up', 0.65, { verb: 0.3 })) { this.S('vo_mission_completed', 0.9, { delay: 0.9, rv: 0 }); return; } [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => this.tone(mtof(67 + s), 0, 0.8, 'triangle', 0.08, i * 0.1)); }
+  crumble() { if (this.S('mine', 0.7, { rate: 0.8 })) return; this.noise(0.6, 200, 0.5, 0.25, 'lowpass', 0, 80); }
   music(name) {
     this.stopMusic(); if (!this.ctx || !MUSIC[name]) return;
     const cfg = MUSIC[name], spb = 60 / cfg.bpm / 2; let step = 0, next = this.ctx.currentTime + 0.15;
     this.musTimer = setInterval(() => { if (!this.ctx) return; while (next < this.ctx.currentTime + 0.35) { this.mstep(cfg, step, next, spb); next += spb; step++; } }, 90);
   }
-  stopMusic() { clearInterval(this.musTimer); }
+  stopMusic() { clearInterval(this.musTimer); if (this.musSrc) { try { this.musSrc.stop(); } catch (e) {} this.musSrc = null; } }
   mnote(m, t, dur, type, vol, dest, attack = 0.01) {
     const c = this.ctx, o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = mtof(m);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);

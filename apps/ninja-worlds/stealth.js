@@ -69,7 +69,7 @@ export class Stealth {
     if (this.dragging) {
       if (this.throwBody(this.dragging)) return true;
       const lk = this.nearLocker(1.9);
-      if (lk && !lk.body) { const e = this.dragging; lk.body = e; lk.openT = 1; e.hidden = true; e.m.g.visible = false; e.st = 'sleep'; e.sleepT = 1e9; this.dragging = null; P.dragging = false; this.c.sfx.tone(160, 90, 0.4, 'square', 0.12); this.c.say('🗄️ خبّيته بالخزانة — محد بيلقاه.'); this.c.addCoins(5, P.pos); return true; }
+      if (lk && !lk.body) { const e = this.dragging; lk.body = e; lk.openT = 1; e.hidden = true; e.m.g.visible = false; e.st = 'sleep'; e.sleepT = 1e9; this.dragging = null; P.dragging = false; this.c.sfx.locker(); this.c.sfx.S('soft_h', 0.6); this.c.say('🗄️ خبّيته بالخزانة — محد بيلقاه.'); this.c.addCoins(5, P.pos); return true; }
       this.drop(); return true;
     }
     const e = this.c.enemies.list.find((x) => x.ship && x.alive && x.st === 'sleep' && !x.hidden && x.pos.distanceTo(P.pos) < 1.8);
@@ -139,7 +139,7 @@ export class Stealth {
         f.done = true; const sp = e.pos.clone(); sp.y = -3;
         this.c.sparks.emit(sp, { color: 0xe0f2fe, count: 40, speed: 6, up: 6, life: 0.9, size: 0.35, grav: 9 });
         this.c.sparks.emit(sp, { color: 0x7dd3fc, count: 20, speed: 3, up: 3, life: 1.2, size: 0.5, grav: 6 });
-        this.c.sfx.noise(0.6, 300, 0.6, 0.3, 'lowpass'); this.c.sfx.noise(0.4, 1400, 0.8, 0.12, 'bandpass', 0.08);
+        this.c.sfx.splash(sp);
         e.m.g.removeFromParent(); e.gone = true;
       }
     }
@@ -197,16 +197,16 @@ export class Stealth {
   }
   drop() { if (this.dragging) { this.dragging.st = 'sleep'; this.dragging = null; } if (this.c.player) this.c.player.dragging = false; }
   nearLocker(r) { const P = this.c.player; let best = null, bd = r; for (const lk of this.L.lockers || []) { const d = Math.hypot(lk.front.x - P.pos.x, lk.front.z - P.pos.z); if (d < bd && Math.abs(lk.pos.y - P.pos.y) < 1) { bd = d; best = lk; } } return best; }
-  enterLocker(lk) { const P = this.c.player; this.exitAim(); lk.openT = 1; P.inLocker = lk; lk.player = true; P.vel.set(0, 0, 0); P.lockerBack = P.pos.clone(); P.pos.copy(lk.front); this.c.sfx.tone(140, 110, 0.25, 'square', 0.1); this.c.say('🗄️ مختبئ بالخزانة — الحرّاس ما يشوفونك. اضغط ✋ تطلع.'); }
-  leaveLocker(silent) { const P = this.c.player; if (!P || !P.inLocker) return; P.inLocker.openT = 1; P.inLocker.player = false; P.inLocker = null; if (!silent) this.c.sfx.tone(140, 180, 0.2, 'square', 0.08); }
+  enterLocker(lk) { const P = this.c.player; this.exitAim(); lk.openT = 1; P.inLocker = lk; lk.player = true; P.vel.set(0, 0, 0); P.lockerBack = P.pos.clone(); P.pos.copy(lk.front); this.c.sfx.locker(); this.c.say('🗄️ مختبئ بالخزانة — الحرّاس ما يشوفونك. اضغط ✋ تطلع.'); }
+  leaveLocker(silent) { const P = this.c.player; if (!P || !P.inLocker) return; P.inLocker.openT = 1; P.inLocker.player = false; P.inLocker = null; if (!silent) this.c.sfx.locker(); if (false) this.c.sfx.tone(140, 180, 0.2, 'square', 0.08); }
   /* ---------- shooting ---------- */
   shoot() {
     const w = this.weapon;
     if (this.ammo[w] <= 0) { this.c.sfx.tone(300, 300, 0.05, 'square', 0.06); this.c.say(w === 'pistol' ? '🎯 خلصت أسهم المسدس — دوّر صناديق زرقاء' : '🎯 خلصت أسهم القنّاصة — دوّر صناديق خضراء'); return; }
     if (w === 'sniper' && this.boltT > 0) return; // لسا يلقّم
-    this.ammo[w]--; this.hud(); this.recoil += w === 'sniper' ? 0.055 : 0.02; if (w === 'sniper') { this.boltT = 1.15; setTimeout(() => { this.c.sfx.noise(0.08, 2200, 3, 0.1, 'bandpass'); this.c.sfx.noise(0.07, 1600, 3, 0.1, 'bandpass', 0.18); }, 480); }
+    this.ammo[w]--; this.hud(); this.recoil += w === 'sniper' ? 0.055 : 0.02; if (w === 'sniper') { this.boltT = 1.15; setTimeout(() => this.c.sfx.bolt(), 480); }
     const cam = this.c.camera, o = cam.getWorldPosition(new V()), dir = cam.getWorldDirection(new V());
-    this.c.sfx.noise(0.12, w === 'sniper' ? 900 : 1500, 1.2, 0.22, 'bandpass', 0, 300); this.c.sfx.tone(w === 'sniper' ? 180 : 260, 90, 0.1, 'triangle', 0.08);
+    this.c.sfx.shot(w === 'sniper');
     const far = w === 'sniper' ? 420 : 200, ray = new THREE.Raycaster(o, dir, 0.1, far), hits = ray.intersectObjects(this.L.camMeshes, false), wall = hits.length ? hits[0].distance : far;
     let best = null, bt = wall;
     for (const e of this.c.enemies.list) {

@@ -247,7 +247,8 @@ export class Enemies {
     this.g.onGuardSlept && this.g.onGuardSlept(e);
   }
   noise(pos, r) {
-    for (const e of this.list) if (e.ship && e.alive && !e.alert && (e.st === 'idle' || e.st === 'chase' || e.st === 'inv') && e.pos.distanceTo(pos) < r) { e.st = 'inv'; e.invPos = pos.clone(); e.invT = 0; }
+    let first = null; for (const e of this.list) if (e.ship && e.alive && !e.alert && (e.st === 'idle' || e.st === 'chase' || e.st === 'inv') && e.pos.distanceTo(pos) < r) { if (e.st !== 'inv' && !first) first = e; e.st = 'inv'; e.invPos = pos.clone(); e.invT = 0; }
+    if (first && this.g.onHeard) this.g.onHeard(first);
   }
   lookForBodies(e) {
     for (const o of this.list) {

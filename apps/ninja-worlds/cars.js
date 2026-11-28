@@ -115,7 +115,7 @@ export class Cars {
     }
     return hit;
   }
-  crash(c, s) { if (c.cool > 0) return; c.cool = 0.4; this.g.sfx.noise(0.3, 300, 0.7, Math.min(0.4, s / 60), 'lowpass'); this.g.sfx.tone(120, 60, 0.15, 'square', Math.min(0.12, s / 200)); if (c === this.driving) this.g.shake(Math.min(0.5, s / 40)); this.g.fx.emit(c.pos.clone().add(new V(0, 0.8, 0)), { color: 0xfde68a, count: Math.min(30, s | 0), speed: 4, life: 0.4, size: 0.18 }); }
+  crash(c, s) { if (c.cool > 0) return; c.cool = 0.4; if (this.g.sfx.crash) this.g.sfx.crash(Math.min(1, s / 25), c.pos); else this.g.sfx.noise(0.3, 300, 0.7, Math.min(0.4, s / 60), 'lowpass'); if (c === this.driving) this.g.shake(Math.min(0.5, s / 40)); this.g.fx.emit(c.pos.clone().add(new V(0, 0.8, 0)), { color: 0xfde68a, count: Math.min(30, s | 0), speed: 4, life: 0.4, size: 0.18 }); }
   /* -------- سواقة اللاعب -------- */
   drive(c, dt, inp) {
     const thr = inp.iy || 0, st = inp.ix || 0, hand = inp.jumpH, nitro = inp.rollH && c.nitro > 0.02;
@@ -130,6 +130,7 @@ export class Cars {
       c.steer += (-st - c.steer) * Math.min(1, dt * 8); c.yaw += c.steer * rate * dt;
       c.spin += (hand && Math.abs(c.speed) > 8 ? c.steer * 0.5 : 0 - c.spin) * Math.min(1, dt * 4); // ميلان التفحيط
     }
+    if (nitro && !c.nitroOn && this.g.sfx.nitro) this.g.sfx.nitro(); c.nitroOn = nitro;
     if (nitro) { c.nitro = Math.max(0, c.nitro - dt / 3.5); if (Math.random() < 0.6) this.g.fx.emit(c.pos.clone().add(new V(-Math.sin(c.yaw) * 2.3, 0.5, -Math.cos(c.yaw) * 2.3)), { color: 0x7dd3fc, count: 3, speed: 2, life: 0.3, size: 0.35 }); }
     else c.nitro = Math.min(1, c.nitro + dt / 9);
     if (hand && Math.abs(c.speed) > 10 && Math.abs(c.steer) > 0.4 && Math.random() < 0.5) this.g.fx.emit(c.pos.clone().add(new V(0, 0.2, 0)), { color: 0x9ca3af, count: 2, speed: 1.5, life: 0.8, size: 0.6, grav: -0.5 });

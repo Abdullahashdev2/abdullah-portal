@@ -157,6 +157,9 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 const sparks = new Particles(900, true), dust = new Particles(400, false), motes = new Particles(500, true);
 scene.add(sparks.points, dust.points, motes.points);
 const sfx = new Sound();
+const SURF = { hub: 'conc', w1: 'conc', w2: 'grass', w3: 'snow', w4: 'conc', w5: 'conc', w6: 'conc', w7: 'metal', w8: 'conc' };
+const AMB = { hub: 'breeze', w1: 'breeze', w2: 'wind', w3: 'wind', w4: 'breeze', w5: 'night', w6: 'fire', w7: 'storm', w8: 'city' };
+const ROOM = { w5: 0.2, w7: 0.12, w1: 0.12 };
 addEventListener('resize', resize); resize();
 
 /* ---------------- game object shared with modules ---------------- */
@@ -182,14 +185,15 @@ const G = {
   splash: (p) => { sfx.noise(0.35, 900, 0.6, 0.22, 'bandpass', 0, 300); sparks.emit(p, { color: 0xd8f6ff, count: 26, speed: 4, up: 1.5, life: 0.6, size: 0.25, grav: 9 }); },
   playerHidden: () => { if (player.inLocker) return 'locker'; if (!level.shadows) return false; const p = player.pos, hs = Math.hypot(player.vel.x, player.vel.z); return hs < 4.8 && level.shadows.some((z) => p.x > z.x0 && p.x < z.x1 && p.z > z.z0 && p.z < z.z1 && Math.abs(p.y - z.y) < 0.6); },
   onAlarm: () => { level.alarms = (level.alarms || 0) + 1; sfx.tone(880, 660, 0.25, 'square', 0.12); sfx.tone(880, 660, 0.25, 'square', 0.12, 0.3); if (level.alarms <= 3) say('🚨 انكشفت! الحارس شافك — حاربه أو اهرب للظل.'); },
-  onRadio: (e) => stealth.radioDone(e),
+  onRadio: (e) => { sfx.voice(Math.random() < 0.5 ? 'call_for_backup' : 'cover_me', e.pos); stealth.radioDone(e); },
   tryGrab: () => stealth.tryGrab(),
+  onHeard: (e) => { if (Math.random() < 0.7) sfx.speak(['مين هناك؟', 'سمعت شي…', 'وش هالصوت؟', 'فيه أحد؟'][Math.floor(Math.random() * 4)], { pitch: 0.7, vol: Math.max(0.25, 1 - e.pos.distanceTo(player.pos) / 30) }); },
   onEdgeHang: () => { if (!level._edgeTip) { level._edgeTip = true; say('🧗 متعلّق برّا السفينة — الحراس ما يشوفونك! تحرّك يمين/يسار على طول الحافة، واقفز (أو ادفع للجدار) عشان تطلع.'); } },
   say: (t) => say(t),
   onCaptainDown: (e, how) => captainDown(e, how),
   disguised: () => stealth.disguisedInfo(),
-  onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.12); stealth.spotted(e, search); },
-  onBodyFound: () => stealth.bodyFound(),
+  onSpotted: (e, search) => { sfx.tone(980, 980, 0.18, 'square', 0.08); if (Math.random() < 0.55) sfx.voice(['look_out', 'target_engaged', 'watch_my_back'][Math.floor(Math.random() * 3)], e.pos); else sfx.speak(['وقف! مين أنت؟!', 'هناك! شفته!', 'دخيل!'][Math.floor(Math.random() * 3)], { pitch: 0.7 }); stealth.spotted(e, search); },
+  onBodyFound: (e) => { sfx.speak('في واحد طايح هنا!', { pitch: 0.7 }); sfx.voice('medic', e && e.pos); stealth.bodyFound(); },
   onGuardWoke: () => stealth.guardWoke(),
   onGuardSlept: (e) => { if (!e.sleptOnce) { e.sleptOnce = true; addCoins(4, e.pos); } },
   onTakedown: (e) => { level.takedowns = (level.takedowns || 0) + 1; sfx.tone(300, 120, 0.3, 'triangle', 0.15); sparks.emit(e.pos.clone().add(new V(0, 1.2, 0)), { color: 0xa78bfa, count: 30, speed: 4, life: 0.6 }); if (level.takedowns <= 2) say('🤫 ضربة صامتة! محد سمع شي.'); },
@@ -217,7 +221,7 @@ function computeUpg() {
 }
 function addCoins(n, at) {
   if (!n) return; SAVE.coins = Math.max(0, (SAVE.coins || 0) + n); persist(); hudUpdate();
-  if (n > 0) { sfx.tone(1320, 1760, 0.12, 'square', 0.05); if (at) sparks.emit(at.clone().add(new V(0, 1.2, 0)), { color: 0xffd23f, count: Math.min(30, 6 + n), speed: 3, up: 1.5, life: 0.6, size: 0.22, grav: 5 }); }
+  if (n > 0) { sfx.coin(); if (at) sparks.emit(at.clone().add(new V(0, 1.2, 0)), { color: 0xffd23f, count: Math.min(30, 6 + n), speed: 3, up: 1.5, life: 0.6, size: 0.22, grav: 5 }); }
   const c = $('#coins'); c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
 }
 function renderShop() {
@@ -258,6 +262,7 @@ function loadWorld(id, from) {
   level.say = (t) => say(t); level.sfx = (n) => sfx[n] && sfx[n](); level.shake = (a) => G.shake(a); level.spawnGroup = spawnGroup; level.spawned = {};
   const K = makeKit(level); cfg = level.cfg = WORLDS[id](K, level, SAVE);
   // السفينة أثقل عالم: على الجوال نبدأ فيها بجودة «متوسطة» (بدون bloom وMSAA) والتلقائي يرفعها لو الجوال قدر
+  sfx.ear = camera; sfx.surface = SURF[cfg.id] || 'conc'; sfx.room = ROOM[cfg.id] || 0; if (sfx.ctx) { sfx.amb(AMB[cfg.id] || 'breeze'); }
   setSpy(hero, !!(cfg.ship || cfg.city), cfg.city ? 'street' : 'spy'); player.spy = !!cfg.ship; hero.sword.visible = !(cfg.ship || cfg.city);
   for (const d of level.carDefs || []) cars.spawn(d); // في السفينة: بدلة تجسس وقتال بالأيدي
   if (cfg.ship && matchMedia('(pointer: coarse)').matches && qMode === 'auto' && !LITE && qLevel < 2) applyQuality(2);
@@ -524,7 +529,7 @@ $('#pHQ').onclick = () => { if (qMode === 'auto') qMode = 0; else if (qMode < QL
 $('#pUpg').onclick = () => { renderShop(); $('#upgList').classList.toggle('on'); };
 $('#startBtn').onclick = () => {
   if (STREAM) { let pc = null; try { pc = window.parent.__padAudio; } catch (e) {} sfx.init(pc || undefined, true); } else sfx.init(); started = true; $('#title').classList.add('off'); setTimeout(() => $('#title').remove(), 900);
-  sfx.music(cfg.music); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
+  sfx.music(cfg.music); sfx.ear = camera; sfx.amb(AMB[cfg.id] || 'breeze'); $('#hudWrap').classList.add('on'); if (TOUCH) $('#touch').classList.add('on');
   try { if (TOUCH && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
   if (RESUME && RESUME !== worldId) { const r = RESUME; RESUME = null; setTimeout(() => goWorld(r, null), 300); }
   setTimeout(() => { const t = level.triggers.find((t) => !t.fired && Math.hypot(t.pos.x - player.pos.x, t.pos.z - player.pos.z) < t.r); if (t) { t.fired = true; say(t.text); } }, 900);
@@ -567,7 +572,7 @@ function canGrab() {
 function knockWall() {
   if (knockCd > 0) return; knockCd = 0.6;
   const H = player.hug, at = player.pos.clone().addScaledVector(H.n, 0.4); at.y = player.pos.y;
-  for (let i = 0; i < 2; i++) { sfx.tone(180 - i * 20, 120, 0.07, 'square', 0.12, i * 0.13); sfx.noise(0.06, 700, 2, 0.22, 'bandpass', i * 0.13); }
+  sfx.knock();
   enemies.noise(at, 10); sparks.emit(player.pos.clone().add(new V(0, 1.1, 0)).addScaledVector(H.n, -0.3), { color: 0xcbd5e1, count: 6, speed: 1.5, life: 0.3, size: 0.15 });
   if (!level._knockTip) { level._knockTip = true; say('🤜 طقّيت على الحديد — أقرب حارس بيجي يشوف وش الصوت. اختبئ واستغل اللحظة!'); }
 }
@@ -601,7 +606,7 @@ function interact() {
     const c = cars.nearest(player.pos, 3.3); if (c && !player.carry) { cars.enter(c, player); if (!level._driveTip) { level._driveTip = true; say('🚗 العصا: فوق = بنزين، تحت = فرامل/رجوع، يمين/يسار = دركسون • 🅿️ = فرامل يد (تفحيط) • 💨 = نيترو • 📯 = بوري • ✋ = انزل'); } return; }
   }
   for (const P of level.panels || []) if (!P.done && Math.hypot(P.front.x - player.pos.x, P.front.z - player.pos.z) < 1.5 && Math.abs(P.pos.y - player.pos.y) < 1.2) {
-    P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.tone(600, 200, 0.4, 'sawtooth', 0.1); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
+    P.done = true; P.scr.material.color.setHex(0xef4444); P.gl.material.color.setHex(0xef4444); sfx.panel(); sparks.emit(P.pos.clone().add(new V(0, 1.1, 0)), { color: 0xfde68a, count: 30, speed: 4, life: 0.5 });
     const all = level.panels.filter((x) => x.group === P.group), left = all.filter((x) => !x.done).length;
     say(left ? `⚙️ ${P.label} — باقي ${left}` : `⚙️ ${P.label} — خلصت الكل!`); if (!left && level.onPanels && level.onPanels[P.group]) level.onPanels[P.group]();
     return;
@@ -823,7 +828,7 @@ let swellT = 0, waveNext = 40, waveWarn = 0, waveHit = 0;
 function shipDeckOutdoor(p) { return p.y > -0.6 && p.y < 1.6 && !(p.z > 117 && p.z < 157 && Math.abs(p.x) < 9); }
 function captainDown(e, how) {
   if (level.captainDown) return; level.captainDown = true; level.complete = true; if (level.exitPortal) level.exitPortal.setActive(true);
-  addCoins(100, player.pos); sfx.win && sfx.win(); G.shake(0.4);
+  addCoins(100, player.pos); sfx.stopMusic(); sfx.music(cfg.music); sfx.win && sfx.win(); G.shake(0.4);
   say(how === 'sea' ? '⚓🌊 رميت القائد «عاصفة» في البحر!! السفينة صارت لك — المروحية تنتظرك على المهبط 🚁' : '⚓😴 القائد «عاصفة» نام! السفينة صارت لك — المروحية تنتظرك على المهبط 🚁');
 }
 function captainLogic() {
@@ -831,6 +836,7 @@ function captainLogic() {
   if (player.pos.z > 200 && player.pos.y > -0.6 && player.pos.y < 2) {
     level.capSpawned = true; const c = cfg.captain;
     const e = enemies.spawn({ x: c.x, y: c.y, z: c.z, type: 'guard', alert: true, zone: c.zone, captain: true }); e.yaw = Math.PI;
+    sfx.musicFile('mus_battle', 0.55); sfx.speak('توقّعتك تجي… محد يطلع من سفينتي.', { pitch: 0.55, rate: 0.9 });
     say('⚓ «عاصفة»: «توقّعتك تجي… محد يطلع من سفينتي.» — صوّب على راسه (٣ رؤوس تنيّمه)، ولما يعبّي سلاحه أو تضرب الموجة: امسكه من الخلف وارمه في البحر!');
     sfx.tone(110, 80, 1.2, 'sawtooth', 0.12); G.shake(0.3);
   }
@@ -838,7 +844,7 @@ function captainLogic() {
 function waveLogic(dt) {
   if (!cfg || !cfg.ship || !started) { level && (level.waveHit = 0); return; }
   swellT += dt;
-  if (waveWarn > 0) { waveWarn -= dt; if (waveWarn <= 0) { waveHit = 1.8; G.shake(0.5); sfx.noise(1.6, 180, 0.5, 0.35, 'lowpass'); sfx.noise(1.2, 900, 0.4, 0.12, 'bandpass', 0.2);
+  if (waveWarn > 0) { waveWarn -= dt; if (waveWarn <= 0) { waveHit = 1.8; G.shake(0.5); sfx.voice(Math.random() < 0.5 ? 'hold' : 'get_down', player.pos, 0.6); sfx.S('soft_h', 1, { rate: 0.5 }); sfx.S('metal_h', 0.6, { rate: 0.5, delay: 0.1 }); sfx.noise(1.6, 180, 0.5, 0.35, 'lowpass'); sfx.noise(1.2, 900, 0.4, 0.12, 'bandpass', 0.2);
       for (let i = 0; i < 4; i++) sparks.emit(new V(Math.sign(Math.random() - 0.5) * 15.5, 1.5, player.pos.z + (Math.random() - 0.5) * 20), { color: 0xe0f2fe, count: 30, speed: 7, up: 7, life: 1, size: 0.4, grav: 8 }); } }
   else if (waveHit > 0) waveHit -= dt;
   else if ((waveNext -= dt) <= 0) { waveNext = 45 + Math.random() * 30; waveWarn = 2.4; say('🌊 موجة كبيرة جاية! تمسّك… أو استغلها: الحراس على السطح بيتمسكون وما بيشوفون شي'); sfx.tone(90, 60, 2.2, 'sine', 0.12); }
@@ -870,13 +876,13 @@ function worldLogic(dt) {
     if (near && !ok && !D.warned) { D.warned = true; say('🔒 الباب مقفول — يحتاج «' + D.lock + '»'); sfx.tone(220, 180, 0.15, 'square', 0.08); }
     if (!near) D.warned = false;
     const was = D.open; D.open += ((want ? 1 : 0) - D.open) * Math.min(1, dt * 7);
-    if ((was < 0.05 && D.open >= 0.05) || (was > 0.95 && D.open <= 0.95 && !want)) sfx.noise(0.35, 500, 0.8, 0.08, 'bandpass', 0, 1400);
+    if ((was < 0.05 && D.open >= 0.05) || (was > 0.95 && D.open <= 0.95 && !want)) sfx.door(D.open > was, D.pos);
     D.b.mesh.position.y = D.base + D.open * (D.h - 0.15); D.b.active = D.open < 0.55;
     if (ok && D.lock) D.stripe.material.color.setHex(0x4ade80);
   }
   // keycards
-  for (const C of level.cards || []) if (!C.taken && C.pos.distanceTo(new V(p.x, p.y + 0.8, p.z)) < 1.3) { C.taken = true; C.g.removeFromParent(); level.keys[C.name] = true; sfx.pickup(); say('🗝️ أخذت «' + C.name + '»'); }
-  if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.noise(2.2, 90, 0.4, 0.5, 'lowpass', 0, 40), 400 + Math.random() * 900); }
+  for (const C of level.cards || []) if (!C.taken && C.pos.distanceTo(new V(p.x, p.y + 0.8, p.z)) < 1.3) { C.taken = true; C.g.removeFromParent(); level.keys[C.name] = true; sfx.keycard(); say('🗝️ أخذت «' + C.name + '»'); }
+  if (cfg.storm) { stormT -= dt; if (stormT < 0) { stormT = 6 + Math.random() * 9; flash = 1; setTimeout(() => sfx.thunder(), 400 + Math.random() * 900); }
     flash = Math.max(0, flash - dt * 5); hemi.intensity = cfg.hemi[2] * (1 + 4 * flash * (flash > 0.6 || flash < 0.35 ? 1 : 0.3));
     if (level.rainMesh) { level.rainMesh.position.set(p.x, p.y - 4, p.z); level.rainMesh.visible = !cam.roof && !underRoof(); } }
   // checkpoints
@@ -1043,14 +1049,14 @@ function frame(now) {
   if (LITE && lock30) { skipFrame = !skipFrame; if (skipFrame) return; }
   // underwater look
   const cw = G.waterAt(camera.position), uw = !!(cw && camera.position.y < cw.y1);
-  scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw);
+  scene.fog = uw ? waterFog : normalFog; $('#uw').classList.toggle('on', uw); if (sfx.ctx && uw !== sfx._uw) { sfx._uw = uw; sfx.amb(uw ? 'dive' : (AMB[cfg.id] || 'breeze')); }
   renderFrame();
   if (STREAM && now - streamLast >= 1000 / streamFps - 4) { streamLast = now; streamDraw(); }
 }
 requestAnimationFrame(frame);
 
 /* ---------------- debug / test hooks ---------------- */
-window.__G = { scene, renderer, wave: () => { waveNext = 0; },
+window.__G = { scene, renderer, sfx, wave: () => { waveNext = 0; },
   get player() { return player; }, setLite: (v) => { LITE = v; applyLite(); }, get lite() { return { on: LITE, lvl: liteLvl, lock30, fps: fpsAvg }; }, get skin() { return skin; }, THREE, get stealth() { return stealth; }, updateCam: () => { player.animate(1 / 60); updateCamera(1 / 60); camera.updateMatrixWorld(true); }, get level() { return level; }, get enemies() { return enemies; }, get cam() { return cam; }, SAVE: () => SAVE,
   load: (id) => loadWorld(id, null), tp: (x, y, z, yaw = 0) => { player.spawn(new V(x, y, z), yaw); cam.yaw = yaw; scarf.init = false; },
   virt: (v) => { __virt = v; },
